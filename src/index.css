@@ -387,6 +387,33 @@ small {
   gap: 15px;
   margin-left: auto;
 }
+.language-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 3px;
+  border: 1px solid #e7e9f0;
+  border-radius: 9px;
+  background: #f7f8fb;
+}
+.language-switch button {
+  min-width: 27px;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 6px;
+  color: #8993a2;
+  background: transparent;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1;
+  cursor: pointer;
+}
+.language-switch button.active {
+  color: #5548c7;
+  background: #fff;
+  box-shadow: 0 1px 3px #20294414;
+}
 .project-pill {
   display: flex;
   align-items: center;
@@ -3647,7 +3674,13 @@ small {
   display: grid;
   place-items: center;
   padding: 36px clamp(28px, 5vw, 80px);
+  position: relative;
   z-index: 1;
+}
+.language-switch-auth {
+  position: absolute;
+  top: 20px;
+  right: clamp(28px, 5vw, 80px);
 }
 .auth-panel {
   width: min(100%, 440px);
@@ -5780,6 +5813,10 @@ small {
     padding: 28px 22px;
     background:
       radial-gradient(ellipse at 85% 0%, #eae8ff 0, transparent 38%), #f8f9fc;
+  }
+  .language-switch-auth {
+    top: 17px;
+    right: 20px;
   }
   .auth-mobile-brand {
     display: flex;

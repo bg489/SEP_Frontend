@@ -1227,7 +1227,7 @@ function ReviewQueue({
                 <p>{failure.rootCause}</p>
                 <span className="review-tags">
                   <span className="confidence-chip">
-                    {Math.round(failure.confidence * 100)}% confidence
+                    {Math.round(failure.confidence)}% confidence
                   </span>
                   <small>
                     {failure.evidence.length} evidence points ·{" "}
@@ -1374,7 +1374,7 @@ function ReviewQueue({
               </div>
               <div>
                 <small>Model confidence</small>
-                <b>{Math.round(inspectingFailure.confidence * 100)}%</b>
+                <b>{Math.round(inspectingFailure.confidence)}%</b>
               </div>
             </div>
             <div className="review-evidence-list">

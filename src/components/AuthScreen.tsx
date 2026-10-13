@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Icon } from "./Icon";
+import { LanguageSwitcher } from "../i18n";
 import type { DemoUser, UserRole } from "../types";
 
 type AuthMode = "login" | "register" | "forgot";
@@ -171,6 +172,7 @@ export function AuthScreen({
       </section>
 
       <section className="auth-panel-wrap">
+        <LanguageSwitcher className="language-switch-auth" />
         <form className="auth-panel" onSubmit={submit}>
           <div className="auth-mobile-brand brand">
             <div className="brand-mark">

@@ -2,7 +2,7 @@
 
 **AutoScenarioX — Scenario Management and Explainable Failure Analytics**
 
-This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface follows the English terminology in the Software Requirements Specification.
+This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser.
 
 The app starts in **mock mode**. Its API boundary is designed so the frontend can later use the .NET REST API without coupling screen components to HTTP or Supabase.
 
@@ -15,7 +15,7 @@ The app starts in **mock mode**. Its API boundary is designed so the frontend ca
 | **Test Reviewer** | Overview, scenario approval queue, failure evidence and root-cause review, run details, campaign reports, profile |
 | **Administrator** | Overview, user and role management, simulation nodes, test-oracle rules, analytics settings, audit log, profile |
 
-The sign-in screen also includes registration and forgot-password views. After signing in, use the role selector in the top bar to preview each role's navigation and screens.
+The sign-in screen also includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. After signing in, use the role selector in the top bar to preview each role's navigation and screens.
 
 ## Run locally
 

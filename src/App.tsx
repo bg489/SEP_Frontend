@@ -8,6 +8,7 @@ import {
 import { Icon, type IconName } from "./components/Icon";
 import { AuthScreen } from "./components/AuthScreen";
 import { RolePages, RoleWelcome } from "./components/RolePages";
+import { LanguageProvider, LanguageSwitcher } from "./i18n";
 import { api, isMockMode } from "./services/api";
 import {
   mockCampaigns,
@@ -225,6 +226,14 @@ const dashboardLinks: Record<
 };
 
 export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+}
+
+function AppContent() {
   const [user, setUser] = useState<DemoUser | null>(() => {
     try {
       return JSON.parse(
@@ -666,6 +675,7 @@ export default function App() {
               </span>
               <Icon name="chevron" size={13} />
             </button>
+            <LanguageSwitcher />
             <button className="sign-out-button" onClick={signOut}>
               Sign out
             </button>
@@ -759,7 +769,6 @@ export default function App() {
             <Campaigns
               campaigns={campaigns}
               scenarios={scenarios}
-              notify={notify}
               onNavigate={navigate}
               onOpenCampaign={(id) => {
                 setSelectedCampaignId(id);
@@ -1652,13 +1661,11 @@ function ScenarioLibrary({
 function Campaigns({
   campaigns,
   scenarios,
-  notify,
   onNavigate,
   onOpenCampaign,
 }: {
   campaigns: Campaign[];
   scenarios: Scenario[];
-  notify: (s: string) => void;
   onNavigate: (page: Page) => void;
   onOpenCampaign: (id: string) => void;
 }) {
