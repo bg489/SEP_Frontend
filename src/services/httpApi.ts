@@ -1,6 +1,9 @@
 import type {
   AutoScenarioApi,
   Campaign,
+  CarlaIntegrationConfig,
+  AnalyticsPreferences,
+  AuditEvent,
   CreateCampaignInput,
   CreateScenarioInput,
   OracleRule,
@@ -9,6 +12,7 @@ import type {
   ScenarioFilters,
   ScenarioStatus,
   ScenarioVersionRecord,
+  ScenarioRun,
   FailureCluster,
   WorkerNode,
 } from "../types";
@@ -31,7 +35,15 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       },
     });
     if (!response.ok) {
-      const message = await response.text().catch(() => "");
+      const body = await response.text().catch(() => "");
+      let message = body;
+      try {
+        const payload = JSON.parse(body) as { message?: unknown; title?: unknown };
+        if (typeof payload.message === "string") message = payload.message;
+        else if (typeof payload.title === "string") message = payload.title;
+      } catch {
+        // Keep plain-text API errors readable.
+      }
       throw new Error(
         message || "Request failed with status " + response.status,
       );
@@ -42,6 +54,27 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
 
   getOverview() {
     return this.request<OverviewData>("/api/dashboard/overview");
+  }
+  getCarlaIntegration() {
+    return this.request<CarlaIntegrationConfig>("/api/integration/carla");
+  }
+  getAnalyticsPreferences() {
+    return this.request<AnalyticsPreferences>("/api/analytics/preferences");
+  }
+  saveAnalyticsPreferences(preferences: AnalyticsPreferences) {
+    return this.request<AnalyticsPreferences>("/api/analytics/preferences", {
+      method: "PUT",
+      body: JSON.stringify(preferences),
+    });
+  }
+  listAuditEvents() {
+    return this.request<AuditEvent[]>("/api/audit-log");
+  }
+  saveCarlaIntegration(config: CarlaIntegrationConfig) {
+    return this.request<CarlaIntegrationConfig>("/api/integration/carla", {
+      method: "PUT",
+      body: JSON.stringify(config),
+    });
   }
   listScenarios(filters: ScenarioFilters = {}) {
     const params = new URLSearchParams();
@@ -97,10 +130,33 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       body: JSON.stringify(changes),
     });
   }
+  async getCampaignRanking(id: string) {
+    return (await this.request<Record<string, unknown> | null>("/api/campaigns/" + encodeURIComponent(id) + "/ranking")) ?? null;
+  }
+  async saveCampaignRanking(id: string, ranking: Record<string, unknown>) {
+    await this.request<void>("/api/campaigns/" + encodeURIComponent(id) + "/ranking", {
+      method: "PUT",
+      body: JSON.stringify(ranking),
+    });
+  }
   updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">) {
     return this.request<Scenario>("/api/scenarios/" + encodeURIComponent(id) + "/execution-metrics", {
       method: "PATCH",
       body: JSON.stringify(changes),
+    });
+  }
+  listRuns() {
+    return this.request<ScenarioRun[]>("/api/runs");
+  }
+  queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string) {
+    return this.request<ScenarioRun[]>("/api/campaigns/" + encodeURIComponent(campaignId) + "/runs", {
+      method: "POST",
+      body: JSON.stringify({ scenarioIds, retryOf }),
+    });
+  }
+  cancelCampaignRuns(campaignId: string) {
+    return this.request<ScenarioRun[]>("/api/campaigns/" + encodeURIComponent(campaignId) + "/runs/cancel", {
+      method: "POST",
     });
   }
   listFailures() {

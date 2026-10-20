@@ -9,6 +9,9 @@ import {
 import type {
   AutoScenarioApi,
   Campaign,
+  CarlaIntegrationConfig,
+  AnalyticsPreferences,
+  AuditEvent,
   CreateCampaignInput,
   CreateScenarioInput,
   FailureCluster,
@@ -18,10 +21,20 @@ import type {
   ScenarioFilters,
   ScenarioStatus,
   ScenarioVersionRecord,
+  ScenarioRun,
   WorkerNode,
 } from "../types";
 import {
   appendAuditEvent,
+  getAnalyticsPreferences,
+  getCarlaConfig,
+  getRanking,
+  listAuditEvents as readAuditEvents,
+  listRuns,
+  saveCarlaConfig,
+  saveAnalyticsPreferences,
+  saveRanking,
+  saveRuns,
   recordScenarioVersion,
   scenarioVersionHistory,
 } from "./workflowStore";
@@ -63,6 +76,23 @@ function makeId(prefix: string, items: { id: string }[]): string {
 export const mockApi: AutoScenarioApi = {
   async getOverview(): Promise<OverviewData> {
     return readStored("autoscenariox.mock.overview", mockOverview);
+  },
+  async getCarlaIntegration(): Promise<CarlaIntegrationConfig> {
+    return getCarlaConfig();
+  },
+  async saveCarlaIntegration(config: CarlaIntegrationConfig): Promise<CarlaIntegrationConfig> {
+    saveCarlaConfig(config);
+    return config;
+  },
+  async getAnalyticsPreferences(): Promise<AnalyticsPreferences> {
+    return getAnalyticsPreferences();
+  },
+  async saveAnalyticsPreferences(preferences: AnalyticsPreferences): Promise<AnalyticsPreferences> {
+    saveAnalyticsPreferences(preferences);
+    return preferences;
+  },
+  async listAuditEvents(): Promise<AuditEvent[]> {
+    return readAuditEvents();
   },
   async listScenarios(filters: ScenarioFilters = {}): Promise<Scenario[]> {
     const query = (filters.query ?? "").trim().toLowerCase();
@@ -220,6 +250,12 @@ export const mockApi: AutoScenarioApi = {
     }
     return updated;
   },
+  async getCampaignRanking(id: string): Promise<Record<string, unknown> | null> {
+    return getRanking<Record<string, unknown>>(id) ?? null;
+  },
+  async saveCampaignRanking(id: string, ranking: Record<string, unknown>): Promise<void> {
+    saveRanking(id, ranking);
+  },
   async updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">): Promise<Scenario> {
     const items = readStored(storageKeys.scenarios, mockScenarios);
     const current = items.find((scenario) => scenario.id === id);
@@ -228,17 +264,61 @@ export const mockApi: AutoScenarioApi = {
     writeStored(storageKeys.scenarios, items.map((scenario) => scenario.id === id ? updated : scenario));
     return updated;
   },
+  async listRuns(): Promise<ScenarioRun[]> {
+    return listRuns();
+  },
+  async queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string): Promise<ScenarioRun[]> {
+    const campaign = (await mockApi.listCampaigns()).find((item) => item.id === campaignId);
+    if (!campaign) throw new Error("Campaign not found: " + campaignId);
+    const scenarios = await mockApi.listScenarios();
+    const selected = (scenarioIds ?? campaign.scenarioIds).map((id) => scenarios.find((item) => item.id === id)).filter((item): item is Scenario => Boolean(item));
+    if (!selected.length) throw new Error("The campaign has no available scenarios.");
+    const stamp = Date.now();
+    let sequence = 0;
+    const queued = selected.flatMap((scenario) => Array.from({ length: Math.max(1, campaign.repetitions ?? 1) }, (_, index): ScenarioRun => ({
+      id: `RUN-${stamp}-${++sequence}`,
+      campaignId,
+      scenarioId: scenario.id,
+      scenarioName: scenario.name,
+      scenarioVersion: scenario.version,
+      state: "Queued",
+      progress: 0,
+      retryOf,
+      repetition: index + 1,
+      artifacts: [],
+      evidence: [],
+    })));
+    saveRuns([...listRuns(), ...queued]);
+    return queued;
+  },
+  async cancelCampaignRuns(campaignId: string): Promise<ScenarioRun[]> {
+    const cancelled = listRuns().filter((run) => run.campaignId === campaignId && ["Queued", "Assigned", "Running"].includes(run.state)).map((run) => ({ ...run, state: "Cancelled" as const, progress: 0 }));
+    const ids = new Set(cancelled.map((run) => run.id));
+    saveRuns(listRuns().map((run) => ids.has(run.id) ? cancelled.find((item) => item.id === run.id)! : run));
+    return cancelled;
+  },
   async listFailures() {
     return readStored(storageKeys.failures, mockFailures);
   },
   async addFailureCluster(failure: FailureCluster): Promise<FailureCluster> {
     const items = readStored(storageKeys.failures, mockFailures);
-    const existing = items.find((item) => item.id === failure.id);
+    const failureRules = new Set(failure.evidence.map((item) => item.rule));
+    const existing = items.find((item) => item.id === failure.id || (
+      item.scenarioName === failure.scenarioName &&
+      item.evidence.some((evidence) => failureRules.has(evidence.rule))
+    ));
     const updated = existing
-      ? { ...existing, affectedRuns: existing.affectedRuns + 1, evidence: [...failure.evidence, ...existing.evidence] }
+      ? {
+          ...existing,
+          affectedRuns: existing.affectedRuns + 1,
+          evidence: [...failure.evidence, ...existing.evidence],
+          lastDetected: failure.lastDetected,
+          sourceRunId: failure.sourceRunId ?? existing.sourceRunId,
+          reviewStatus: "Needs review" as const,
+        }
       : failure;
     writeStored(storageKeys.failures, existing
-      ? items.map((item) => item.id === failure.id ? updated : item)
+      ? items.map((item) => item.id === existing.id ? updated : item)
       : [updated, ...items]);
     appendAuditEvent({ actor: "AutoScenarioX System", action: "Failure cluster updated", target: updated.id, result: "Success" });
     return updated;

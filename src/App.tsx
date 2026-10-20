@@ -320,21 +320,32 @@ function AppContent() {
       api.listFailures(),
       api.listWorkers(),
       api.listOracleRules(),
+      api.listRuns(),
+      api.getCarlaIntegration(),
     ])
-      .then(([o, s, c, f, w, r]) => {
+      .then(([o, s, c, f, w, r, runResult, carlaResult]) => {
         if (!mounted) return;
         if (o.status === "fulfilled") setOverview(o.value);
+        else if (!isMockMode) setOverview({ totalScenarios: 0, activeCampaigns: 0, passRate: 0, failureClusters: 0, weeklyRuns: [], weeklyLabels: [], recentActivity: [] });
         if (s.status === "fulfilled") setScenarios(s.value);
+        else if (!isMockMode) setScenarios([]);
         if (c.status === "fulfilled") setCampaigns(c.value);
+        else if (!isMockMode) setCampaigns([]);
         if (f.status === "fulfilled") setFailures(f.value);
+        else if (!isMockMode) setFailures([]);
         if (w.status === "fulfilled") setWorkers(w.value);
+        else if (!isMockMode) setWorkers([]);
         if (r.status === "fulfilled") setRules(r.value);
+        else if (!isMockMode) setRules([]);
+        if (runResult.status === "fulfilled") setRuns(runResult.value);
+        else if (!isMockMode) setRuns([]);
+        if (carlaResult.status === "fulfilled") setCarlaConfig(carlaResult.value);
         if (
           !isMockMode &&
-          [o, s, c, f, w, r].some((result) => result.status === "rejected")
+          [o, s, c, f, w, r, runResult, carlaResult].some((result) => result.status === "rejected")
         )
           setToast(
-            "Some API endpoints are unavailable. Demo data is shown for those sections.",
+            "Some backend data could not be loaded. Check the API connection and permissions.",
           );
       })
       .finally(() => {
@@ -354,7 +365,9 @@ function AppContent() {
       if (!campaignRuns.length) return campaign;
       const completed = campaignRuns.filter((run) => terminalStates.has(run.state));
       const progress = Math.round(campaignRuns.reduce((sum, run) => sum + run.progress, 0) / campaignRuns.length);
-      let status: Campaign["status"] = "Running";
+      let status: Campaign["status"] = campaignRuns.every((run) => run.state === "Queued")
+        ? "Queued"
+        : "Running";
       if (completed.length === campaignRuns.length) {
         status = completed.every((run) => run.state === "Cancelled")
           ? "Cancelled"
@@ -434,6 +447,34 @@ function AppContent() {
   );
 
   const notify = (message: string) => setToast(message);
+  const recordAuditEvent = (event: Parameters<typeof appendAuditEvent>[0]) => {
+    appendAuditEvent(event);
+  };
+  const refreshWorkspace = async () => {
+    const results = await Promise.allSettled([
+      api.getOverview(),
+      api.listScenarios(),
+      api.listCampaigns(),
+      api.listFailures(),
+      api.listWorkers(),
+      api.listOracleRules(),
+      api.listRuns(),
+      api.getCarlaIntegration(),
+    ]);
+    const [overviewResult, scenariosResult, campaignsResult, failuresResult, workersResult, rulesResult, runsResult, carlaResult] = results;
+    if (overviewResult.status === "fulfilled") setOverview(overviewResult.value);
+    if (scenariosResult.status === "fulfilled") setScenarios(scenariosResult.value);
+    if (campaignsResult.status === "fulfilled") setCampaigns(campaignsResult.value);
+    if (failuresResult.status === "fulfilled") setFailures(failuresResult.value);
+    if (workersResult.status === "fulfilled") setWorkers(workersResult.value);
+    if (rulesResult.status === "fulfilled") setRules(rulesResult.value);
+    if (runsResult.status === "fulfilled") setRuns(runsResult.value);
+    if (carlaResult.status === "fulfilled") setCarlaConfig(carlaResult.value);
+    setOracleProfile(getOracleProfileState());
+    notify(results.some((result) => result.status === "rejected")
+      ? "Some workspace sources could not be refreshed."
+      : "Workspace data refreshed from its current data source.");
+  };
   const openScenario = (scenario: Scenario) => {
     setSelectedScenario(scenario);
     setScenarioVersions([]);
@@ -485,6 +526,26 @@ function AppContent() {
       if (bi < 0) return -1;
       return ai - bi;
     });
+    if (!isMockMode) {
+      void api.getCampaignRanking(campaignId).catch(() => null).then((savedRanking) => {
+        const savedOrder = Array.isArray(savedRanking?.order) ? savedRanking.order as string[] : [];
+        const effectiveOrder = savedOrder.length
+          ? [...orderedScenarios].sort((left, right) => {
+              const leftRank = savedOrder.indexOf(left.id);
+              const rightRank = savedOrder.indexOf(right.id);
+              return (leftRank < 0 ? Number.MAX_SAFE_INTEGER : leftRank) - (rightRank < 0 ? Number.MAX_SAFE_INTEGER : rightRank);
+            })
+          : orderedScenarios;
+        return api.queueCampaignRuns(campaignId, effectiveOrder.map((scenario) => scenario.id), retryOf);
+      }).then((queuedRuns) => {
+        setRuns((current) => [...current.filter((item) => !queuedRuns.some((queued) => queued.id === item.id)), ...queuedRuns]);
+        setCampaigns((current) => current.map((item) => item.id === campaignId ? { ...item, status: "Queued", progress: 0 } : item));
+        setSelectedCampaignId(campaignId);
+        recordAuditEvent({ actor: user?.name ?? "Current user", action: "Queue campaign execution", target: campaignId, result: "Success" });
+        notify(`${campaign.name} queued ${queuedRuns.length} run(s) in PostgreSQL. A connected CARLA worker is required to execute them.`);
+      }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not queue campaign runs."));
+      return;
+    }
     const startedAt = new Date().toLocaleString();
     const createdAt = Date.now();
     const executionItems = orderedScenarios.flatMap((scenario) =>
@@ -517,7 +578,7 @@ function AppContent() {
     void api.updateCampaign(campaignId, { status: "Running", progress: 0, failedRuns: 0, passRate: 0 }).catch((error: unknown) => {
       if (!isMockMode) notify(error instanceof Error ? error.message : "Could not start the campaign.");
     });
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Start campaign execution (mock)", target: campaignId, result: "Success" });
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: isMockMode ? "Start campaign execution (mock)" : "Queue campaign execution", target: campaignId, result: "Success" });
     notify(`${campaign.name} queued ${newRuns.length} scenario runs in the local mock simulator. No CARLA process was started.`);
 
     newRuns.forEach((run, index) => {
@@ -574,7 +635,7 @@ function AppContent() {
           : worker));
         if (!passed) {
           const failure: FailureCluster = {
-            id: `FCL-${run.id}`,
+            id: sourceFailure?.id ?? `FCL-${run.id}`,
             label: sourceFailure?.label ?? evidence[0]?.rule ?? "Oracle violation",
             rootCause: sourceFailure?.rootCause ?? `The ${evidence[0]?.rule ?? "oracle"} rule was violated during this execution.`,
             reviewStatus: "Needs review",
@@ -588,17 +649,32 @@ function AppContent() {
             sourceRunId: run.id,
           };
           void api.addFailureCluster(failure).then((saved) => {
-            setFailures((current) => [saved, ...current]);
-            setOverview((current) => ({ ...current, failureClusters: current.failureClusters + 1 }));
+            return api.listFailures().then((latestFailures) => {
+              setFailures(latestFailures);
+              setOverview((current) => ({ ...current, failureClusters: latestFailures.length }));
+              return saved;
+            });
           }).catch((error: unknown) => {
             if (!isMockMode) notify(error instanceof Error ? error.message : "Could not save failure analysis.");
           });
         }
-        appendAuditEvent({ actor: "AutoScenarioX System", action: `Oracle verdict ${finished.verdict}`, target: run.id, result: passed ? "Success" : "Rejected" });
+        recordAuditEvent({ actor: "AutoScenarioX System", action: `Oracle verdict ${finished.verdict}`, target: run.id, result: passed ? "Success" : "Rejected" });
       }, waveOffset + 1600);
     });
   };
   const cancelCampaign = (campaignId: string) => {
+    if (!isMockMode) {
+      void api.cancelCampaignRuns(campaignId).then((cancelledRuns) => {
+        const cancelledIds = new Set(cancelledRuns.map((run) => run.id));
+        setRuns((current) => current.map((run) => cancelledIds.has(run.id) ? { ...run, state: "Cancelled", progress: 0 } : run));
+        if (cancelledRuns.length) {
+          setCampaigns((current) => current.map((campaign) => campaign.id === campaignId ? { ...campaign, status: "Cancelled", progress: 0 } : campaign));
+          recordAuditEvent({ actor: user?.name ?? "Current user", action: "Cancel campaign execution", target: campaignId, result: "Info" });
+        }
+        notify(cancelledRuns.length ? `Cancelled ${cancelledRuns.length} queued run(s).` : "There are no active runs to cancel.");
+      }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not cancel campaign runs."));
+      return;
+    }
     const activeRuns = runs.filter((run) => run.campaignId === campaignId && (run.state === "Queued" || run.state === "Assigned" || run.state === "Running"));
     if (!activeRuns.length) return notify("There are no active runs to cancel.");
     activeRuns.forEach((run) => cancelledRunIds.current.add(run.id));
@@ -611,7 +687,7 @@ function AppContent() {
       const activeRuns = Math.max(0, worker.activeRuns - (cancelledByWorker.get(worker.id) ?? 0));
       return { ...worker, activeRuns, status: activeRuns ? "Busy" : "Online" };
     }));
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Cancel campaign execution", target: campaignId, result: "Info" });
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Cancel campaign execution", target: campaignId, result: "Info" });
     notify("Campaign cancellation requested; queued mock runs were stopped.");
   };
   const reexecuteFailure = async (failure: FailureCluster) => {
@@ -719,13 +795,13 @@ function AppContent() {
       setRules(saved);
       setOracleProfile(profile);
       saveOracleProfileState(profile);
-      appendAuditEvent({ actor: user?.name ?? "Current user", action: `Validated and activated oracle profile v${profile.version}`, target: "Default safety profile", result: "Success" });
+      recordAuditEvent({ actor: user?.name ?? "Current user", action: `Validated and activated oracle profile v${profile.version}`, target: "Default safety profile", result: "Success" });
       notify(`Oracle profile v${profile.version} validated and activated.`);
     } catch {
       notify("Could not save oracle rules. Check the API connection.");
     }
   };
-  const saveCarlaIntegration = (next: CarlaIntegrationConfig) => {
+  const saveCarlaIntegration = async (next: CarlaIntegrationConfig): Promise<boolean> => {
     if (!next.host.trim() || !next.scenarioRunnerPath.trim()) {
       notify("Enter a CARLA host and installation path before saving.");
       return false;
@@ -734,45 +810,68 @@ function AppContent() {
       notify("Use two different valid ports between 1 and 65535.");
       return false;
     }
-    const saved = { ...next, qualityLevel: "Low" as const, validated: true, active: false, connectionStatus: "Not tested" as const, updatedAt: new Date().toLocaleString() };
+    const candidate = { ...next, qualityLevel: "Low" as const, validated: true, active: false, connectionStatus: "Not tested" as const, updatedAt: new Date().toLocaleString() };
+    let saved: CarlaIntegrationConfig;
+    try {
+      saved = await api.saveCarlaIntegration(candidate);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save CARLA settings.");
+      return false;
+    }
     setCarlaConfig(saved);
     persistCarlaConfig(saved);
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Saved CARLA integration settings (Low quality)", target: `${saved.host}:${saved.rpcPort}`, result: "Success" });
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Saved CARLA integration settings (Low quality)", target: `${saved.host}:${saved.rpcPort}`, result: "Success" });
     notify("CARLA settings saved. The connection has not been tested yet.");
     return true;
   };
-  const testCarlaIntegration = () => {
+  const testCarlaIntegration = async () => {
     if (!carlaConfig.validated) return notify("Save valid CARLA settings before testing the mock connection.");
     const updated = { ...carlaConfig, connectionStatus: "Connected (mock)" as const, updatedAt: new Date().toLocaleString() };
-    setCarlaConfig(updated);
-    persistCarlaConfig(updated);
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Tested CARLA connection (mock only; no process started)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
+    try {
+      const saved = await api.saveCarlaIntegration(updated);
+      setCarlaConfig(saved);
+      persistCarlaConfig(saved);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save the mock connection status.");
+      return;
+    }
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Tested CARLA connection (mock only; no process started)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
     notify("Mock connection succeeded. No CARLA process was started.");
   };
-  const activateCarlaIntegration = () => {
+  const activateCarlaIntegration = async () => {
     if (!carlaConfig.validated || carlaConfig.connectionStatus !== "Connected (mock)") {
       notify("Save the settings and pass the mock connection check before activation.");
       return;
     }
     const updated = { ...carlaConfig, active: true, qualityLevel: "Low" as const, updatedAt: new Date().toLocaleString() };
-    setCarlaConfig(updated);
-    persistCarlaConfig(updated);
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Activated CARLA integration in mock mode (Low quality)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
+    try {
+      const saved = await api.saveCarlaIntegration(updated);
+      setCarlaConfig(saved);
+      persistCarlaConfig(saved);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not activate CARLA settings.");
+      return;
+    }
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Activated CARLA integration in mock mode (Low quality)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
     notify("CARLA integration is active in mock mode at Low quality.");
   };
-  const testWorkerConnection = (worker: WorkerNode) => {
+  const testWorkerConnection = async (worker: WorkerNode) => {
     const reachable = worker.status !== "Offline";
     const updated = workers.map((item) => item.id === worker.id
       ? { ...item, status: reachable ? (item.activeRuns ? "Busy" as const : "Online" as const) : "Offline" as const, lastHeartbeat: reachable ? "Just now" : item.lastHeartbeat }
       : item);
-    setWorkers(updated);
-    void api.saveWorkers(updated).catch(() => undefined);
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: `Tested worker connection (mock): ${worker.name}`, target: `${worker.host}:${worker.port}`, result: reachable ? "Success" : "Rejected" });
+    try {
+      setWorkers(await api.saveWorkers(updated));
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not update the simulation node.");
+      return;
+    }
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: `Tested worker connection (mock): ${worker.name}`, target: `${worker.host}:${worker.port}`, result: reachable ? "Success" : "Rejected" });
     notify(reachable
       ? `Mock connection to ${worker.name} succeeded. No CARLA process was started.`
       : `Mock connection to ${worker.name} failed; the worker is offline.`);
   };
-  const setWorkerAvailability = (worker: WorkerNode, online: boolean) => {
+  const setWorkerAvailability = async (worker: WorkerNode, online: boolean) => {
     if (worker.activeRuns > 0) {
       notify("A worker with active runs cannot be taken offline.");
       return;
@@ -780,9 +879,13 @@ function AppContent() {
     const updated = workers.map((item) => item.id === worker.id
       ? { ...item, status: online ? "Online" as const : "Offline" as const }
       : item);
-    setWorkers(updated);
-    void api.saveWorkers(updated).catch(() => undefined);
-    appendAuditEvent({ actor: user?.name ?? "Current user", action: online ? "Brought simulation worker online" : "Took simulation worker offline", target: worker.id, result: "Success" });
+    try {
+      setWorkers(await api.saveWorkers(updated));
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not update the simulation node.");
+      return;
+    }
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: online ? "Brought simulation worker online" : "Took simulation worker offline", target: worker.id, result: "Success" });
     notify(`${worker.name} is now ${online ? "online" : "offline"} in the mock cluster.`);
   };
   const confirmFailure = async (failure: FailureCluster, changes: Partial<FailureCluster> = {}) => {
@@ -825,15 +928,6 @@ function AppContent() {
       <button className="btn btn-primary" onClick={() => setDialog("campaign")}>
         <Icon name="plus" size={16} /> New campaign
       </button>
-    ) : page === "priority" && role === "Test Engineer" ? (
-      <button
-        className="btn btn-light"
-        onClick={() =>
-          notify("Evaluation report will download when the API is connected.")
-        }
-      >
-        <Icon name="download" size={15} /> Export report
-      </button>
     ) : page === "oracles" && role === "Administrator" ? (
       <button className="btn btn-light" onClick={() => saveRules(rules)}>
         <Icon name="check" size={15} /> Save changes
@@ -841,7 +935,7 @@ function AppContent() {
     ) : page === "failures" || page === "nodes" ? (
       <button
         className="btn btn-light"
-        onClick={() => notify("Data refreshed from the mock workspace.")}
+        onClick={() => void refreshWorkspace()}
       >
         <Icon name="refresh" size={15} /> Refresh
       </button>
@@ -1135,6 +1229,7 @@ function AppContent() {
           {page === "failures" && (
             <Failures
               failures={failures}
+              runs={runs}
               notify={notify}
               onConfirm={confirmFailure}
               onReexecute={reexecuteFailure}
@@ -1150,11 +1245,16 @@ function AppContent() {
               onActivateConfig={activateCarlaIntegration}
               onTestWorker={testWorkerConnection}
               onWorkerAvailability={setWorkerAvailability}
-              onAddWorker={(worker) => {
+              onAddWorker={async (worker) => {
                 const next = [worker, ...workers];
-                setWorkers(next);
-                void api.saveWorkers(next).catch(() => undefined);
-                appendAuditEvent({ actor: user?.name ?? "Current user", action: "Registered mock simulation worker", target: worker.id, result: "Success" });
+                try {
+                  setWorkers(await api.saveWorkers(next));
+                } catch (error) {
+                  notify(error instanceof Error ? error.message : "Could not register the simulation node.");
+                  return;
+                }
+                recordAuditEvent({ actor: user?.name ?? "Current user", action: "Registered simulation worker", target: worker.id, result: "Success" });
+                notify(`${worker.name} registered.`);
               }}
             />
           )}
@@ -1178,18 +1278,29 @@ function AppContent() {
               workers={workers}
               onNavigate={navigate}
               onNotify={notify}
-              onScenarioStatus={(id, status) => {
-                void api.updateScenarioStatus(id, status).then((updated) => {
+              onScenarioStatus={async (id, status) => {
+                try {
+                  const updated = await api.updateScenarioStatus(id, status);
                   setScenarios((items) => items.map((item) => item.id === id ? updated : item));
-                }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not update review status."));
+                  notify(status === "In review" ? `${id} submitted for review.` : `${id} status changed to ${status}.`);
+                  return true;
+                } catch (error) {
+                  notify(error instanceof Error ? error.message : "Could not update review status.");
+                  return false;
+                }
               }}
-              onScenarioUpdate={(id, changes) => {
-                void api.updateScenario(id, changes).then((updated) => {
+              onScenarioUpdate={async (id, changes) => {
+                try {
+                  const updated = await api.updateScenario(id, changes);
                   setScenarios((items) => items.map((item) => item.id === id ? updated : item));
                   setSelectedScenario((item) => item?.id === id ? updated : item);
                   void api.listScenarioVersions(id).then(setScenarioVersions);
                   notify(`${id} saved as immutable version ${updated.version}.`);
-                }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not save scenario version."));
+                  return true;
+                } catch (error) {
+                  notify(error instanceof Error ? error.message : "Could not save scenario version.");
+                  return false;
+                }
               }}
               onImport={async (scenario) => {
                 const saved = await api.persistImportedScenario(scenario);
@@ -2252,7 +2363,7 @@ function Prioritization({
   const [order, setOrder] = useState<Scenario[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
   const [weights, setWeights] = useState({ risk: 50, history: 35, cost: 15 });
-  const [metrics, setMetrics] = useState({ apfd: "—", apfdc: "—", early: "—", duration: "—", baselineApfd: "Unavailable" });
+  const [metrics, setMetrics] = useState({ apfd: "—", apfdc: "—", early: "—", duration: "—", baselineApfd: "Unavailable", baselineApfdc: "Unavailable" });
   const [detectionPositions, setDetectionPositions] = useState<number[]>([]);
   const [baselineDetectionPositions, setBaselineDetectionPositions] = useState<number[]>([]);
   const [faultCount, setFaultCount] = useState(0);
@@ -2262,12 +2373,13 @@ function Prioritization({
   const candidateScenarios = campaign?.scenarioIds.length
     ? campaign.scenarioIds.map((id) => scenarios.find((scenario) => scenario.id === id)).filter((item): item is Scenario => Boolean(item))
     : scenarios.filter((scenario) => scenario.status === "Active" || scenario.status === "Approved");
+  const cost = (scenario: Scenario) => 4 + scenario.actors * 0.48;
+  const stableHash = (value: string) => Array.from(value).reduce((sum, char) => Math.imul(sum ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
   const run = () => {
     if (candidateScenarios.length === 0) {
       notify("Select a campaign with scenarios before requesting prioritization.");
       return;
     }
-    const cost = (scenario: Scenario) => 4 + scenario.actors * 0.48;
     const faultSignal = (scenario: Scenario) => Math.min(1, ((100 - scenario.passRate) / 100) * Math.log2(scenario.runCount + 1) / 5);
     const maxCost = Math.max(...candidateScenarios.map(cost), 1);
     const totalWeight = Math.max(1, weights.risk + weights.history + weights.cost);
@@ -2276,7 +2388,6 @@ function Prioritization({
       faultSignal(scenario) * weights.history / totalWeight +
       (1 - cost(scenario) / maxCost) * weights.cost / totalWeight
     ));
-    const stableHash = (value: string) => Array.from(value).reduce((sum, char) => Math.imul(sum ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
     const nextOrder = [...candidateScenarios].sort((a, b) => {
       if (strategy === "Severity-first") return severity(b.severity) - severity(a.severity) || score(b) - score(a) || a.id.localeCompare(b.id);
       if (strategy === "Risk-first") return b.priorityScore - a.priorityScore || a.id.localeCompare(b.id);
@@ -2304,6 +2415,15 @@ function Prioritization({
     const baselineApfd = baselinePositions.length && baselineOrder.length
       ? 1 - baselinePositions.reduce((sum, position) => sum + position, 0) / (baselineOrder.length * baselinePositions.length) + 1 / (2 * baselineOrder.length)
       : undefined;
+    const baselineTotalCost = baselineOrder.reduce((sum, scenario) => sum + cost(scenario), 0);
+    const baselinePrefixCosts = baselineOrder.map((scenario, index) => baselineOrder.slice(0, index).reduce((sum, item) => sum + cost(item), 0) + cost(scenario) / 2);
+    const baselineDetectedAt = knownFaults.map((failure) => {
+      const index = baselineOrder.findIndex((scenario) => scenario.name === failure.scenarioName);
+      return index < 0 ? undefined : baselinePrefixCosts[index] / baselineTotalCost;
+    }).filter((value): value is number => value !== undefined);
+    const baselineApfdc = baselineDetectedAt.length
+      ? 1 - baselineDetectedAt.reduce((sum, value) => sum + value, 0) / baselineDetectedAt.length + 1 / (2 * baselineOrder.length)
+      : undefined;
     const apfdc = detectedAt.length
       ? 1 - detectedAt.reduce((sum, value) => sum + value, 0) / detectedAt.length + 1 / (2 * nextOrder.length)
       : undefined;
@@ -2323,11 +2443,52 @@ function Prioritization({
       early: knownFaults.length ? `${earlyFaults} / ${knownFaults.length}` : "No linked faults",
       duration,
       baselineApfd: baselineApfd === undefined ? "Unavailable" : baselineApfd.toFixed(2),
+      baselineApfdc: baselineApfdc === undefined ? "Unavailable" : baselineApfdc.toFixed(2),
     };
     setMetrics(result);
-    saveRanking(campaign?.id ?? "unassigned", { strategy, weights, order: nextOrder.map((scenario) => scenario.id), ...result, calculatedAt: new Date().toISOString() });
+    const savedRanking = { strategy, weights, order: nextOrder.map((scenario) => scenario.id), ...result, calculatedAt: new Date().toISOString() };
+    saveRanking(campaign?.id ?? "unassigned", savedRanking);
+    if (campaign && !isMockMode) {
+      void api.saveCampaignRanking(campaign.id, savedRanking).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not save the ranking to the backend."));
+    }
     setRanked(true);
     notify(`Scenario ranking generated for ${campaign?.name ?? "the active scenario set"} with ${strategy.toLowerCase()}.`);
+  };
+  const exportEvaluation = () => {
+    if (!ranked || !campaign) return;
+    const knownFaults = failures.filter((failure) => order.some((scenario) => scenario.name === failure.scenarioName));
+    const baselineOrder = [...candidateScenarios].sort((left, right) => stableHash(`${campaign.id}:${left.id}`) - stableHash(`${campaign.id}:${right.id}`));
+    const rows: (string | number)[][] = [
+      ["AutoScenarioX prioritization evaluation"],
+      ["Campaign", campaign.name],
+      ["Campaign ID", campaign.id],
+      ["Calculated at", new Date().toLocaleString()],
+      ["Proposed strategy", strategy],
+      ["Risk / history / cost weights", `${weights.risk}% / ${weights.history}% / ${weights.cost}%`],
+      ["Proposed APFD", metrics.apfd],
+      ["Seeded random baseline APFD", metrics.baselineApfd],
+      ["Proposed APFDc", metrics.apfdc],
+      ["Seeded random baseline APFDc", metrics.baselineApfdc],
+      ["Known failure clusters", knownFaults.length],
+      [],
+      ["Proposed rank", "Scenario ID", "Scenario", "Priority score", "Estimated cost (min)", "Linked failure clusters"],
+      ...order.map((scenario, index) => [
+        index + 1,
+        scenario.id,
+        scenario.name,
+        scores[scenario.id] ?? scenario.priorityScore,
+        cost(scenario).toFixed(2),
+        knownFaults.filter((failure) => failure.scenarioName === scenario.name).map((failure) => failure.id).join(", ") || "—",
+      ]),
+      [],
+      ["Failure cluster", "Proposed detection rank", "Baseline detection rank"],
+      ...knownFaults.map((failure) => [
+        failure.id,
+        order.findIndex((scenario) => scenario.name === failure.scenarioName) + 1,
+        baselineOrder.findIndex((scenario) => scenario.name === failure.scenarioName) + 1,
+      ]),
+    ];
+    downloadCsv(`${campaign.id}-prioritization-evaluation.csv`, rows);
   };
   return (
     <div className="content-stack">
@@ -2354,10 +2515,15 @@ function Prioritization({
         </div>
         <div>
           <Badge value="Ready" />
-          <button className="btn btn-primary" onClick={run}>
-            <Icon name="spark" size={15} />
-            {ranked ? "Re-run" : "Run prioritization"}
-          </button>
+          <div className="actions">
+            <button className="btn btn-light" disabled={!ranked} onClick={exportEvaluation}>
+              <Icon name="download" size={14} /> Export evaluation
+            </button>
+            <button className="btn btn-primary" onClick={run}>
+              <Icon name="spark" size={15} />
+              {ranked ? "Re-run" : "Run prioritization"}
+            </button>
+          </div>
         </div>
       </div>
       <div className="metric-grid">
@@ -2372,8 +2538,8 @@ function Prioritization({
         <Metric
           label="APFDc score"
           value={ranked ? metrics.apfdc : "—"}
-          delta={ranked && metrics.apfdc !== "Unavailable" ? "Estimated" : "Not calculated"}
-          text="weighted by estimated run cost"
+          delta={ranked && metrics.apfdc !== "Unavailable" && metrics.baselineApfdc !== "Unavailable" ? `${Number(metrics.apfdc) >= Number(metrics.baselineApfdc) ? "+" : ""}${(Number(metrics.apfdc) - Number(metrics.baselineApfdc)).toFixed(2)} vs baseline` : ranked ? "Unavailable" : "Not calculated"}
+          text={ranked ? `seeded random baseline ${metrics.baselineApfdc}` : "weighted by estimated run cost"}
           icon="clock"
           color="blue"
         />
@@ -2548,13 +2714,41 @@ function Prioritization({
   );
 }
 
+function failureAgeDays(lastDetected: string): number | undefined {
+  const now = new Date();
+  const relative = lastDetected.match(/^(\d+)\s*(min|minute|minutes|h|hr|hour|hours|d|day|days)\s+ago$/i);
+  if (relative) {
+    const amount = Number(relative[1]);
+    const unit = relative[2].toLowerCase();
+    const days = unit.startsWith("d") ? amount : unit.startsWith("h") ? amount / 24 : amount / 1440;
+    return days;
+  }
+  if (/^today$/i.test(lastDetected)) return 0;
+  if (/^yesterday$/i.test(lastDetected)) return 1;
+  const numericDate = lastDetected.match(/\b(\d{1,2})[/.](\d{1,2})[/.](\d{4})\b/);
+  if (numericDate) {
+    const first = Number(numericDate[1]);
+    const second = Number(numericDate[2]);
+    const year = Number(numericDate[3]);
+    const candidates = [new Date(year, first - 1, second), new Date(year, second - 1, first)]
+      .filter((date) => !Number.isNaN(date.getTime()) && date.getFullYear() === year)
+      .map((date) => (now.getTime() - date.getTime()) / 86400000);
+    const pastCandidates = candidates.filter((days) => days >= -1);
+    if (pastCandidates.length) return Math.max(0, Math.min(...pastCandidates));
+  }
+  const parsed = Date.parse(lastDetected);
+  return Number.isNaN(parsed) ? undefined : Math.max(0, (now.getTime() - parsed) / 86400000);
+}
+
 function Failures({
   failures,
+  runs,
   notify,
   onConfirm,
   onReexecute,
 }: {
   failures: FailureCluster[];
+  runs: ScenarioRun[];
   notify: (s: string) => void;
   onConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
   onReexecute: (failure: FailureCluster) => void;
@@ -2562,18 +2756,55 @@ function Failures({
   const [open, setOpen] = useState<FailureCluster | null>(null);
   const [reviewFilter, setReviewFilter] = useState("All statuses");
   const [timeRange, setTimeRange] = useState("This week");
+  const [draftRootCause, setDraftRootCause] = useState("");
   const visibleFailures = failures.filter(
     (failure) =>
       reviewFilter === "All statuses" || failure.reviewStatus === reviewFilter,
   );
+  const periodDays = timeRange === "This week" ? 7 : 30;
+  const periodFailures = failures.filter((failure) => {
+    const ageDays = failureAgeDays(failure.lastDetected);
+    return ageDays === undefined || ageDays <= periodDays;
+  });
   const similarFailures = open ? failures.filter((failure) => failure.id !== open.id && (failure.map === open.map || failure.evidence.some((item) => open.evidence.some((source) => source.rule === item.rule)))).slice(0, 3) : [];
-  const types = [
-    ["Collision", 9, "red"],
-    ["Time-to-collision", 7, "orange"],
-    ["Lane invasion", 5, "purple"],
-    ["Route incompletion", 3, "blue"],
-    ["Traffic-light violation", 2, "green"],
-  ];
+  const typeCounts = new Map<string, number>();
+  periodFailures.forEach((failure) => {
+    if (!failure.evidence.length) {
+      typeCounts.set("Unclassified oracle failure", (typeCounts.get("Unclassified oracle failure") ?? 0) + failure.affectedRuns);
+    }
+    failure.evidence.forEach((evidence) => {
+      typeCounts.set(evidence.rule, (typeCounts.get(evidence.rule) ?? 0) + failure.affectedRuns);
+    });
+  });
+  const typeColors = ["red", "orange", "purple", "blue", "green"];
+  const types = [...typeCounts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 5)
+    .map(([label, count], index) => ({ label, count, color: typeColors[index % typeColors.length] }));
+  const maxTypeCount = Math.max(1, ...types.map((item) => item.count));
+  const safetyCriticalCount = [...typeCounts.entries()].reduce((sum, [rule, count]) =>
+    /collision|lane|traffic.light|speed/i.test(rule) ? sum + count : sum, 0);
+  const behavioralCount = [...typeCounts.entries()].reduce((sum, [rule, count]) =>
+    /collision|lane|traffic.light|speed/i.test(rule) ? sum : sum + count, 0);
+  const topFailure = [...periodFailures].sort((left, right) => right.affectedRuns - left.affectedRuns)[0];
+  const topType = types[0];
+  const periodAffectedRuns = periodFailures.reduce((sum, failure) => sum + failure.affectedRuns, 0);
+  const topFailureShare = topFailure ? Math.round((topFailure.affectedRuns / Math.max(1, periodAffectedRuns)) * 100) : 0;
+  const failedRunCount = runs.filter((run) => run.verdict === "FAIL" || run.verdict === "TIMEOUT").length;
+  const clusterRunCount = failures.reduce((sum, failure) => sum + failure.affectedRuns, 0);
+  const averageConfidence = failures.length
+    ? Math.round(failures.reduce((sum, failure) => sum + failure.confidence, 0) / failures.length)
+    : 0;
+  const generateExplanation = () => {
+    if (!open?.evidence.length) {
+      notify("No oracle evidence is available to generate an explanation.");
+      return;
+    }
+    const evidenceSummary = open.evidence.map((evidence) =>
+      `${evidence.rule} measured ${evidence.measured} at ${evidence.timestamp} against ${evidence.threshold}`,
+    );
+    setDraftRootCause(`The failure is classified as “${open.label}”. Recorded oracle evidence: ${evidenceSummary.join("; ")}. Verify this explanation against the source run before confirming.`);
+  };
   return (
     <div className="content-stack">
       <div className="metric-grid">
@@ -2589,32 +2820,27 @@ function Failures({
         />
         <Metric
           label="Affected executions"
-          value={String(failures.reduce((s, f) => s + f.affectedRuns, 0))}
-          delta="−18%"
-          text="compared to last week"
+          value={String(failedRunCount || clusterRunCount)}
+          delta={failedRunCount ? "Recorded run verdicts" : "Historical cluster links"}
+          text={failedRunCount ? "failed or timed-out executions" : "affected-run counts across clusters"}
           icon="activity"
           color="purple"
         />
         <Metric
           label="Mean confidence"
-          value={
-            Math.round(
-              failures.reduce((s, f) => s + f.confidence, 0) /
-                Math.max(1, failures.length),
-            ) + "%"
-          }
-          delta="+4.2%"
+          value={averageConfidence + "%"}
+          delta="Across current clusters"
           text="explanation confidence"
           icon="spark"
           color="blue"
         />
         <Metric
-          label="Reviewed this week"
+          label="Confirmed clusters"
           value={String(
             failures.filter((f) => f.reviewStatus === "Confirmed").length,
           )}
-          delta="On track"
-          text="review queue progress"
+          delta="Current status"
+          text="reviewed root-cause classifications"
           icon="circle-check"
           color="green"
         />
@@ -2630,14 +2856,11 @@ function Failures({
               const next =
                 timeRange === "This week" ? "Last 30 days" : "This week";
               setTimeRange(next);
-              notify(
-                `Failure analytics period changed to ${next}; mock chart values are illustrative.`,
-              );
             }}
           />
-          <div className="failure-types">
-            {types.map(([label, count, color]) => (
-              <div key={label as string}>
+          {types.length ? <div className="failure-types">
+            {types.map(({ label, count, color }) => (
+              <div key={label}>
                 <span className={"failure-type " + color}>
                   <Icon
                     name={
@@ -2654,19 +2877,22 @@ function Failures({
                 <span className="bar-bg">
                   <i
                     className={"bar-" + color}
-                    style={{ width: Number(count) * 9 + "%" }}
+                    style={{ width: `${Math.max(4, (count / maxTypeCount) * 100)}%` }}
                   />
                 </span>
                 <strong>{count}</strong>
               </div>
             ))}
-          </div>
+          </div> : <Empty title="No oracle evidence in this period" detail="Failure type counts appear when runs produce linked oracle evidence." />}
           <div className="chart-foot">
-            Safety-critical <b>16</b>
+            Safety-critical <b>{safetyCriticalCount}</b>
             <span>
-              Behavioral <b>10</b>
+              Behavioral <b>{behavioralCount}</b>
             </span>
-            <button onClick={() => failures[0] && setOpen(failures[0])}>
+            <button onClick={() => {
+              const failure = periodFailures[0];
+              if (failure) { setOpen(failure); setDraftRootCause(failure.rootCause); }
+            }}>
               View oracle evidence <Icon name="arrow-right" size={12} />
             </button>
           </div>
@@ -2679,24 +2905,31 @@ function Failures({
           </h3>
           <blockquote>
             <b>
-              Rainy merge scenarios account for 31% of this week's new failures.
+              {topFailure
+                ? `${topFailure.scenarioName} accounts for ${topFailureShare}% of affected cluster runs in ${timeRange.toLowerCase()}.`
+                : `No failure clusters were recorded in ${timeRange.toLowerCase()}.`}
             </b>{" "}
-            Low TTC and contact events co-occur in Town05 across 4 runs.
+            {topType
+              ? `${topType.label} is the most frequent linked oracle signal (${topType.count} affected-run references).`
+              : "No oracle evidence is linked to these clusters yet."}
           </blockquote>
           <div className="insight-tags">
             <span>
-              <Icon name="map" size={13} /> Town05
+              <Icon name="map" size={13} /> {topFailure?.map ?? "No map data"}
             </span>
             <span>
-              <Icon name="cloud" size={13} /> Heavy rain
+              <Icon name="cloud" size={13} /> {topType?.label ?? "No oracle signal"}
             </span>
             <span>
-              <Icon name="users" size={13} /> 4 related runs
+              <Icon name="users" size={13} /> {topFailure?.affectedRuns ?? 0} related runs
             </span>
           </div>
           <button
             className="link-button"
-            onClick={() => failures[0] && setOpen(failures[0])}
+            onClick={() => {
+              const failure = periodFailures[0];
+              if (failure) { setOpen(failure); setDraftRootCause(failure.rootCause); }
+            }}
           >
             Review evidence <Icon name="arrow-right" size={14} />
           </button>
@@ -2740,7 +2973,7 @@ function Failures({
             </thead>
             <tbody>
               {visibleFailures.map((f) => (
-                <tr key={f.id} onClick={() => setOpen(f)}>
+                <tr key={f.id} onClick={() => { setOpen(f); setDraftRootCause(f.rootCause); }}>
                   <td>
                     <div className="cluster-name">
                       <Icon name="failures" size={15} />
@@ -2828,8 +3061,11 @@ function Failures({
             </label>
             <label>
               Verified explanation
-              <textarea name="rootCause" defaultValue={open.rootCause} rows={3} required maxLength={1200} />
+              <textarea name="rootCause" value={draftRootCause} onChange={(event) => setDraftRootCause(event.target.value)} rows={3} required maxLength={1200} />
             </label>
+            <button className="btn btn-light" type="button" disabled={!open.evidence.length} onClick={generateExplanation}>
+              <Icon name="spark" size={14} /> Generate explanation from evidence
+            </button>
             <label>
               Reviewer note
               <textarea name="reviewerNote" rows={2} maxLength={1000} placeholder="Why does the evidence support this classification?" />
@@ -2864,7 +3100,7 @@ function Nodes({
   workers: WorkerNode[];
   config: CarlaIntegrationConfig;
   notify: (s: string) => void;
-  onSaveConfig: (config: CarlaIntegrationConfig) => boolean;
+  onSaveConfig: (config: CarlaIntegrationConfig) => boolean | Promise<boolean>;
   onTestConfig: () => void;
   onActivateConfig: () => void;
   onTestWorker: (worker: WorkerNode) => void;
@@ -2884,8 +3120,8 @@ function Nodes({
       active: false,
       connectionStatus: "Not tested",
     }));
-  const saveConfig = () => {
-    if (onSaveConfig(draftConfig)) {
+  const saveConfig = async () => {
+    if (await onSaveConfig(draftConfig)) {
       setDraftConfig({ ...draftConfig, qualityLevel: "Low", validated: true, active: false, connectionStatus: "Not tested" });
     }
   };

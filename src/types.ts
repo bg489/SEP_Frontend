@@ -245,6 +245,11 @@ export interface ScenarioFilters {
 
 export interface AutoScenarioApi {
   getOverview(): Promise<OverviewData>;
+  getCarlaIntegration(): Promise<CarlaIntegrationConfig>;
+  saveCarlaIntegration(config: CarlaIntegrationConfig): Promise<CarlaIntegrationConfig>;
+  getAnalyticsPreferences(): Promise<AnalyticsPreferences>;
+  saveAnalyticsPreferences(preferences: AnalyticsPreferences): Promise<AnalyticsPreferences>;
+  listAuditEvents(): Promise<AuditEvent[]>;
   listScenarios(filters?: ScenarioFilters): Promise<Scenario[]>;
   createScenario(input: CreateScenarioInput): Promise<Scenario>;
   persistImportedScenario(scenario: Scenario): Promise<Scenario>;
@@ -255,7 +260,12 @@ export interface AutoScenarioApi {
   listCampaigns(): Promise<Campaign[]>;
   createCampaign(input: CreateCampaignInput): Promise<Campaign>;
   updateCampaign(id: string, changes: Partial<Campaign>): Promise<Campaign>;
+  getCampaignRanking(id: string): Promise<Record<string, unknown> | null>;
+  saveCampaignRanking(id: string, ranking: Record<string, unknown>): Promise<void>;
   updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">): Promise<Scenario>;
+  listRuns(): Promise<ScenarioRun[]>;
+  queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string): Promise<ScenarioRun[]>;
+  cancelCampaignRuns(campaignId: string): Promise<ScenarioRun[]>;
   addFailureCluster(failure: FailureCluster): Promise<FailureCluster>;
   listFailures(): Promise<FailureCluster[]>;
   confirmFailureCluster(id: string, changes?: Partial<FailureCluster>): Promise<FailureCluster>;

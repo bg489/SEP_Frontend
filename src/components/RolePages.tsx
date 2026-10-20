@@ -11,6 +11,7 @@ import {
   saveAnalyticsPreferences,
 } from "../services/workflowStore";
 import { isAuthApiEnabled } from "../services/authConfig";
+import { api, isMockMode } from "../services/api";
 import type { AppDispatch, RootState } from "../app/store";
 import { adminRoleChangeRequested, adminUsersRequested } from "../features/auth/authSlice";
 import type {
@@ -37,8 +38,8 @@ interface RolePagesProps {
   workers: WorkerNode[];
   onNavigate: (page: AppPage) => void;
   onNotify: (message: string) => void;
-  onScenarioStatus: (id: string, status: ScenarioStatus) => void;
-  onScenarioUpdate: (id: string, changes: Partial<Scenario>) => void;
+  onScenarioStatus: (id: string, status: ScenarioStatus) => Promise<boolean>;
+  onScenarioUpdate: (id: string, changes: Partial<Scenario>) => Promise<boolean>;
   onImport: (scenario: Scenario) => Promise<Scenario>;
   onFailureConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
   onScenarioReexecute: (failure: FailureCluster) => void;
@@ -250,16 +251,14 @@ function ScenarioEditor({
   scenarios,
   onScenarioStatus,
   onScenarioUpdate,
-  onNotify,
   initialScenarioId,
 }: RolePagesProps) {
   const [id, setId] = useState(initialScenarioId ?? scenarios[0]?.id ?? "");
+  const [preview, setPreview] = useState<Scenario | null>(null);
   const selected = scenarios.find((scenario) => scenario.id === id);
-  function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selected) return;
-    const data = new FormData(event.currentTarget);
-    onScenarioUpdate(selected.id, {
+  function changesFromForm(form: HTMLFormElement): Partial<Scenario> {
+    const data = new FormData(form);
+    return {
       name: String(data.get("name")),
       description: String(data.get("description")),
       map: String(data.get("map")),
@@ -272,8 +271,12 @@ function ScenarioEditor({
       obstacleCount: Number(data.get("obstacleCount")),
       triggerCondition: String(data.get("triggerCondition")),
       actions: String(data.get("actions")),
-      status: "Draft",
-    });
+    };
+  }
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selected) return;
+    await onScenarioUpdate(selected.id, { ...changesFromForm(event.currentTarget), status: "Draft" });
   }
   return (
     <div className="role-page-stack">
@@ -410,9 +413,14 @@ function ScenarioEditor({
               <button
                 className="btn btn-light"
                 type="button"
-                onClick={() =>
-                  onNotify("Scenario preview refreshed from mock data.")
-                }
+                onClick={(event) => {
+                  const form = event.currentTarget.form;
+                  if (!form) return;
+                  setPreview({
+                    ...selected,
+                    ...changesFromForm(form),
+                  });
+                }}
               >
                 Preview definition
               </button>
@@ -424,9 +432,12 @@ function ScenarioEditor({
                 className="btn btn-light"
                 type="button"
                 disabled={selected.status === "In review"}
-                onClick={() => {
-                  onScenarioStatus(selected.id, "In review");
-                  onNotify(`${selected.id} submitted for review. Save edits before submitting.`);
+                onClick={async (event) => {
+                  const form = event.currentTarget.form;
+                  if (!form || !form.reportValidity()) return;
+                  const saved = await onScenarioUpdate(selected.id, { ...changesFromForm(form), status: "Draft" });
+                  if (!saved) return;
+                  await onScenarioStatus(selected.id, "In review");
                 }}
               >
                 Submit for review
@@ -459,6 +470,35 @@ function ScenarioEditor({
             </div>
           </aside>
         </form>
+      )}
+      {preview && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreview(null); }}>
+          <section className="modal review-detail-modal" role="dialog" aria-modal="true" aria-labelledby="scenario-preview-title">
+            <div className="modal-head">
+              <div>
+                <small className="section-kicker">UNSAVED SCENARIO PREVIEW · {preview.id}</small>
+                <h2 id="scenario-preview-title">{preview.name}</h2>
+                <p>{preview.description || "No description provided."}</p>
+              </div>
+              <button className="icon-button" type="button" aria-label="Close scenario preview" onClick={() => setPreview(null)}><Icon name="close" size={18} /></button>
+            </div>
+            <div className="review-detail-grid">
+              {[
+                ["Map / route", `${preview.map} · ${preview.routeDescription ?? "—"}`],
+                ["Category / weather", `${preview.category} · ${preview.weather}`],
+                ["Ego vehicle", preview.egoVehicle ?? "—"],
+                ["Traffic density", preview.trafficDensity ?? "—"],
+                ["Pedestrians / obstacles", `${preview.pedestrianCount ?? 0} / ${preview.obstacleCount ?? 0}`],
+                ["Trigger", preview.triggerCondition ?? "—"],
+                ["Scenario action", preview.actions ?? "—"],
+              ].map(([label, value]) => <div key={label}><small>{label}</small><b>{value}</b></div>)}
+            </div>
+            <div className="modal-actions">
+              <span className="badge draft">Preview only · not saved</span>
+              <button className="btn btn-primary" type="button" onClick={() => setPreview(null)}>Close preview</button>
+            </div>
+          </section>
+        </div>
       )}
     </div>
   );
@@ -666,7 +706,17 @@ function ImportScenarios({
 }
 
 function ScenarioCompare({ scenarios }: RolePagesProps) {
-  const preferences = useMemo(() => getAnalyticsPreferences(), []);
+  const [preferences, setPreferences] = useState(getAnalyticsPreferences);
+  useEffect(() => {
+    if (isMockMode) return;
+    let active = true;
+    void api.getAnalyticsPreferences().then((value) => {
+      if (!active) return;
+      setPreferences(value);
+      saveAnalyticsPreferences(value);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const [leftId, setLeftId] = useState(scenarios[0]?.id ?? "");
   const [rightId, setRightId] = useState(
     scenarios[1]?.id ?? scenarios[0]?.id ?? "",
@@ -1212,7 +1262,6 @@ function ReviewQueue({
   onScenarioStatus,
   onFailureConfirm,
   onScenarioReexecute,
-  onNotify,
   onNavigate,
 }: RolePagesProps) {
   const [inspectingScenario, setInspectingScenario] = useState<Scenario | null>(
@@ -1305,21 +1354,13 @@ function ReviewQueue({
                 </button>
                 <button
                   className="btn btn-light btn-xs"
-                  onClick={() => {
-                    onScenarioStatus(scenario.id, "Draft");
-                    onNotify(
-                      `${scenario.id} returned to draft with a mock review note.`,
-                    );
-                  }}
+                  onClick={() => { void onScenarioStatus(scenario.id, "Draft"); }}
                 >
                   Request changes
                 </button>
                 <button
                   className="btn btn-primary btn-xs"
-                  onClick={() => {
-                    onScenarioStatus(scenario.id, "Active");
-                    onNotify(`${scenario.id} approved for campaign use.`);
-                  }}
+                  onClick={() => { void onScenarioStatus(scenario.id, "Active"); }}
                 >
                   Approve
                 </button>
@@ -1444,22 +1485,16 @@ function ReviewQueue({
               </button>
               <button
                 className="btn btn-light"
-                onClick={() => {
-                  onScenarioStatus(inspectingScenario.id, "Draft");
-                  setInspectingScenario(null);
-                  onNotify(`${inspectingScenario.id} returned to draft.`);
+                onClick={async () => {
+                  if (await onScenarioStatus(inspectingScenario.id, "Draft")) setInspectingScenario(null);
                 }}
               >
                 Request changes
               </button>
               <button
                 className="btn btn-primary"
-                onClick={() => {
-                  onScenarioStatus(inspectingScenario.id, "Active");
-                  setInspectingScenario(null);
-                  onNotify(
-                    `${inspectingScenario.id} approved for campaign use.`,
-                  );
+                onClick={async () => {
+                  if (await onScenarioStatus(inspectingScenario.id, "Active")) setInspectingScenario(null);
                 }}
               >
                 <Icon name="check" size={15} />
@@ -1591,7 +1626,23 @@ function CampaignReport({
   const duration = completedRuns.length
     ? `${Math.floor(completedRuns.reduce((sum, run) => sum + (run.durationSeconds ?? 0), 0) / 60)}m`
     : "No run data";
-  const ranking = campaign ? getRanking<{ apfd: string; apfdc: string; baselineApfd: string; strategy: string }>(campaign.id) : undefined;
+  const [ranking, setRanking] = useState<{ apfd: string; apfdc: string; baselineApfd: string; baselineApfdc: string; strategy: string } | undefined>(
+    () => campaign ? getRanking<{ apfd: string; apfdc: string; baselineApfd: string; baselineApfdc: string; strategy: string }>(campaign.id) : undefined,
+  );
+  useEffect(() => {
+    if (!campaign) return;
+    if (isMockMode) {
+      setRanking(getRanking(campaign.id));
+      return;
+    }
+    let active = true;
+    void api.getCampaignRanking(campaign.id).then((value) => {
+      if (active) setRanking(value as typeof ranking);
+    }).catch(() => {
+      if (active) setRanking(undefined);
+    });
+    return () => { active = false; };
+  }, [campaign?.id]);
   const campaignFailures = failures.filter((failure) => selectedScenarios.some((scenario) => scenario.name === failure.scenarioName));
   return (
     <div className="role-page-stack">
@@ -1609,7 +1660,9 @@ function CampaignReport({
             ["Status", campaign.status],
             ["Strategy", ranking?.strategy ?? campaign.strategy],
             ["APFD", ranking?.apfd ?? "Unavailable"],
+            ["Seeded random baseline APFD", ranking?.baselineApfd ?? "Unavailable"],
             ["APFDc (estimated)", ranking?.apfdc ?? "Unavailable"],
+            ["Seeded random baseline APFDc", ranking?.baselineApfdc ?? "Unavailable"],
             ["Run ID", "Scenario ID", "Scenario version", "Verdict", "Duration seconds", "Worker", "Evidence"],
             ...campaignRuns.map((run) => [run.id, run.scenarioId, run.scenarioVersion, run.verdict ?? run.state, run.durationSeconds ?? "", run.workerId ?? "", run.evidence.map((evidence) => `${evidence.rule} ${evidence.measured} threshold ${evidence.threshold}`).join("; ")]),
           ])}
@@ -1711,7 +1764,7 @@ function CampaignReport({
                 ],
                 [
                   "Tune campaign order",
-                    ranking ? `${ranking.strategy} · APFD ${ranking.apfd} vs baseline ${ranking.baselineApfd}` : "Run prioritization to calculate APFD/APFDc for this campaign",
+                    ranking ? `${ranking.strategy} · APFD ${ranking.apfd} / ${ranking.baselineApfd}; APFDc ${ranking.apfdc} / ${ranking.baselineApfdc}` : "Run prioritization to calculate APFD/APFDc for this campaign",
                   "priority",
                 ],
               ].map(([title, detail, icon]) => (
@@ -2106,6 +2159,18 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
       return stored;
     }
   });
+  useEffect(() => {
+    if (isMockMode) return;
+    let active = true;
+    void api.getAnalyticsPreferences().then((value) => {
+      if (!active) return;
+      setSettings(value);
+      saveAnalyticsPreferences(value);
+    }).catch((error: unknown) => {
+      if (active) onNotify(error instanceof Error ? error.message : "Could not load analytics settings.");
+    });
+    return () => { active = false; };
+  }, []);
   function patch(changes: Partial<AnalyticsPreferences>) {
     setSettings((current) => ({ ...current, ...changes }));
   }
@@ -2115,7 +2180,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
       featureWeights: { ...current.featureWeights, [feature]: value },
     }));
   }
-  function save() {
+  async function save() {
     if (!(settings.similarityWarning >= 0 && settings.similarityWarning < settings.similarityBlock && settings.similarityBlock <= 1)) {
       onNotify("Similarity thresholds must satisfy 0 ≤ warning < block ≤ 1.");
       return;
@@ -2129,7 +2194,14 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
       onNotify("Evidence retention must be at least one day.");
       return;
     }
-    saveAnalyticsPreferences(settings);
+    let saved = settings;
+    try {
+      saved = await api.saveAnalyticsPreferences(settings);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : "Could not save analytics settings.");
+      return;
+    }
+    saveAnalyticsPreferences(saved);
     localStorage.setItem("asx-analytics", JSON.stringify({
       days: settings.reportDays,
       includeDrafts: settings.includeDrafts,
@@ -2137,7 +2209,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
       weeklyEmail: settings.weeklyEmail,
     }));
     appendAuditEvent({ actor: "Current administrator", action: "Updated analytics and similarity settings", target: "Workspace analytics", result: "Success" });
-    onNotify("Analytics settings saved in this browser.");
+    onNotify(isMockMode ? "Analytics settings saved in this browser." : "Analytics settings saved to the backend.");
   }
   return (
     <div className="role-page-stack">
@@ -2265,7 +2337,16 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
 
 function AuditLog({ onNotify }: RolePagesProps) {
   void onNotify;
-  const entries = useMemo(() => listAuditEvents().map((event: AuditEvent) => {
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>(listAuditEvents);
+  useEffect(() => {
+    if (isMockMode) return;
+    let active = true;
+    void api.listAuditEvents().then((events) => {
+      if (active) setAuditEvents(events);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  const entries = useMemo(() => auditEvents.map((event: AuditEvent) => {
     const action = event.action.toLowerCase();
     const category = action.includes("scenario") ? "Scenario"
       : action.includes("campaign") || action.includes("run") || action.includes("oracle verdict") ? "Execution"
@@ -2275,7 +2356,7 @@ function AuditLog({ onNotify }: RolePagesProps) {
               : action.includes("user") || action.includes("role") || action.includes("access") ? "Access"
                 : "Configuration";
     return { ...event, category };
-  }), []);
+  }), [auditEvents]);
   const [filter, setFilter] = useState("All activity");
   const [query, setQuery] = useState("");
   const visible = entries.filter((entry) =>
