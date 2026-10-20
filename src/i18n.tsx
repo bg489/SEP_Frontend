@@ -74,6 +74,12 @@ function translateDynamic(value: string) {
   if (match) return "Đã chuyển sang chế độ xem trước không gian làm việc " + (vietnameseTranslations[match[1]] ?? match[1]) + ".";
   match = value.match(/^(.+) updated in the mock workspace\.$/);
   if (match) return match[1] + " đã được cập nhật trong không gian mẫu.";
+  match = value.match(/^(.+) saved as immutable version (.+)\.$/);
+  if (match) return match[1] + " đã lưu thành phiên bản bất biến " + match[2] + ".";
+  match = value.match(/^(.+) submitted for review\. Save edits before submitting\.$/);
+  if (match) return "Đã gửi " + match[1] + " để duyệt. Hãy lưu chỉnh sửa trước khi gửi duyệt.";
+  match = value.match(/^(.+) cloned to (.+)\.$/);
+  if (match) return "Đã nhân bản " + match[1] + " thành " + match[2] + ".";
   match = value.match(/^Imported from (.+)\. Review the scenario definition before approval\.$/);
   if (match) return "Đã nhập từ " + match[1] + ". Hãy xem lại định nghĩa kịch bản trước khi phê duyệt.";
   match = value.match(/^(.+) was imported as a draft\.$/);

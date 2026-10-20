@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "./Icon";
+import { downloadCsv } from "../utils/download";
 import { isAuthApiEnabled } from "../services/authConfig";
 import type { AppDispatch, RootState } from "../app/store";
 import { adminRoleChangeRequested, adminUsersRequested } from "../features/auth/authSlice";
@@ -26,7 +27,7 @@ interface RolePagesProps {
   onNotify: (message: string) => void;
   onScenarioStatus: (id: string, status: ScenarioStatus) => void;
   onScenarioUpdate: (id: string, changes: Partial<Scenario>) => void;
-  onImport: (scenario: Scenario) => void;
+  onImport: (scenario: Scenario) => Promise<Scenario>;
   onFailureConfirm: (failure: FailureCluster) => void;
   onCampaignStatus: (id: string, status: Campaign["status"]) => void;
   onUserUpdate: (user: DemoUser) => void;
@@ -233,6 +234,7 @@ export function RolePages(props: RolePagesProps) {
 
 function ScenarioEditor({
   scenarios,
+  onScenarioStatus,
   onScenarioUpdate,
   onNotify,
   initialScenarioId,
@@ -249,9 +251,15 @@ function ScenarioEditor({
       map: String(data.get("map")),
       weather: String(data.get("weather")),
       category: String(data.get("category")),
+      routeDescription: String(data.get("routeDescription")),
+      egoVehicle: String(data.get("egoVehicle")),
+      trafficDensity: String(data.get("trafficDensity")) as Scenario["trafficDensity"],
+      pedestrianCount: Number(data.get("pedestrianCount")),
+      obstacleCount: Number(data.get("obstacleCount")),
+      triggerCondition: String(data.get("triggerCondition")),
+      actions: String(data.get("actions")),
       status: "Draft",
     });
-    onNotify(`${selected.id} updated in the mock workspace.`);
   }
   return (
     <div className="role-page-stack">
@@ -347,6 +355,43 @@ function ScenarioEditor({
                 ))}
               </select>
             </label>
+            <div className="form-row">
+              <label>
+                Route description
+                <input name="routeDescription" defaultValue={selected.routeDescription ?? "Start → junction → goal"} maxLength={500} />
+              </label>
+              <label>
+                Ego vehicle
+                <select name="egoVehicle" defaultValue={selected.egoVehicle ?? "vehicle.tesla.model3"}>
+                  {["vehicle.tesla.model3", "vehicle.lincoln.mkz_2020", "vehicle.mercedes.coupe", "vehicle.audi.tt"].map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="form-row">
+              <label>
+                Traffic density
+                <select name="trafficDensity" defaultValue={selected.trafficDensity ?? "Medium"}>
+                  {["Low", "Medium", "High"].map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </label>
+              <label>
+                Pedestrians / obstacles
+                <span className="form-row">
+                  <input name="pedestrianCount" type="number" min="0" max="100" defaultValue={selected.pedestrianCount ?? 1} aria-label="Pedestrians" />
+                  <input name="obstacleCount" type="number" min="0" max="100" defaultValue={selected.obstacleCount ?? 0} aria-label="Obstacles" />
+                </span>
+              </label>
+            </div>
+            <div className="form-row">
+              <label>
+                Trigger condition
+                <input name="triggerCondition" defaultValue={selected.triggerCondition ?? "Ego reaches start waypoint"} maxLength={300} />
+              </label>
+              <label>
+                Scenario action
+                <input name="actions" defaultValue={selected.actions ?? "Actor enters ego lane"} maxLength={300} />
+              </label>
+            </div>
             <div className="editor-form-actions">
               <button
                 className="btn btn-light"
@@ -360,6 +405,17 @@ function ScenarioEditor({
               <button className="btn btn-primary" type="submit">
                 <Icon name="check" size={15} />
                 Save draft
+              </button>
+              <button
+                className="btn btn-light"
+                type="button"
+                disabled={selected.status === "In review"}
+                onClick={() => {
+                  onScenarioStatus(selected.id, "In review");
+                  onNotify(`${selected.id} submitted for review. Save edits before submitting.`);
+                }}
+              >
+                Submit for review
               </button>
             </div>
           </div>
@@ -407,8 +463,8 @@ function ImportScenarios({
       onNotify("Choose an OpenSCENARIO .xosc or .osc file.");
       return;
     }
-    if (candidate.size > 25 * 1024 * 1024) {
-      onNotify("The mock import limit is 25 MB.");
+    if (candidate.size > 10 * 1024 * 1024) {
+      onNotify("The import limit is 10 MB.");
       return;
     }
     setFile(candidate);
@@ -429,34 +485,61 @@ function ImportScenarios({
         normalizedFileName,
     ),
   );
-  function importFile() {
+  async function importFile() {
     if (!file) return;
     if (duplicate) {
       onNotify("A scenario with this name is already in the library.");
       return;
     }
+    let contents: string;
+    try {
+      contents = await file.text();
+    } catch {
+      onNotify("The selected scenario file could not be read.");
+      return;
+    }
+    const parsed = new DOMParser().parseFromString(contents, "application/xml");
+    const root = parsed.documentElement;
+    if (
+      parsed.getElementsByTagName("parsererror").length > 0 ||
+      root.localName !== "OpenSCENARIO" ||
+      parsed.getElementsByTagName("Storyboard").length === 0
+    ) {
+      onNotify("Import rejected: expected valid OpenSCENARIO XML with a Storyboard. No scenario was created.");
+      return;
+    }
     const name = file.name.replace(/\.(xosc|osc)$/i, "").replace(/[_-]+/g, " ");
+    const logicFile = parsed.getElementsByTagName("LogicFile")[0]?.getAttribute("filepath") ?? "";
+    const mapMatch = logicFile.match(/Town\d+|Town10HD/i);
+    const actorCount = parsed.getElementsByTagName("ScenarioObject").length;
     const scenario: Scenario = {
-      id: `SCN-${Math.floor(100 + Math.random() * 899)}`,
+      id: "SCN-IMPORT",
       name,
       description: `Imported from ${file.name}. Review the scenario definition before approval.`,
-      map: "Town05",
+      map: mapMatch?.[0] ?? "Town05",
       category: "Urban",
       severity: "Medium",
       status: "Draft",
       version: "v0.1",
       weather: "Clear noon",
-      actors: 3,
+      actors: Math.max(1, actorCount + 1),
       runCount: 0,
       passRate: 0,
       lastRun: "Not run",
       owner: "Current user",
       tags: ["imported"],
       priorityScore: 52,
+      routeDescription: "Imported route configuration",
+      egoVehicle: "Imported from OpenSCENARIO",
+      sourceFileName: file.name,
     };
-    onImport(scenario);
-    setFile(null);
-    onNotify(`${scenario.id} was imported as a draft.`);
+    try {
+      const saved = await onImport(scenario);
+      setFile(null);
+      onNotify(`${saved.id} was imported as a draft from ${file.name}.`);
+    } catch (error) {
+      onNotify(error instanceof Error ? error.message : "Could not save the imported scenario.");
+    }
   }
   return (
     <div className="role-page-stack">
@@ -491,7 +574,7 @@ function ImportScenarios({
         <small>
           {file
             ? `${(file.size / 1024).toFixed(1)} KB · Ready for mock validation`
-            : "or choose a file from your computer · .xosc, .osc · up to 25 MB"}
+            : "or choose a file from your computer · .xosc, .osc · up to 10 MB"}
         </small>
         <span className="btn btn-light">Choose file</span>
       </label>
@@ -568,13 +651,24 @@ function ImportScenarios({
   );
 }
 
-function ScenarioCompare({ scenarios, onNotify }: RolePagesProps) {
+function ScenarioCompare({ scenarios }: RolePagesProps) {
   const [leftId, setLeftId] = useState(scenarios[0]?.id ?? "");
   const [rightId, setRightId] = useState(
     scenarios[1]?.id ?? scenarios[0]?.id ?? "",
   );
   const left = scenarios.find((scenario) => scenario.id === leftId);
   const right = scenarios.find((scenario) => scenario.id === rightId);
+  const comparableFeatures = left && right ? [
+    ["category", left.category === right.category ? 1 : 0],
+    ["map", left.map === right.map ? 1 : 0],
+    ["weather", left.weather === right.weather ? 1 : 0],
+    ["severity", left.severity === right.severity ? 1 : 0],
+    ["actors", 1 - Math.min(1, Math.abs(left.actors - right.actors) / Math.max(left.actors, right.actors, 1))],
+    ["pass rate", 1 - Math.abs(left.passRate - right.passRate) / 100],
+  ] as [string, number][] : [];
+  const similarity = comparableFeatures.length
+    ? comparableFeatures.reduce((sum, [, score]) => sum + score, 0) / comparableFeatures.length
+    : undefined;
   const rows: [string, string, string][] =
     left && right
       ? [
@@ -605,9 +699,12 @@ function ScenarioCompare({ scenarios, onNotify }: RolePagesProps) {
         </div>
         <button
           className="btn btn-light"
-          onClick={() =>
-            onNotify("Comparison report prepared from mock scenario data.")
-          }
+          disabled={!left || !right}
+          onClick={() => left && right && downloadCsv("scenario-comparison.csv", [
+            ["Feature", left.id, right.id],
+            ...rows,
+            ["Gower similarity", `${((similarity ?? 0) * 100).toFixed(1)}%`, `${((similarity ?? 0) * 100).toFixed(1)}%`],
+          ])}
         >
           <Icon name="download" size={15} />
           Export comparison
@@ -667,6 +764,16 @@ function ScenarioCompare({ scenarios, onNotify }: RolePagesProps) {
           </div>
         ))}
       </section>
+      {similarity !== undefined && (
+        <section className="card compare-similarity">
+          <div>
+            <small className="section-kicker">GOWER SIMILARITY · CONFIGURATION FEATURES</small>
+            <h3>{(similarity * 100).toFixed(1)}% similar</h3>
+            <p>Mixed categorical and numeric values are normalized; the score is calculated from the fields shown in this comparison.</p>
+          </div>
+          <Badge value={similarity >= 0.93 ? "Possible duplicate" : similarity >= 0.78 ? "Review match" : "Distinct"} />
+        </section>
+      )}
     </div>
   );
 }
@@ -724,12 +831,12 @@ function ScenarioClusters({ scenarios, onNavigate, onNotify }: RolePagesProps) {
                 <h3>{group.category} scenarios</h3>
                 <small>
                   {
-                    group.items.filter((item) => item.status === "Approved")
+                    group.items.filter((item) => item.status === "Active" || item.status === "Approved")
                       .length
                   }{" "}
-                  approved ·{" "}
+                  active ·{" "}
                   {
-                    group.items.filter((item) => item.status !== "Approved")
+                    group.items.filter((item) => item.status !== "Active" && item.status !== "Approved")
                       .length
                   }{" "}
                   need attention
@@ -1187,7 +1294,7 @@ function ReviewQueue({
                 <button
                   className="btn btn-primary btn-xs"
                   onClick={() => {
-                    onScenarioStatus(scenario.id, "Approved");
+                    onScenarioStatus(scenario.id, "Active");
                     onNotify(`${scenario.id} approved for campaign use.`);
                   }}
                 >
@@ -1325,7 +1432,7 @@ function ReviewQueue({
               <button
                 className="btn btn-primary"
                 onClick={() => {
-                  onScenarioStatus(inspectingScenario.id, "Approved");
+                  onScenarioStatus(inspectingScenario.id, "Active");
                   setInspectingScenario(null);
                   onNotify(
                     `${inspectingScenario.id} approved for campaign use.`,

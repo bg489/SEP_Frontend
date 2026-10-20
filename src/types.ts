@@ -1,4 +1,4 @@
-export type ScenarioStatus = "Approved" | "In review" | "Draft" | "Archived";
+export type ScenarioStatus = "Active" | "Approved" | "In review" | "Draft" | "Archived";
 export type CampaignStatus =
   "Running" | "Queued" | "Completed" | "Draft" | "Needs review";
 export type RunVerdict = "PASS" | "FAIL" | "TIMEOUT";
@@ -49,6 +49,67 @@ export interface Scenario {
   owner: string;
   tags: string[];
   priorityScore: number;
+  routeDescription?: string;
+  egoVehicle?: string;
+  trafficDensity?: "Low" | "Medium" | "High";
+  pedestrianCount?: number;
+  obstacleCount?: number;
+  triggerCondition?: string;
+  actions?: string;
+  sourceFileName?: string;
+}
+
+export interface ScenarioVersionRecord {
+  version: string;
+  savedAt: string;
+  note: string;
+  hash: string;
+  status: ScenarioStatus;
+}
+
+export interface ScenarioRun {
+  id: string;
+  campaignId: string;
+  scenarioId: string;
+  scenarioName: string;
+  scenarioVersion: string;
+  state: "Queued" | "Assigned" | "Running" | "Passed" | "Failed" | "Cancelled" | "Timed Out";
+  progress: number;
+  verdict?: RunVerdict;
+  startedAt?: string;
+  durationSeconds?: number;
+  workerId?: string;
+  retryOf?: string;
+  artifacts: string[];
+  evidence: FailureEvidence[];
+}
+
+export interface AuditEvent {
+  id: string;
+  time: string;
+  actor: string;
+  action: string;
+  target: string;
+  result: "Success" | "Rejected" | "Info";
+}
+
+export interface CarlaIntegrationConfig {
+  host: string;
+  rpcPort: number;
+  streamingPort: number;
+  carlaVersion: string;
+  scenarioRunnerPath: string;
+  qualityLevel: "Low" | "Epic";
+  validated: boolean;
+  active: boolean;
+  updatedAt: string;
+}
+
+export interface AnalyticsPreferences {
+  similarityWarning: number;
+  similarityBlock: number;
+  featureWeights: { map: number; category: number; weather: number; severity: number; actors: number };
+  retentionDays: number;
 }
 
 export interface Campaign {
@@ -151,6 +212,11 @@ export interface AutoScenarioApi {
   getOverview(): Promise<OverviewData>;
   listScenarios(filters?: ScenarioFilters): Promise<Scenario[]>;
   createScenario(input: CreateScenarioInput): Promise<Scenario>;
+  persistImportedScenario(scenario: Scenario): Promise<Scenario>;
+  updateScenario(id: string, changes: Partial<Scenario>): Promise<Scenario>;
+  cloneScenario(id: string): Promise<Scenario>;
+  updateScenarioStatus(id: string, status: ScenarioStatus, note?: string): Promise<Scenario>;
+  listScenarioVersions(id: string): Promise<ScenarioVersionRecord[]>;
   listCampaigns(): Promise<Campaign[]>;
   createCampaign(input: CreateCampaignInput): Promise<Campaign>;
   listFailures(): Promise<FailureCluster[]>;

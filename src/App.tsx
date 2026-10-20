@@ -38,6 +38,7 @@ import type {
   OracleRule,
   OverviewData,
   Scenario,
+  ScenarioVersionRecord,
   UserRole,
   WorkerNode,
 } from "./types";
@@ -260,6 +261,7 @@ function AppContent() {
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(
     null,
   );
+  const [scenarioVersions, setScenarioVersions] = useState<ScenarioVersionRecord[]>([]);
   const [editorScenarioId, setEditorScenarioId] = useState<
     string | undefined
   >();
@@ -371,6 +373,22 @@ function AppContent() {
   );
 
   const notify = (message: string) => setToast(message);
+  const openScenario = (scenario: Scenario) => {
+    setSelectedScenario(scenario);
+    setScenarioVersions([]);
+    void api.listScenarioVersions(scenario.id).then(setScenarioVersions).catch(() => setScenarioVersions([]));
+  };
+  const cloneSelectedScenario = async (scenario: Scenario) => {
+    try {
+      const cloned = await api.cloneScenario(scenario.id);
+      setScenarios((items) => [cloned, ...items]);
+      setOverview((value) => ({ ...value, totalScenarios: value.totalScenarios + 1 }));
+      openScenario(cloned);
+      notify(`${scenario.id} cloned to ${cloned.id}.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not clone scenario.");
+    }
+  };
   const createScenario = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -744,7 +762,7 @@ function AppContent() {
               secondaryLabel={dashboardLinks[role].secondaryLabel}
               openPrimary={() => navigate(dashboardLinks[role].primary)}
               openSecondary={() => navigate(dashboardLinks[role].secondary)}
-              onScenario={setSelectedScenario}
+              onScenario={openScenario}
             />
           )}
           {page === "scenarios" && (
@@ -755,7 +773,7 @@ function AppContent() {
               setSearch={setSearch}
               status={statusFilter}
               setStatus={setStatusFilter}
-              openScenario={setSelectedScenario}
+              openScenario={openScenario}
               onImport={() => navigate("import")}
             />
           )}
@@ -812,26 +830,24 @@ function AppContent() {
               workers={workers}
               onNavigate={navigate}
               onNotify={notify}
-              onScenarioStatus={(id, status) =>
-                setScenarios((items) =>
-                  items.map((item) =>
-                    item.id === id ? { ...item, status } : item,
-                  ),
-                )
-              }
-              onScenarioUpdate={(id, changes) =>
-                setScenarios((items) =>
-                  items.map((item) =>
-                    item.id === id ? { ...item, ...changes } : item,
-                  ),
-                )
-              }
-              onImport={(scenario) => {
-                setScenarios((items) => [scenario, ...items]);
-                setOverview((value) => ({
-                  ...value,
-                  totalScenarios: value.totalScenarios + 1,
-                }));
+              onScenarioStatus={(id, status) => {
+                void api.updateScenarioStatus(id, status).then((updated) => {
+                  setScenarios((items) => items.map((item) => item.id === id ? updated : item));
+                }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not update review status."));
+              }}
+              onScenarioUpdate={(id, changes) => {
+                void api.updateScenario(id, changes).then((updated) => {
+                  setScenarios((items) => items.map((item) => item.id === id ? updated : item));
+                  setSelectedScenario((item) => item?.id === id ? updated : item);
+                  void api.listScenarioVersions(id).then(setScenarioVersions);
+                  notify(`${id} saved as immutable version ${updated.version}.`);
+                }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not save scenario version."));
+              }}
+              onImport={async (scenario) => {
+                const saved = await api.persistImportedScenario(scenario);
+                setScenarios((items) => [saved, ...items]);
+                setOverview((value) => ({ ...value, totalScenarios: value.totalScenarios + 1 }));
+                return saved;
               }}
               onFailureConfirm={confirmFailure}
               onCampaignStatus={(id, status) =>
@@ -1008,7 +1024,7 @@ function AppContent() {
           </div>
           <div className="scenario-picker">
             {scenarios
-              .filter((s) => s.status === "Approved")
+              .filter((s) => s.status === "Active" || s.status === "Approved")
               .slice(0, 7)
               .map((s) => (
                 <label className="pick-item" key={s.id}>
@@ -1086,15 +1102,28 @@ function AppContent() {
             </div>
             <div className="drawer-section">
               <h3>Version history</h3>
-              <div className="version-entry">
-                <i />
-                <span>
-                  <b>{selectedScenario.version} · Current</b>
-                  <small>Preserved with each campaign run.</small>
-                </span>
-              </div>
+              {(scenarioVersions.length ? scenarioVersions : [{
+                version: selectedScenario.version,
+                savedAt: "Current version",
+                note: "Scenario definition",
+                hash: "",
+                status: selectedScenario.status,
+              }]).map((version, index) => (
+                <div className="version-entry" key={version.version}>
+                  <i />
+                  <span>
+                    <b>{version.version} {index === 0 ? "· Current" : ""}</b>
+                    <small>{version.note} · {version.savedAt} · {version.hash ? `SHA ${version.hash}` : version.status}</small>
+                  </span>
+                </div>
+              ))}
             </div>
             <div className="drawer-actions">
+              {role === "Scenario Engineer" && (
+                <button className="btn btn-light" onClick={() => void cloneSelectedScenario(selectedScenario)}>
+                  <Icon name="plus" size={15} /> Clone scenario
+                </button>
+              )}
               <button
                 className="btn btn-light"
                 onClick={() => downloadScenarioFile(selectedScenario)}
@@ -1536,7 +1565,7 @@ function ScenarioLibrary({
         <label className="filter-box">
           <Icon name="filter" size={15} />
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {["All statuses", "Approved", "In review", "Draft", "Archived"].map(
+            {["All statuses", "Active", "Approved", "In review", "Draft", "Archived"].map(
               (x) => (
                 <option key={x}>{x}</option>
               ),

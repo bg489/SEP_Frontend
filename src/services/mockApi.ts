@@ -15,7 +15,14 @@ import type {
   OverviewData,
   Scenario,
   ScenarioFilters,
+  ScenarioStatus,
+  ScenarioVersionRecord,
 } from "../types";
+import {
+  appendAuditEvent,
+  recordScenarioVersion,
+  scenarioVersionHistory,
+} from "./workflowStore";
 
 const storageKeys = {
   scenarios: "autoscenariox.mock.scenarios",
@@ -101,12 +108,75 @@ export const mockApi: AutoScenarioApi = {
             : 62,
     };
     writeStored(storageKeys.scenarios, [created, ...items]);
+    recordScenarioVersion(created, "Scenario created");
+    appendAuditEvent({ actor: "Current user", action: "Create scenario", target: created.id, result: "Success" });
     const overview = readStored("autoscenariox.mock.overview", mockOverview);
     writeStored("autoscenariox.mock.overview", {
       ...overview,
       totalScenarios: overview.totalScenarios + 1,
     });
     return created;
+  },
+  async persistImportedScenario(scenario: Scenario): Promise<Scenario> {
+    const items = readStored(storageKeys.scenarios, mockScenarios);
+    const created = { ...scenario, id: makeId("SCN", items), version: "v1.0" };
+    writeStored(storageKeys.scenarios, [created, ...items]);
+    recordScenarioVersion(created, `Imported ${scenario.sourceFileName ?? "OpenSCENARIO file"}`);
+    appendAuditEvent({ actor: "Current user", action: "Import scenario", target: created.id, result: "Success" });
+    const overview = readStored("autoscenariox.mock.overview", mockOverview);
+    writeStored("autoscenariox.mock.overview", { ...overview, totalScenarios: overview.totalScenarios + 1 });
+    return created;
+  },
+  async updateScenario(id: string, changes: Partial<Scenario>): Promise<Scenario> {
+    const items = readStored(storageKeys.scenarios, mockScenarios);
+    const current = items.find((scenario) => scenario.id === id);
+    if (!current) throw new Error("Scenario not found: " + id);
+    scenarioVersionHistory(current);
+    const versionParts = current.version.match(/^v(\d+)\.(\d+)$/);
+    const nextVersion = versionParts
+      ? `v${versionParts[1]}.${Number(versionParts[2]) + 1}`
+      : "v1.1";
+    const updated: Scenario = { ...current, ...changes, id, version: nextVersion, status: "Draft" };
+    writeStored(storageKeys.scenarios, items.map((scenario) => scenario.id === id ? updated : scenario));
+    recordScenarioVersion(updated, "Edited scenario definition");
+    appendAuditEvent({ actor: "Current user", action: "Create scenario version", target: `${id} ${nextVersion}`, result: "Success" });
+    return updated;
+  },
+  async cloneScenario(id: string): Promise<Scenario> {
+    const items = readStored(storageKeys.scenarios, mockScenarios);
+    const original = items.find((scenario) => scenario.id === id);
+    if (!original) throw new Error("Scenario not found: " + id);
+    const cloned: Scenario = {
+      ...original,
+      id: makeId("SCN", items),
+      name: `Copy of ${original.name}`,
+      version: "v1.0",
+      status: "Draft",
+      runCount: 0,
+      passRate: 0,
+      lastRun: "Never",
+      owner: "Current user",
+      tags: [...original.tags, "clone"],
+    };
+    writeStored(storageKeys.scenarios, [cloned, ...items]);
+    recordScenarioVersion(cloned, `Cloned from ${original.id}`);
+    appendAuditEvent({ actor: "Current user", action: "Clone scenario", target: `${original.id} → ${cloned.id}`, result: "Success" });
+    const overview = readStored("autoscenariox.mock.overview", mockOverview);
+    writeStored("autoscenariox.mock.overview", { ...overview, totalScenarios: overview.totalScenarios + 1 });
+    return cloned;
+  },
+  async updateScenarioStatus(id: string, status: ScenarioStatus, note = ""): Promise<Scenario> {
+    const items = readStored(storageKeys.scenarios, mockScenarios);
+    const current = items.find((scenario) => scenario.id === id);
+    if (!current) throw new Error("Scenario not found: " + id);
+    const updated = { ...current, status };
+    writeStored(storageKeys.scenarios, items.map((scenario) => scenario.id === id ? updated : scenario));
+    appendAuditEvent({ actor: "Current user", action: `Scenario status: ${status}${note ? ` (${note})` : ""}`, target: id, result: "Success" });
+    return updated;
+  },
+  async listScenarioVersions(id: string): Promise<ScenarioVersionRecord[]> {
+    const scenario = readStored(storageKeys.scenarios, mockScenarios).find((item) => item.id === id);
+    return scenario ? scenarioVersionHistory(scenario) : [];
   },
   async listCampaigns(): Promise<Campaign[]> {
     return readStored(storageKeys.campaigns, mockCampaigns);

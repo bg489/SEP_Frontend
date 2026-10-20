@@ -7,6 +7,8 @@ import type {
   OverviewData,
   Scenario,
   ScenarioFilters,
+  ScenarioStatus,
+  ScenarioVersionRecord,
   FailureCluster,
   WorkerNode,
 } from "../types";
@@ -55,6 +57,30 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       method: "POST",
       body: JSON.stringify(input),
     });
+  }
+  persistImportedScenario(scenario: Scenario) {
+    return this.request<Scenario>("/api/scenarios/import", {
+      method: "POST",
+      body: JSON.stringify(scenario),
+    });
+  }
+  updateScenario(id: string, changes: Partial<Scenario>) {
+    return this.request<Scenario>("/api/scenarios/" + encodeURIComponent(id) + "/versions", {
+      method: "POST",
+      body: JSON.stringify(changes),
+    });
+  }
+  cloneScenario(id: string) {
+    return this.request<Scenario>("/api/scenarios/" + encodeURIComponent(id) + "/clone", { method: "POST" });
+  }
+  updateScenarioStatus(id: string, status: ScenarioStatus, note = "") {
+    return this.request<Scenario>("/api/scenarios/" + encodeURIComponent(id) + "/status", {
+      method: "PUT",
+      body: JSON.stringify({ status, note }),
+    });
+  }
+  listScenarioVersions(id: string) {
+    return this.request<ScenarioVersionRecord[]>("/api/scenarios/" + encodeURIComponent(id) + "/versions");
   }
   listCampaigns() {
     return this.request<Campaign[]>("/api/campaigns");
