@@ -5,11 +5,21 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Icon, type IconName } from "./components/Icon";
 import { AuthScreen } from "./components/AuthScreen";
 import { RolePages, RoleWelcome } from "./components/RolePages";
 import { LanguageProvider, LanguageSwitcher } from "./i18n";
 import { api, isMockMode } from "./services/api";
+import { isAuthApiEnabled } from "./services/authConfig";
+import type { AppDispatch, RootState } from "./app/store";
+import {
+  bootstrapAuthRequested,
+  loginRequested,
+  logoutRequested,
+  passwordResetRequested,
+  registerRequested,
+} from "./features/auth/authSlice";
 import {
   mockCampaigns,
   mockFailures,
@@ -234,15 +244,9 @@ export default function App() {
 }
 
 function AppContent() {
-  const [user, setUser] = useState<DemoUser | null>(() => {
-    try {
-      return JSON.parse(
-        localStorage.getItem("asx-session") ?? "null",
-      ) as DemoUser | null;
-    } catch {
-      return null;
-    }
-  });
+  const dispatch = useDispatch<AppDispatch>();
+  const auth = useSelector((state: RootState) => state.auth);
+  const user = auth.user;
   const [page, setPage] = useState<Page>("overview");
   const [overview, setOverview] = useState<OverviewData>(mockOverview);
   const [scenarios, setScenarios] = useState<Scenario[]>(mockScenarios);
@@ -265,6 +269,10 @@ function AppContent() {
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [ready, setReady] = useState(false);
   const role = user?.role ?? "Test Engineer";
+  useEffect(() => {
+    dispatch(bootstrapAuthRequested());
+  }, [dispatch]);
+
   const navigate = (target: Page) => {
     if (!rolePages[role].includes(target)) {
       notify("This screen is not included in the current role preview.");
@@ -273,18 +281,12 @@ function AppContent() {
     setPage(target);
     setSelectedScenario(null);
   };
-  const authenticate = (next: DemoUser) => {
-    localStorage.setItem("asx-session", JSON.stringify(next));
-    setUser(next);
-    setPage("overview");
-  };
   const updateUser = (next: DemoUser) => {
+    if (isAuthApiEnabled) return;
     localStorage.setItem("asx-session", JSON.stringify(next));
-    setUser(next);
   };
   const signOut = () => {
-    localStorage.removeItem("asx-session");
-    setUser(null);
+    dispatch(logoutRequested());
     setPage("overview");
   };
 
@@ -491,7 +493,22 @@ function AppContent() {
       </button>
     ) : null;
 
-  if (!user) return <AuthScreen onAuthenticate={authenticate} />;
+  if (auth.status === "checking") {
+    return <div className="auth-loading">Checking your session…</div>;
+  }
+
+  if (!user) {
+    return (
+      <AuthScreen
+        busy={auth.busy}
+        error={auth.error}
+        notice={auth.message}
+        onLogin={(input) => dispatch(loginRequested(input))}
+        onRegister={(input) => dispatch(registerRequested(input))}
+        onRequestPasswordReset={(email) => dispatch(passwordResetRequested(email))}
+      />
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -637,29 +654,6 @@ function AppContent() {
               <i />
             </button>
             <span className="top-divider" />
-            <label className="role-preview-select">
-              <small>ROLE PREVIEW</small>
-              <select
-                value={user.role}
-                aria-label="Preview role"
-                onChange={(event) => {
-                  const nextRole = event.target.value as UserRole;
-                  updateUser({ ...user, role: nextRole });
-                  if (!rolePages[nextRole].includes(page)) setPage("overview");
-                  setSelectedScenario(null);
-                  notify(`Switched to ${nextRole} workspace preview.`);
-                }}
-              >
-                {[
-                  "Scenario Engineer",
-                  "Test Engineer",
-                  "Test Reviewer",
-                  "Administrator",
-                ].map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </label>
             <button className="top-user" onClick={() => navigate("profile")}>
               <Avatar
                 initials={user.name

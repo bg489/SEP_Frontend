@@ -1,48 +1,34 @@
 import { useState, type FormEvent } from "react";
 import { Icon } from "./Icon";
 import { LanguageSwitcher } from "../i18n";
-import type { DemoUser, UserRole } from "../types";
+import type { LoginInput, RegisterInput, RegistrationRole } from "../services/authApi";
 
 type AuthMode = "login" | "register" | "forgot";
 
-const demoAccounts: DemoUser[] = [
-  {
-    name: "Linh Nguyen",
-    email: "scenario@autoscenariox.dev",
-    role: "Scenario Engineer",
-  },
-  {
-    name: "Bao Doan",
-    email: "tester@autoscenariox.dev",
-    role: "Test Engineer",
-  },
-  {
-    name: "Mai Tran",
-    email: "reviewer@autoscenariox.dev",
-    role: "Test Reviewer",
-  },
-  {
-    name: "Alex Pham",
-    email: "admin@autoscenariox.dev",
-    role: "Administrator",
-  },
-];
-
-const roles: UserRole[] = [
+const registrationRoles: RegistrationRole[] = [
   "Scenario Engineer",
   "Test Engineer",
   "Test Reviewer",
-  "Administrator",
 ];
 
+interface AuthScreenProps {
+  busy: boolean;
+  error: string | null;
+  notice: string | null;
+  onLogin: (input: LoginInput) => void;
+  onRegister: (input: RegisterInput) => void;
+  onRequestPasswordReset: (email: string) => void;
+}
+
 export function AuthScreen({
-  onAuthenticate,
-}: {
-  onAuthenticate: (user: DemoUser) => void;
-}) {
+  busy,
+  error,
+  notice,
+  onLogin,
+  onRegister,
+  onRequestPasswordReset,
+}: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [role, setRole] = useState<UserRole>("Test Engineer");
-  const [message, setMessage] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,45 +38,24 @@ export function AuthScreen({
       .toLowerCase();
 
     if (mode === "forgot") {
-      setMessage(
-        `A password reset link is ready to send to ${email} when authentication is connected.`,
-      );
+      onRequestPasswordReset(email);
       return;
     }
 
     if (mode === "register") {
-      const user: DemoUser = {
+      onRegister({
         name: String(data.get("name") ?? "New user").trim(),
         email,
-        role,
-      };
-      const saved = JSON.parse(
-        localStorage.getItem("asx-users") ?? "[]",
-      ) as DemoUser[];
-      localStorage.setItem(
-        "asx-users",
-        JSON.stringify([user, ...saved.filter((item) => item.email !== email)]),
-      );
-      onAuthenticate(user);
+        password: String(data.get("password") ?? ""),
+        role: String(data.get("role") ?? "Scenario Engineer") as RegistrationRole,
+      });
       return;
     }
 
-    const known = demoAccounts.find((item) => item.email === email);
-    const saved = JSON.parse(
-      localStorage.getItem("asx-users") ?? "[]",
-    ) as DemoUser[];
-    const registered = saved.find((item) => item.email === email);
-    const user = registered ??
-      known ?? {
-        name:
-          email
-            .split("@")[0]
-            ?.replace(/[._-]/g, " ")
-            .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "Demo user",
-        email: email || "demo@autoscenariox.dev",
-        role,
-      };
-    onAuthenticate({ ...user, role: known?.role ?? registered?.role ?? role });
+    onLogin({
+      email,
+      password: String(data.get("password") ?? ""),
+    });
   }
 
   return (
@@ -204,9 +169,9 @@ export function AuthScreen({
             </h2>
             <p>
               {mode === "login"
-                ? "Enter your details or use a demo role to explore AutoScenarioX."
+                ? "Sign in with an account registered in the AutoScenarioX database."
                 : mode === "register"
-                  ? "Set up a demo profile. Authentication will connect to your backend later."
+                  ? "Create an account with your work email and choose your role. Administrator access is assigned separately."
                   : "Enter your email and we’ll prepare a reset request."}
             </p>
           </div>
@@ -247,8 +212,8 @@ export function AuthScreen({
                   name="password"
                   type="password"
                   required
-                  minLength={6}
-                  placeholder="At least 6 characters"
+                  minLength={8}
+                  placeholder="8+ characters with upper/lowercase, number and symbol"
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
@@ -256,43 +221,56 @@ export function AuthScreen({
               </div>
             </label>
           )}
-          {mode !== "forgot" && (
-            <label className="auth-label">
-              Preview role
-              <select
-                value={role}
-                onChange={(event) => setRole(event.target.value as UserRole)}
-              >
-                {roles.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </label>
-          )}
           {mode === "login" && (
             <button
               className="auth-forgot"
               type="button"
+              disabled={busy}
               onClick={() => {
-                setMessage("");
                 setMode("forgot");
               }}
             >
               Forgot password?
             </button>
           )}
-          {message && (
-            <div className="auth-message">
-              <Icon name="circle-check" size={16} />
-              {message}
+          {mode === "register" && (
+            <label className="auth-label">
+              Role
+              <select name="role" defaultValue="Scenario Engineer" required>
+                {registrationRoles.map((registrationRole) => (
+                  <option key={registrationRole} value={registrationRole}>
+                    {registrationRole}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {mode === "register" && (
+            <div className="auth-role-note">
+              <Icon name="shield" size={15} />
+              Choose Scenario Engineer, Test Engineer, or Test Reviewer. Administrator access must be assigned by an existing administrator.
             </div>
           )}
-          <button className="btn btn-primary auth-submit" type="submit">
-            {mode === "login"
-              ? "Sign in"
-              : mode === "register"
-                ? "Create account"
-                : "Send reset link"}
+          {error && (
+            <div className="auth-message auth-error" role="alert">
+              <Icon name="warning" size={16} />
+              {error}
+            </div>
+          )}
+          {notice && (
+            <div className="auth-message" role="status">
+              <Icon name="circle-check" size={16} />
+              {notice}
+            </div>
+          )}
+          <button className="btn btn-primary auth-submit" type="submit" disabled={busy}>
+            {busy
+              ? "Please wait…"
+              : mode === "login"
+                ? "Sign in"
+                : mode === "register"
+                  ? "Create account"
+                  : "Send reset link"}
             <Icon name="arrow-right" size={16} />
           </button>
           <div className="auth-switch">
@@ -301,8 +279,8 @@ export function AuthScreen({
                 New to AutoScenarioX?{" "}
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => {
-                    setMessage("");
                     setMode("register");
                   }}
                 >
@@ -314,8 +292,8 @@ export function AuthScreen({
                 Already have an account?{" "}
                 <button
                   type="button"
+                  disabled={busy}
                   onClick={() => {
-                    setMessage("");
                     setMode("login");
                   }}
                 >
@@ -324,39 +302,8 @@ export function AuthScreen({
               </>
             )}
           </div>
-          {mode === "login" && (
-            <>
-              <div className="auth-divider">
-                <span />
-                or explore a role
-                <span />
-              </div>
-              <div className="demo-role-grid">
-                {demoAccounts.map((account, index) => (
-                  <button
-                    type="button"
-                    key={account.role}
-                    className="demo-role"
-                    onClick={() => onAuthenticate(account)}
-                  >
-                    <span className={`demo-role-avatar tone-${index}`}>
-                      {account.name
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")}
-                    </span>
-                    <span>
-                      <b>{account.role}</b>
-                      <small>{account.name}</small>
-                    </span>
-                    <Icon name="arrow-right" size={14} />
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
           <div className="auth-footnote">
-            <i /> Demo data only · No backend authentication is connected
+            <i /> Secure sign-in · Role-based access
           </div>
         </form>
       </section>
