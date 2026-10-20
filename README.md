@@ -4,7 +4,7 @@
 
 This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser. Authentication requests are managed with Redux Saga.
 
-The app starts in **mock mode**. Its API boundary is designed so the frontend can later use the .NET REST API without coupling screen components to HTTP or Supabase.
+The app starts in **mock mode** for UI previews. Set `VITE_DATA_MODE=api` to use the .NET REST API and PostgreSQL for scenarios, campaigns, execution queue records, failures, prioritization results, configuration, and audit history. Authentication always uses the .NET API. The browser never connects directly to PostgreSQL or Supabase.
 
 ## Features by role
 
@@ -23,7 +23,7 @@ The sign-in screen includes registration and forgot-password views. Use the **EN
 
 - Node.js 20.19 or newer
 - npm
-- .NET 10 SDK and PostgreSQL 18 to run backend authentication
+- .NET 10 SDK and PostgreSQL 18 to run the backend
 
 ### Install and start
 
@@ -56,7 +56,7 @@ VITE_DATA_MODE=mock
 VITE_API_BASE_URL=http://localhost:5080
 ```
 
-Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` only switches scenario-management data; it never changes authentication. Set `VITE_DATA_MODE=api` only when the scenario-management endpoints listed below are available.
+Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` only switches scenario-management data; it never changes authentication. Set `VITE_DATA_MODE=api` to load workflow data from PostgreSQL. The backend applies its EF migration at startup. If an API call fails in API mode, that section shows an error instead of silently presenting seeded demo records as live data.
 
 ### Run backend authentication
 
@@ -67,29 +67,35 @@ Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, 
 ### Frontend service boundary
 
 - `src/data/mockData.ts` provides sample scenarios, campaigns, failures, workers, dashboard metrics, and oracle rules.
-- `src/services/mockApi.ts` implements the demo API. Scenario and campaign creation, root-cause confirmation, and oracle edits are saved in browser `localStorage`.
-- `src/services/httpApi.ts` implements the .NET REST adapter.
+- `src/services/mockApi.ts` implements the demo API. Mock edits are saved in browser `localStorage`.
+- `src/services/httpApi.ts` implements the .NET REST adapter for available workflow endpoints.
 - `src/services/api.ts` selects the mock or HTTP implementation using `VITE_DATA_MODE`.
 - `src/services/authApi.ts` sends login, registration, password-reset, and session requests to the .NET authentication API.
 - `src/features/auth/authSaga.ts` handles login, registration, session restore, password-reset requests, and logout.
 - `src/app/store.ts` creates the Redux store and runs the authentication saga.
 - `src/types.ts` defines the API and screen data contracts.
 
-### Expected .NET API endpoints
+### .NET API endpoints used by the frontend
 
 | Method | Endpoint | Used for |
 | --- | --- | --- |
 | `GET` | `/api/dashboard/overview` | Dashboard metrics and activity |
-| `GET`, `POST` | `/api/scenarios` | Search/list scenarios and create a scenario (`search` and `status` query parameters are supported) |
-| `GET`, `POST` | `/api/campaigns` | List and create campaigns |
-| `GET` | `/api/analytics/failure-clusters` | Failure clusters and evidence |
-| `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm a reviewed root cause |
-| `GET` | `/api/simulation-nodes` | Simulation worker status |
+| `GET`, `POST` | `/api/scenarios` | Search/list and create scenarios (`search`, `status`) |
+| `POST` | `/api/scenarios/import`, `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/clone` | Import, edit into a new version, or clone |
+| `GET`, `PUT`, `PATCH` | `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/status`, `/api/scenarios/{id}/execution-metrics` | Version history, review state, execution metrics |
+| `GET`, `POST`, `PATCH` | `/api/campaigns`, `/api/campaigns/{id}` | Campaign list, create, and update |
+| `GET`, `PUT` | `/api/campaigns/{id}/ranking` | Persist prioritization order and APFD/APFDc evaluation |
+| `GET`, `POST` | `/api/runs`, `/api/campaigns/{id}/runs` | Read and queue backend run records |
+| `POST` | `/api/campaigns/{id}/runs/cancel` | Cancel queued runs |
+| `GET`, `POST` | `/api/analytics/failure-clusters` | Failure groups and oracle evidence |
+| `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm or correct a root cause |
+| `GET`, `PUT` | `/api/simulation-nodes` | Read or configure simulation node records |
 | `GET`, `PUT` | `/api/oracles/rules` | Read and save oracle rules |
+| `GET`, `PUT` | `/api/integration/carla` | Save CARLA profile; quality is fixed to Low |
+| `GET`, `PUT` | `/api/analytics/preferences` | Persist similarity and reporting settings |
+| `GET` | `/api/audit-log` | Read administrator audit history |
 
-API responses should match the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. If an API request fails, the interface keeps its available demo data and displays a notification.
-
-Actual CARLA execution, OpenSCENARIO parsing, campaign approval, node registration, and report export still need backend support.
+API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. Campaign execution currently persists queue records; a running CARLA/ScenarioRunner worker and worker callback API are still required to execute them. The CARLA connection check is a mock and does not launch CARLA. The scenario import flow validates XML in the browser before sending the definition to the API; report files are generated in the browser from persisted run and ranking data.
 
 ### Supabase and secrets
 
