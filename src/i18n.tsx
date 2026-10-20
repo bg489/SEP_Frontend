@@ -30,6 +30,24 @@ function translateDynamic(value: string) {
     /^A password reset link is ready to send to (.+) when authentication is connected\.$/,
   );
   if (match) return "Liên kết đặt lại mật khẩu sẽ được gửi tới " + match[1] + " khi kết nối xác thực được thiết lập.";
+  match = value.match(/^Oracle profile v(\d+) validated and activated\.$/);
+  if (match) return "Hồ sơ oracle v" + match[1] + " đã được kiểm tra và kích hoạt.";
+  match = value.match(/^Mock connection to (.+) succeeded\. No CARLA process was started\.$/);
+  if (match) return "Kết nối giả lập tới " + match[1] + " thành công. CARLA không được khởi động.";
+  match = value.match(/^Mock connection to (.+) failed; the worker is offline\.$/);
+  if (match) return "Kết nối giả lập tới " + match[1] + " thất bại; máy chạy đang ngoại tuyến.";
+  match = value.match(/^Saved (.+) · (Settings validated|Settings need validation)$/);
+  if (match) return "Đã lưu " + match[1] + " · " + (match[2] === "Settings validated" ? "Cấu hình đã được kiểm tra" : "Cấu hình cần được kiểm tra");
+  match = value.match(/^Configuration v(\d+)$/);
+  if (match) return "Cấu hình v" + match[1];
+  match = value.match(/^(.+) is now (online|offline) in the mock cluster\.$/);
+  if (match) return match[1] + (match[2] === "online" ? " hiện trực tuyến trong cụm giả lập." : " hiện ngoại tuyến trong cụm giả lập.");
+  match = value.match(/^(\d+) linked failure clusters have evidence ready for review$/);
+  if (match) return match[1] + " cụm lỗi được liên kết có bằng chứng sẵn sàng để duyệt";
+  match = value.match(/^(.+) · APFD (.+) vs baseline (.+)$/);
+  if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " · APFD " + match[2] + " so với mốc cơ sở " + match[3];
+  match = value.match(/^(\d+) completed run records$/);
+  if (match) return match[1] + " lượt chạy đã hoàn tất";
   match = value.match(/^(\d+) need review$/);
   if (match) return match[1] + " mục cần duyệt";
   match = value.match(/^(\d+)% complete$/);
@@ -88,6 +106,12 @@ function translateDynamic(value: string) {
   if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " cho " + match[2] + "; " + match[3] + ".";
   match = value.match(/^APFD (.+); estimated APFDc (.+); (.+) used for (.+)\.$/);
   if (match) return "APFD " + match[1] + "; APFDc ước tính " + match[2] + "; dùng " + match[3] + " cho " + match[4] + ".";
+  match = value.match(/^Execution blocked: (.+) must be Active first\.$/);
+  if (match) return "Không thể thực thi: " + match[1] + " phải ở trạng thái Active trước.";
+  match = value.match(/^(.+) queued (\d+) scenario runs in the local mock simulator\. No CARLA process was started\.$/);
+  if (match) return "Đã xếp " + match[2] + " lượt chạy kịch bản của " + match[1] + " vào bộ mô phỏng mẫu cục bộ. CARLA không được khởi động.";
+  match = value.match(/^(.+) campaign; (.+)\.$/);
+  if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " chiến dịch; " + match[2] + ".";
   match = value.match(/^Imported from (.+)\. Review the scenario definition before approval\.$/);
   if (match) return "Đã nhập từ " + match[1] + ". Hãy xem lại định nghĩa kịch bản trước khi phê duyệt.";
   match = value.match(/^(.+) was imported as a draft\.$/);

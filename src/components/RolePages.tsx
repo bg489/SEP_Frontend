@@ -666,6 +666,7 @@ function ImportScenarios({
 }
 
 function ScenarioCompare({ scenarios }: RolePagesProps) {
+  const preferences = useMemo(() => getAnalyticsPreferences(), []);
   const [leftId, setLeftId] = useState(scenarios[0]?.id ?? "");
   const [rightId, setRightId] = useState(
     scenarios[1]?.id ?? scenarios[0]?.id ?? "",
@@ -678,11 +679,18 @@ function ScenarioCompare({ scenarios }: RolePagesProps) {
     ["weather", left.weather === right.weather ? 1 : 0],
     ["severity", left.severity === right.severity ? 1 : 0],
     ["actors", 1 - Math.min(1, Math.abs(left.actors - right.actors) / Math.max(left.actors, right.actors, 1))],
-    ["pass rate", 1 - Math.abs(left.passRate - right.passRate) / 100],
-  ] as [string, number][] : [];
-  const similarity = comparableFeatures.length
-    ? comparableFeatures.reduce((sum, [, score]) => sum + score, 0) / comparableFeatures.length
+  ] as [keyof AnalyticsPreferences["featureWeights"], number][] : [];
+  const totalWeight = comparableFeatures.reduce((sum, [feature]) => sum + preferences.featureWeights[feature], 0);
+  const similarity = totalWeight > 0
+    ? comparableFeatures.reduce((sum, [feature, score]) => sum + score * preferences.featureWeights[feature], 0) / totalWeight
     : undefined;
+  const similarityLabel = similarity === undefined
+    ? "No comparison weight"
+    : similarity >= preferences.similarityBlock
+      ? "Possible duplicate"
+      : similarity >= preferences.similarityWarning
+        ? "Review match"
+        : "Distinct";
   const rows: [string, string, string][] =
     left && right
       ? [
@@ -785,7 +793,7 @@ function ScenarioCompare({ scenarios }: RolePagesProps) {
             <h3>{(similarity * 100).toFixed(1)}% similar</h3>
             <p>Mixed categorical and numeric values are normalized; the score is calculated from the fields shown in this comparison.</p>
           </div>
-          <Badge value={similarity >= 0.93 ? "Possible duplicate" : similarity >= 0.78 ? "Review match" : "Distinct"} />
+          <Badge value={similarityLabel} />
         </section>
       )}
     </div>
@@ -1760,7 +1768,7 @@ function CampaignReport({
                         <Badge value={scenario.severity} />
                       </td>
                       <td>{scenario.runCount}</td>
-                      <td>{scenario.passRate.toFixed(1)}%</td>
+                <td>{scenario.runCount ? `${scenario.passRate.toFixed(1)}%` : "—"}</td>
                       <td>{scenario.priorityScore}/100</td>
                     </tr>
                   ))}
@@ -2081,25 +2089,54 @@ function UserManagement({ onNotify }: RolePagesProps) {
 }
 
 function AnalyticsSettings({ onNotify }: RolePagesProps) {
-  const [settings, setSettings] = useState(
-    () =>
-      (JSON.parse(localStorage.getItem("asx-analytics") ?? "null") as {
-        days: string;
-        includeDrafts: boolean;
-        group: string;
-        weeklyEmail: boolean;
-      } | null) ?? {
-        days: "30",
-        includeDrafts: false,
-        group: "severity",
-        weeklyEmail: true,
-      },
-  );
-  function patch(changes: Partial<typeof settings>) {
+  const [settings, setSettings] = useState<AnalyticsPreferences>(() => {
+    const stored = getAnalyticsPreferences();
+    try {
+      const legacy = JSON.parse(localStorage.getItem("asx-analytics") ?? "null") as {
+        days?: string; includeDrafts?: boolean; group?: string; weeklyEmail?: boolean;
+      } | null;
+      return {
+        ...stored,
+        reportDays: legacy?.days ?? stored.reportDays,
+        includeDrafts: legacy?.includeDrafts ?? stored.includeDrafts,
+        group: legacy?.group ?? stored.group,
+        weeklyEmail: legacy?.weeklyEmail ?? stored.weeklyEmail,
+      };
+    } catch {
+      return stored;
+    }
+  });
+  function patch(changes: Partial<AnalyticsPreferences>) {
     setSettings((current) => ({ ...current, ...changes }));
   }
+  function patchWeight(feature: keyof AnalyticsPreferences["featureWeights"], value: number) {
+    setSettings((current) => ({
+      ...current,
+      featureWeights: { ...current.featureWeights, [feature]: value },
+    }));
+  }
   function save() {
-    localStorage.setItem("asx-analytics", JSON.stringify(settings));
+    if (!(settings.similarityWarning >= 0 && settings.similarityWarning < settings.similarityBlock && settings.similarityBlock <= 1)) {
+      onNotify("Similarity thresholds must satisfy 0 ≤ warning < block ≤ 1.");
+      return;
+    }
+    const weights = Object.values(settings.featureWeights);
+    if (weights.some((weight) => !Number.isFinite(weight) || weight < 0) || weights.every((weight) => weight === 0)) {
+      onNotify("Feature weights must be non-negative and at least one must be above zero.");
+      return;
+    }
+    if (!Number.isInteger(settings.retentionDays) || settings.retentionDays < 1) {
+      onNotify("Evidence retention must be at least one day.");
+      return;
+    }
+    saveAnalyticsPreferences(settings);
+    localStorage.setItem("asx-analytics", JSON.stringify({
+      days: settings.reportDays,
+      includeDrafts: settings.includeDrafts,
+      group: settings.group,
+      weeklyEmail: settings.weeklyEmail,
+    }));
+    appendAuditEvent({ actor: "Current administrator", action: "Updated analytics and similarity settings", target: "Workspace analytics", result: "Success" });
     onNotify("Analytics settings saved in this browser.");
   }
   return (
@@ -2129,8 +2166,8 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
           <label>
             Time range
             <select
-              value={settings.days}
-              onChange={(event) => patch({ days: event.target.value })}
+              value={settings.reportDays}
+              onChange={(event) => patch({ reportDays: event.target.value })}
             >
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
@@ -2156,6 +2193,18 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             checked={settings.includeDrafts}
             onChange={(checked) => patch({ includeDrafts: checked })}
           />
+          <div className="setting-divider" />
+          <small className="section-kicker">SCENARIO SIMILARITY · GOWER</small>
+          <div className="analytics-number-grid">
+            <label>Review warning threshold<input type="number" min="0" max="1" step="0.01" value={settings.similarityWarning} onChange={(event) => patch({ similarityWarning: Number(event.target.value) })} /></label>
+            <label>Duplicate block threshold<input type="number" min="0" max="1" step="0.01" value={settings.similarityBlock} onChange={(event) => patch({ similarityBlock: Number(event.target.value) })} /></label>
+          </div>
+          <p>Feature weights used by scenario comparison</p>
+          <div className="analytics-weight-grid">
+            {(["map", "category", "weather", "severity", "actors"] as const).map((feature) => (
+              <label key={feature}>{feature[0].toUpperCase() + feature.slice(1)}<input type="number" min="0" step="0.1" value={settings.featureWeights[feature]} onChange={(event) => patchWeight(feature, Number(event.target.value))} /></label>
+            ))}
+          </div>
         </section>
         <section className="card settings-card">
           <small className="section-kicker">DELIVERY & PRIVACY</small>
@@ -2168,6 +2217,10 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             onChange={(checked) => patch({ weeklyEmail: checked })}
           />
           <div className="setting-divider" />
+          <label>
+            Evidence retention (days)
+            <input type="number" min="1" max="3650" value={settings.retentionDays} onChange={(event) => patch({ retentionDays: Number(event.target.value) })} />
+          </label>
           <div className="privacy-box">
             <Icon name="shield" size={17} />
             <div>
@@ -2192,7 +2245,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
           <h3>Report settings summary</h3>
         </div>
         <div className="analytics-preview-pills">
-          <span>{settings.days} day window</span>
+          <span>{settings.reportDays} day window</span>
           <span>Grouped by {settings.group}</span>
           <span>
             {settings.includeDrafts ? "Drafts included" : "Approved data only"}
@@ -2202,6 +2255,8 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
               ? "Weekly summary enabled"
               : "No scheduled summary"}
           </span>
+          <span>{Math.round(settings.similarityWarning * 100)}% / {Math.round(settings.similarityBlock * 100)}% similarity thresholds</span>
+          <span>{settings.retentionDays} day evidence retention</span>
         </div>
       </section>
     </div>
@@ -2209,70 +2264,23 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
 }
 
 function AuditLog({ onNotify }: RolePagesProps) {
-  const entries = [
-    [
-      "09:42:18",
-      "Scenario approved",
-      "SCN-038 · Pedestrian crossing at dusk",
-      "Mai Tran",
-      "Review",
-    ],
-    [
-      "09:37:04",
-      "Campaign started",
-      "CMP-108 · Night Drive Regression",
-      "Bao Doan",
-      "Execution",
-    ],
-    [
-      "09:15:52",
-      "Oracle threshold updated",
-      "Minimum TTC · 2.0 s → 2.2 s",
-      "Alex Pham",
-      "Configuration",
-    ],
-    [
-      "08:54:39",
-      "Failure label confirmed",
-      "FC-019 · Unsafe merge at Town05",
-      "Mai Tran",
-      "Review",
-    ],
-    [
-      "08:31:12",
-      "Scenario imported",
-      "SCN-126 · Foggy bend stopping distance",
-      "Linh Nguyen",
-      "Scenario",
-    ],
-    [
-      "08:20:06",
-      "User role changed",
-      "Tuan Le · Test Engineer → Scenario Engineer",
-      "Alex Pham",
-      "Access",
-    ],
-    [
-      "Yesterday",
-      "Simulation node reconnected",
-      "carla-worker-03 · Town04",
-      "System",
-      "Infrastructure",
-    ],
-    [
-      "Yesterday",
-      "Campaign report generated",
-      "CMP-106 · Weather Robustness v2",
-      "Bao Doan",
-      "Analytics",
-    ],
-  ];
+  void onNotify;
+  const entries = useMemo(() => listAuditEvents().map((event: AuditEvent) => {
+    const action = event.action.toLowerCase();
+    const category = action.includes("scenario") ? "Scenario"
+      : action.includes("campaign") || action.includes("run") || action.includes("oracle verdict") ? "Execution"
+        : action.includes("failure") || action.includes("review") || action.includes("root cause") ? "Review"
+          : action.includes("worker") || action.includes("carla") || action.includes("node") ? "Infrastructure"
+            : action.includes("analytics") || action.includes("report") ? "Analytics"
+              : action.includes("user") || action.includes("role") || action.includes("access") ? "Access"
+                : "Configuration";
+    return { ...event, category };
+  }), []);
   const [filter, setFilter] = useState("All activity");
   const [query, setQuery] = useState("");
-  const visible = entries.filter(
-    (entry) =>
-      (filter === "All activity" || entry[4] === filter) &&
-      entry.join(" ").toLowerCase().includes(query.toLowerCase()),
+  const visible = entries.filter((entry) =>
+    (filter === "All activity" || entry.category === filter) &&
+    `${entry.time} ${entry.action} ${entry.target} ${entry.actor} ${entry.result} ${entry.category}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
     <div className="role-page-stack">
@@ -2292,9 +2300,7 @@ function AuditLog({ onNotify }: RolePagesProps) {
         </div>
         <button
           className="btn btn-light"
-          onClick={() =>
-            onNotify("Audit CSV prepared from the current mock filter.")
-          }
+          onClick={() => downloadCsv("autoscenariox-audit-log.csv", [["Time", "Event", "Resource", "Actor", "Result", "Category"], ...visible.map(({ time, action, target, actor, result, category }) => [time, action, target, actor, result, category])])}
         >
           <Icon name="download" size={15} />
           Export log
@@ -2348,21 +2354,21 @@ function AuditLog({ onNotify }: RolePagesProps) {
               </tr>
             </thead>
             <tbody>
-              {visible.map(([time, event, resource, actor, category]) => (
-                <tr key={`${time}-${event}`}>
+              {visible.map(({ id, time, action, target, actor, result, category }) => (
+                <tr key={id}>
                   <td className="audit-time">{time}</td>
                   <td>
                     <span
                       className={`audit-event audit-${category.toLowerCase()}`}
                     >
                       <i />
-                      {event}
+                      {action}
                     </span>
                   </td>
-                  <td>{resource}</td>
+                  <td>{target}</td>
                   <td>{actor}</td>
                   <td>
-                    <span className="audit-category">{category}</span>
+                    <span className="audit-category">{category} · {result}</span>
                   </td>
                 </tr>
               ))}
@@ -2374,8 +2380,7 @@ function AuditLog({ onNotify }: RolePagesProps) {
         </div>
         <div className="audit-foot">
           <Icon name="shield" size={14} />
-          Mock events shown for design preview · Connect the backend audit
-          endpoint for authoritative records.
+          Events are stored in this browser for the frontend mock. The backend audit endpoint can replace this source later.
         </div>
       </section>
     </div>

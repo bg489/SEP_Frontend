@@ -2279,6 +2279,80 @@ small {
 .nodes-card {
   overflow: hidden;
 }
+.carla-config-card {
+  padding: 16px 18px;
+}
+.carla-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.carla-config-grid label,
+.analytics-number-grid label,
+.analytics-weight-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #5e6878;
+  font-size: 9px;
+  font-weight: 650;
+}
+.carla-config-grid input,
+.carla-config-grid select,
+.analytics-number-grid input,
+.analytics-weight-grid input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #e6e9ef;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 9px;
+  color: #354052;
+  font: inherit;
+}
+.carla-config-grid select:disabled {
+  background: #fff8df;
+  color: #8a6e19;
+  opacity: 1;
+}
+.carla-path-field {
+  grid-column: span 2;
+}
+.carla-config-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid #eff1f4;
+  margin-top: 13px;
+  padding-top: 12px;
+}
+.carla-config-footer > span,
+.carla-config-note,
+.oracle-history-note {
+  color: #858e9e;
+  font-size: 8px;
+}
+.carla-config-note {
+  display: block;
+  margin-top: 8px;
+}
+.carla-config-footer .actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+.carla-config-footer .btn {
+  min-height: 30px;
+  font-size: 8px;
+}
+.carla-config-footer .btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 .node-grid {
   padding: 0 15px 15px;
   display: grid;
@@ -2363,7 +2437,22 @@ small {
 .node-bottom {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
+}
+.node-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.node-actions .text-button {
+  text-align: right;
+  font-size: 7px;
+}
+.node-actions .text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 .slot-bar {
   display: flex;
@@ -2577,6 +2666,10 @@ small {
 }
 .oracle-save .btn {
   height: 30px;
+}
+.oracle-history-note {
+  display: block;
+  line-height: 1.5;
 }
 .oracle-aside {
   display: flex;
@@ -5556,6 +5649,16 @@ small {
   grid-template-columns: 1fr 1fr;
   gap: 14px;
 }
+.analytics-number-grid,
+.analytics-weight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 10px 0 13px;
+}
+.analytics-weight-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .settings-card {
   padding: 19px 21px;
 }
@@ -5928,6 +6031,9 @@ small {
   .report-grid {
     grid-template-columns: 1fr;
   }
+  .carla-config-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .admin-stat-row {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -5936,6 +6042,13 @@ small {
     flex-direction: column;
   }
   .analytics-preview-pills {
+    justify-content: flex-start;
+  }
+  .carla-config-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .carla-config-footer .actions {
     justify-content: flex-start;
   }
 }
@@ -6027,6 +6140,20 @@ small {
   .compare-selectors {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+  .carla-config-grid,
+  .analytics-number-grid,
+  .analytics-weight-grid {
+    grid-template-columns: 1fr;
+  }
+  .carla-path-field {
+    grid-column: auto;
+  }
+  .carla-config-footer .actions {
+    width: 100%;
+  }
+  .carla-config-footer .btn {
+    flex: 1;
   }
   .compare-vs {
     width: 30px;

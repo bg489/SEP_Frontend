@@ -700,9 +700,27 @@ function AppContent() {
     }
   };
   const saveRules = async (next: OracleRule[]) => {
+    if (!next.some((rule) => rule.enabled)) {
+      notify("Enable at least one oracle rule before activating the profile.");
+      return;
+    }
+    if (next.some((rule) => !Number.isFinite(rule.threshold) || rule.threshold < 0)) {
+      notify("Oracle thresholds must be finite, non-negative numbers.");
+      return;
+    }
     try {
-      setRules(await api.saveOracleRules(next));
-      notify("Oracle configuration saved.");
+      const saved = await api.saveOracleRules(next);
+      const profile = {
+        version: oracleProfile.version + 1,
+        active: true,
+        validated: true,
+        updatedAt: new Date().toLocaleString(),
+      };
+      setRules(saved);
+      setOracleProfile(profile);
+      saveOracleProfileState(profile);
+      appendAuditEvent({ actor: user?.name ?? "Current user", action: `Validated and activated oracle profile v${profile.version}`, target: "Default safety profile", result: "Success" });
+      notify(`Oracle profile v${profile.version} validated and activated.`);
     } catch {
       notify("Could not save oracle rules. Check the API connection.");
     }
@@ -1125,13 +1143,22 @@ function AppContent() {
           {page === "nodes" && (
             <Nodes
               workers={workers}
+              config={carlaConfig}
               notify={notify}
-              onAddWorker={(worker) =>
-                setWorkers((items) => [worker, ...items])
-              }
+              onSaveConfig={saveCarlaIntegration}
+              onTestConfig={testCarlaIntegration}
+              onActivateConfig={activateCarlaIntegration}
+              onTestWorker={testWorkerConnection}
+              onWorkerAvailability={setWorkerAvailability}
+              onAddWorker={(worker) => {
+                const next = [worker, ...workers];
+                setWorkers(next);
+                void api.saveWorkers(next).catch(() => undefined);
+                appendAuditEvent({ actor: user?.name ?? "Current user", action: "Registered mock simulation worker", target: worker.id, result: "Success" });
+              }}
             />
           )}
-          {page === "oracles" && <Oracles rules={rules} onSave={saveRules} />}
+          {page === "oracles" && <Oracles rules={rules} profile={oracleProfile} onSave={saveRules} />}
           {![
             "overview",
             "scenarios",
@@ -1193,7 +1220,7 @@ function AppContent() {
               <b>
                 <i />{" "}
                 {workers.some((w) => w.status !== "Offline")
-                  ? "Operational"
+                  ? "Mock ready"
                   : "Needs attention"}
               </b>
             </span>
@@ -2825,32 +2852,72 @@ function Failures({
 
 function Nodes({
   workers,
+  config,
   notify,
+  onSaveConfig,
+  onTestConfig,
+  onActivateConfig,
+  onTestWorker,
+  onWorkerAvailability,
   onAddWorker,
 }: {
   workers: WorkerNode[];
+  config: CarlaIntegrationConfig;
   notify: (s: string) => void;
+  onSaveConfig: (config: CarlaIntegrationConfig) => boolean;
+  onTestConfig: () => void;
+  onActivateConfig: () => void;
+  onTestWorker: (worker: WorkerNode) => void;
+  onWorkerAvailability: (worker: WorkerNode, online: boolean) => void;
   onAddWorker: (worker: WorkerNode) => void;
 }) {
   const [registering, setRegistering] = useState(false);
-  const test = (w: WorkerNode) =>
-    notify(
-      w.status === "Offline"
-        ? "Node " +
-            w.name +
-            " could not be reached at " +
-            w.host +
-            ":" +
-            w.port +
-            "."
-        : "Connection to " +
-            w.name +
-            " succeeded · CARLA " +
-            w.carlaVersion +
-            ".",
-    );
+  const [draftConfig, setDraftConfig] = useState(config);
+  useEffect(() => setDraftConfig(config), [config]);
+  const configDirty = JSON.stringify({ ...draftConfig, updatedAt: config.updatedAt }) !== JSON.stringify(config);
+  const updateConfig = (changes: Partial<CarlaIntegrationConfig>) =>
+    setDraftConfig((current) => ({
+      ...current,
+      ...changes,
+      qualityLevel: "Low",
+      validated: false,
+      active: false,
+      connectionStatus: "Not tested",
+    }));
+  const saveConfig = () => {
+    if (onSaveConfig(draftConfig)) {
+      setDraftConfig({ ...draftConfig, qualityLevel: "Low", validated: true, active: false, connectionStatus: "Not tested" });
+    }
+  };
   return (
     <div className="content-stack">
+      <section className="card carla-config-card">
+        <div className="section-head">
+          <div>
+            <small className="section-kicker">CARLA INTEGRATION · LOW QUALITY ONLY</small>
+            <h3>Connection profile</h3>
+            <p>Configure the future worker connection. This screen uses a mock health check and does not launch CARLA.</p>
+          </div>
+          <Badge value={config.active ? "Active (mock)" : config.connectionStatus} />
+        </div>
+        <div className="carla-config-grid">
+          <label>Host / IP<input value={draftConfig.host} onChange={(event) => updateConfig({ host: event.target.value })} placeholder="127.0.0.1" /></label>
+          <label>RPC port<input type="number" min="1" max="65535" value={draftConfig.rpcPort} onChange={(event) => updateConfig({ rpcPort: Number(event.target.value) })} /></label>
+          <label>Streaming port<input type="number" min="1" max="65535" value={draftConfig.streamingPort} onChange={(event) => updateConfig({ streamingPort: Number(event.target.value) })} /></label>
+          <label>CARLA version<input value={draftConfig.carlaVersion} onChange={(event) => updateConfig({ carlaVersion: event.target.value })} /></label>
+          <label className="carla-path-field">CARLA / ScenarioRunner installation path<input value={draftConfig.scenarioRunnerPath} onChange={(event) => updateConfig({ scenarioRunnerPath: event.target.value })} placeholder="C:\\CARLA_0.9.16" /></label>
+          <label>Quality level<select value="Low" disabled><option value="Low">Low</option></select></label>
+        </div>
+        <div className="carla-config-footer">
+          <span>Saved {config.updatedAt} · {config.validated ? "Settings validated" : "Settings need validation"}</span>
+          <div className="actions">
+            <button className="btn btn-light" onClick={saveConfig}><Icon name="check" size={14} /> Save settings</button>
+            <button className="btn btn-light" disabled={!config.validated || configDirty} onClick={onTestConfig}><Icon name="activity" size={14} /> Test mock connection</button>
+            <button className="btn btn-primary" disabled={configDirty || config.connectionStatus !== "Connected (mock)" || config.active} onClick={onActivateConfig}><Icon name="play" size={14} /> Activate mock profile</button>
+          </div>
+        </div>
+        <small className="carla-config-note">No CARLA executable is started by this frontend flow. Runtime quality is locked to Low.</small>
+      </section>
       <div className="metric-grid">
         <Metric
           label="Registered workers"
@@ -2949,9 +3016,14 @@ function Nodes({
                     <i className={n < w.activeRuns ? "busy" : ""} key={n} />
                   ))}
                 </span>
-                <button className="text-button" onClick={() => test(w)}>
-                  Test connection <Icon name="arrow-right" size={12} />
-                </button>
+                <div className="node-actions">
+                  <button className="text-button" onClick={() => onTestWorker(w)}>
+                    Test mock connection <Icon name="arrow-right" size={12} />
+                  </button>
+                  <button className="text-button" disabled={w.activeRuns > 0} onClick={() => onWorkerAvailability(w, w.status === "Offline")}>
+                    {w.status === "Offline" ? "Bring online" : "Take offline"}
+                  </button>
+                </div>
               </div>
             </article>
           ))}
@@ -3053,10 +3125,12 @@ function Nodes({
 
 function Oracles({
   rules,
+  profile,
   onSave,
 }: {
   rules: OracleRule[];
-  onSave: (r: OracleRule[]) => void;
+  profile: { version: number; active: boolean; validated: boolean; updatedAt: string };
+  onSave: (r: OracleRule[]) => void | Promise<void>;
 }) {
   const [draft, setDraft] = useState(rules);
   useEffect(() => setDraft(rules), [rules]);
@@ -3078,7 +3152,7 @@ function Oracles({
             timestamp, measured value and supporting evidence.
           </p>
         </div>
-        <Badge value="Configuration v1.8" />
+        <Badge value={`Configuration v${profile.version}`} />
       </div>
       <div className="oracle-layout">
         <section className="card oracle-list">
@@ -3156,7 +3230,7 @@ function Oracles({
               <Icon name="shield" size={17} />
               Default safety profile
             </h3>
-            <p>Version 1.8 · Active</p>
+            <p>Version {profile.version} · {profile.active && profile.validated ? "Validated & active" : "Not active"}</p>
             <div>
               <span>
                 ENABLED RULES{" "}
