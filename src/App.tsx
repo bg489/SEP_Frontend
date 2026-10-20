@@ -707,13 +707,73 @@ function AppContent() {
       notify("Could not save oracle rules. Check the API connection.");
     }
   };
-  const confirmFailure = async (failure: FailureCluster) => {
+  const saveCarlaIntegration = (next: CarlaIntegrationConfig) => {
+    if (!next.host.trim() || !next.scenarioRunnerPath.trim()) {
+      notify("Enter a CARLA host and installation path before saving.");
+      return false;
+    }
+    if ([next.rpcPort, next.streamingPort].some((port) => !Number.isInteger(port) || port < 1 || port > 65535) || next.rpcPort === next.streamingPort) {
+      notify("Use two different valid ports between 1 and 65535.");
+      return false;
+    }
+    const saved = { ...next, qualityLevel: "Low" as const, validated: true, active: false, connectionStatus: "Not tested" as const, updatedAt: new Date().toLocaleString() };
+    setCarlaConfig(saved);
+    persistCarlaConfig(saved);
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Saved CARLA integration settings (Low quality)", target: `${saved.host}:${saved.rpcPort}`, result: "Success" });
+    notify("CARLA settings saved. The connection has not been tested yet.");
+    return true;
+  };
+  const testCarlaIntegration = () => {
+    if (!carlaConfig.validated) return notify("Save valid CARLA settings before testing the mock connection.");
+    const updated = { ...carlaConfig, connectionStatus: "Connected (mock)" as const, updatedAt: new Date().toLocaleString() };
+    setCarlaConfig(updated);
+    persistCarlaConfig(updated);
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Tested CARLA connection (mock only; no process started)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
+    notify("Mock connection succeeded. No CARLA process was started.");
+  };
+  const activateCarlaIntegration = () => {
+    if (!carlaConfig.validated || carlaConfig.connectionStatus !== "Connected (mock)") {
+      notify("Save the settings and pass the mock connection check before activation.");
+      return;
+    }
+    const updated = { ...carlaConfig, active: true, qualityLevel: "Low" as const, updatedAt: new Date().toLocaleString() };
+    setCarlaConfig(updated);
+    persistCarlaConfig(updated);
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Activated CARLA integration in mock mode (Low quality)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
+    notify("CARLA integration is active in mock mode at Low quality.");
+  };
+  const testWorkerConnection = (worker: WorkerNode) => {
+    const reachable = worker.status !== "Offline";
+    const updated = workers.map((item) => item.id === worker.id
+      ? { ...item, status: reachable ? (item.activeRuns ? "Busy" as const : "Online" as const) : "Offline" as const, lastHeartbeat: reachable ? "Just now" : item.lastHeartbeat }
+      : item);
+    setWorkers(updated);
+    void api.saveWorkers(updated).catch(() => undefined);
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: `Tested worker connection (mock): ${worker.name}`, target: `${worker.host}:${worker.port}`, result: reachable ? "Success" : "Rejected" });
+    notify(reachable
+      ? `Mock connection to ${worker.name} succeeded. No CARLA process was started.`
+      : `Mock connection to ${worker.name} failed; the worker is offline.`);
+  };
+  const setWorkerAvailability = (worker: WorkerNode, online: boolean) => {
+    if (worker.activeRuns > 0) {
+      notify("A worker with active runs cannot be taken offline.");
+      return;
+    }
+    const updated = workers.map((item) => item.id === worker.id
+      ? { ...item, status: online ? "Online" as const : "Offline" as const }
+      : item);
+    setWorkers(updated);
+    void api.saveWorkers(updated).catch(() => undefined);
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: online ? "Brought simulation worker online" : "Took simulation worker offline", target: worker.id, result: "Success" });
+    notify(`${worker.name} is now ${online ? "online" : "offline"} in the mock cluster.`);
+  };
+  const confirmFailure = async (failure: FailureCluster, changes: Partial<FailureCluster> = {}) => {
     try {
-      const updated = await api.confirmFailureCluster(failure.id);
+      const updated = await api.confirmFailureCluster(failure.id, changes);
       setFailures((items) =>
         items.map((item) => (item.id === updated.id ? updated : item)),
       );
-      notify("Root cause marked as confirmed.");
+      notify(changes.label && changes.label !== failure.label ? "Failure classification corrected and confirmed." : "Root cause marked as confirmed.");
     } catch {
       notify("Could not confirm the root cause. Check the API connection.");
     }
