@@ -2,6 +2,7 @@ import type {
   AnalyticsPreferences,
   AuditEvent,
   CarlaIntegrationConfig,
+  OracleProfileState,
   Scenario,
   ScenarioRun,
   ScenarioVersionRecord,
@@ -13,6 +14,8 @@ const keys = {
   audit: "autoscenariox.workflow.audit.v1",
   carla: "autoscenariox.workflow.carla.v1",
   analytics: "autoscenariox.workflow.analytics.v1",
+  workers: "autoscenariox.workflow.workers.v1",
+  oracleProfile: "autoscenariox.workflow.oracle-profile.v1",
   rankings: "autoscenariox.workflow.rankings.v1",
 };
 
@@ -21,10 +24,11 @@ const defaultCarlaConfig: CarlaIntegrationConfig = {
   rpcPort: 2000,
   streamingPort: 2001,
   carlaVersion: "0.9.16",
-  scenarioRunnerPath: "",
+  scenarioRunnerPath: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16",
   qualityLevel: "Low",
   validated: false,
   active: false,
+  connectionStatus: "Not tested",
   updatedAt: "Not configured",
 };
 
@@ -33,6 +37,10 @@ const defaultAnalytics: AnalyticsPreferences = {
   similarityBlock: 0.93,
   featureWeights: { map: 1, category: 1, weather: 1, severity: 1, actors: 1 },
   retentionDays: 180,
+  reportDays: "30",
+  includeDrafts: false,
+  group: "severity",
+  weeklyEmail: true,
 };
 
 function read<T>(key: string, fallback: T): T {
@@ -131,6 +139,22 @@ export function getAnalyticsPreferences(): AnalyticsPreferences {
 
 export function saveAnalyticsPreferences(preferences: AnalyticsPreferences): void {
   write(keys.analytics, preferences);
+}
+
+export function getOracleProfileState(): OracleProfileState {
+  return read(keys.oracleProfile, { version: 1, active: true, validated: true, updatedAt: "Seed configuration" });
+}
+
+export function saveOracleProfileState(profile: { version: number; active: boolean; validated: boolean; updatedAt: string }): void {
+  write(keys.oracleProfile, profile);
+}
+
+export function readWorkers<T>(fallback: T): T {
+  return read(keys.workers, fallback);
+}
+
+export function writeWorkers<T>(workers: T): void {
+  write(keys.workers, workers);
 }
 
 export function saveRanking(key: string, value: unknown): void {

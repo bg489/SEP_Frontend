@@ -91,17 +91,41 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       body: JSON.stringify(input),
     });
   }
+  updateCampaign(id: string, changes: Partial<Campaign>) {
+    return this.request<Campaign>("/api/campaigns/" + encodeURIComponent(id), {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
+  }
+  updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">) {
+    return this.request<Scenario>("/api/scenarios/" + encodeURIComponent(id) + "/execution-metrics", {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
+  }
   listFailures() {
     return this.request<FailureCluster[]>("/api/analytics/failure-clusters");
   }
-  confirmFailureCluster(id: string) {
+  addFailureCluster(failure: FailureCluster) {
+    return this.request<FailureCluster>("/api/analytics/failure-clusters", {
+      method: "POST",
+      body: JSON.stringify(failure),
+    });
+  }
+  confirmFailureCluster(id: string, changes: Partial<FailureCluster> = {}) {
     return this.request<FailureCluster>(
       "/api/analytics/failure-clusters/" + encodeURIComponent(id) + "/confirm",
-      { method: "POST" },
+      { method: "POST", body: JSON.stringify(changes) },
     );
   }
   listWorkers() {
     return this.request<WorkerNode[]>("/api/simulation-nodes");
+  }
+  saveWorkers(workers: WorkerNode[]) {
+    return this.request<WorkerNode[]>("/api/simulation-nodes", {
+      method: "PUT",
+      body: JSON.stringify(workers),
+    });
   }
   listOracleRules() {
     return this.request<OracleRule[]>("/api/oracles/rules");

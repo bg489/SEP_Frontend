@@ -11,12 +11,14 @@ import type {
   Campaign,
   CreateCampaignInput,
   CreateScenarioInput,
+  FailureCluster,
   OracleRule,
   OverviewData,
   Scenario,
   ScenarioFilters,
   ScenarioStatus,
   ScenarioVersionRecord,
+  WorkerNode,
 } from "../types";
 import {
   appendAuditEvent,
@@ -29,6 +31,7 @@ const storageKeys = {
   campaigns: "autoscenariox.mock.campaigns",
   oracles: "autoscenariox.mock.oracles",
   failures: "autoscenariox.mock.failures",
+  workers: "autoscenariox.mock.workers",
 };
 
 function readStored<T>(key: string, fallback: T): T {
@@ -206,22 +209,63 @@ export const mockApi: AutoScenarioApi = {
     writeStored(storageKeys.campaigns, [created, ...items]);
     return created;
   },
+  async updateCampaign(id: string, changes: Partial<Campaign>): Promise<Campaign> {
+    const items = readStored(storageKeys.campaigns, mockCampaigns);
+    const current = items.find((campaign) => campaign.id === id);
+    if (!current) throw new Error("Campaign not found: " + id);
+    const updated = { ...current, ...changes, id };
+    writeStored(storageKeys.campaigns, items.map((campaign) => campaign.id === id ? updated : campaign));
+    if (changes.status && changes.status !== current.status) {
+      appendAuditEvent({ actor: "Current user", action: `Campaign status: ${changes.status}`, target: id, result: "Success" });
+    }
+    return updated;
+  },
+  async updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">): Promise<Scenario> {
+    const items = readStored(storageKeys.scenarios, mockScenarios);
+    const current = items.find((scenario) => scenario.id === id);
+    if (!current) throw new Error("Scenario not found: " + id);
+    const updated = { ...current, ...changes };
+    writeStored(storageKeys.scenarios, items.map((scenario) => scenario.id === id ? updated : scenario));
+    return updated;
+  },
   async listFailures() {
     return readStored(storageKeys.failures, mockFailures);
   },
-  async confirmFailureCluster(id: string) {
+  async addFailureCluster(failure: FailureCluster): Promise<FailureCluster> {
+    const items = readStored(storageKeys.failures, mockFailures);
+    const existing = items.find((item) => item.id === failure.id);
+    const updated = existing
+      ? { ...existing, affectedRuns: existing.affectedRuns + 1, evidence: [...failure.evidence, ...existing.evidence] }
+      : failure;
+    writeStored(storageKeys.failures, existing
+      ? items.map((item) => item.id === failure.id ? updated : item)
+      : [updated, ...items]);
+    appendAuditEvent({ actor: "AutoScenarioX System", action: "Failure cluster updated", target: updated.id, result: "Success" });
+    return updated;
+  },
+  async confirmFailureCluster(id: string, changes: Partial<FailureCluster> = {}) {
     const items = readStored(storageKeys.failures, mockFailures);
     const failure = items.find((item) => item.id === id);
     if (!failure) throw new Error("Failure cluster not found: " + id);
-    const updated = { ...failure, reviewStatus: "Confirmed" as const };
+    const updated = {
+      ...failure,
+      ...changes,
+      originalLabel: changes.label && changes.label !== failure.label ? failure.originalLabel ?? failure.label : failure.originalLabel,
+      reviewStatus: "Confirmed" as const,
+    };
     writeStored(
       storageKeys.failures,
       items.map((item) => (item.id === id ? updated : item)),
     );
+    appendAuditEvent({ actor: changes.reviewedBy ?? "Current user", action: changes.label && changes.label !== failure.label ? `Corrected failure classification: ${failure.label} → ${changes.label}` : "Confirmed failure classification", target: id, result: "Success" });
     return updated;
   },
   async listWorkers() {
-    return mockWorkers;
+    return readStored(storageKeys.workers, mockWorkers);
+  },
+  async saveWorkers(workers: WorkerNode[]) {
+    writeStored(storageKeys.workers, workers);
+    return workers;
   },
   async listOracleRules() {
     return readStored(storageKeys.oracles, mockOracleRules);
