@@ -11,6 +11,8 @@ import { AuthScreen } from "./components/AuthScreen";
 import { RolePages, RoleWelcome } from "./components/RolePages";
 import { LanguageProvider, LanguageSwitcher } from "./i18n";
 import { api, isMockMode } from "./services/api";
+import { saveRanking } from "./services/workflowStore";
+import { downloadCsv } from "./utils/download";
 import { isAuthApiEnabled } from "./services/authConfig";
 import type { AppDispatch, RootState } from "./app/store";
 import {
@@ -792,6 +794,7 @@ function AppContent() {
             <Prioritization
               scenarios={scenarios}
               campaigns={campaigns}
+              failures={failures}
               notify={notify}
             />
           )}
@@ -1868,38 +1871,108 @@ function Campaigns({
 function Prioritization({
   scenarios,
   campaigns,
+  failures,
   notify,
 }: {
   scenarios: Scenario[];
   campaigns: Campaign[];
+  failures: FailureCluster[];
   notify: (s: string) => void;
 }) {
   const [strategy, setStrategy] = useState("Proposed · failure history");
   const [ranked, setRanked] = useState(false);
-  const [order, setOrder] = useState(
-    [...scenarios].sort((a, b) => b.priorityScore - a.priorityScore),
-  );
-  const campaign =
-    campaigns.find((c) => c.status === "Running") ?? campaigns[0];
+  const [campaignId, setCampaignId] = useState("");
+  const [order, setOrder] = useState<Scenario[]>([]);
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [weights, setWeights] = useState({ risk: 50, history: 35, cost: 15 });
+  const [metrics, setMetrics] = useState({ apfd: "—", apfdc: "—", early: "—", duration: "—", baselineApfd: "Unavailable" });
+  const [detectionPositions, setDetectionPositions] = useState<number[]>([]);
+  const [baselineDetectionPositions, setBaselineDetectionPositions] = useState<number[]>([]);
+  const [faultCount, setFaultCount] = useState(0);
+  const campaign = campaigns.find((item) => item.id === campaignId)
+    ?? campaigns.find((item) => item.status === "Running")
+    ?? campaigns[0];
+  const candidateScenarios = campaign?.scenarioIds.length
+    ? campaign.scenarioIds.map((id) => scenarios.find((scenario) => scenario.id === id)).filter((item): item is Scenario => Boolean(item))
+    : scenarios.filter((scenario) => scenario.status === "Active" || scenario.status === "Approved");
   const run = () => {
-    setOrder(
-      [...scenarios].sort((a, b) =>
-        strategy === "Severity-first"
-          ? severity(b.severity) - severity(a.severity) ||
-            b.priorityScore - a.priorityScore
-          : strategy === "Random baseline"
-            ? a.id.localeCompare(b.id)
-            : b.priorityScore - a.priorityScore,
-      ),
-    );
+    if (candidateScenarios.length === 0) {
+      notify("Select a campaign with scenarios before requesting prioritization.");
+      return;
+    }
+    const cost = (scenario: Scenario) => 4 + scenario.actors * 0.48;
+    const faultSignal = (scenario: Scenario) => Math.min(1, ((100 - scenario.passRate) / 100) * Math.log2(scenario.runCount + 1) / 5);
+    const maxCost = Math.max(...candidateScenarios.map(cost), 1);
+    const totalWeight = Math.max(1, weights.risk + weights.history + weights.cost);
+    const score = (scenario: Scenario) => Math.round(100 * (
+      (scenario.priorityScore / 100) * weights.risk / totalWeight +
+      faultSignal(scenario) * weights.history / totalWeight +
+      (1 - cost(scenario) / maxCost) * weights.cost / totalWeight
+    ));
+    const stableHash = (value: string) => Array.from(value).reduce((sum, char) => Math.imul(sum ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
+    const nextOrder = [...candidateScenarios].sort((a, b) => {
+      if (strategy === "Severity-first") return severity(b.severity) - severity(a.severity) || score(b) - score(a) || a.id.localeCompare(b.id);
+      if (strategy === "Risk-first") return b.priorityScore - a.priorityScore || a.id.localeCompare(b.id);
+      if (strategy === "History-based") return faultSignal(b) - faultSignal(a) || score(b) - score(a) || a.id.localeCompare(b.id);
+      if (strategy === "Shortest-first") return cost(a) - cost(b) || a.id.localeCompare(b.id);
+      if (strategy === "Random baseline") return stableHash(`${campaign?.id ?? "baseline"}:${a.id}`) - stableHash(`${campaign?.id ?? "baseline"}:${b.id}`);
+      return score(b) - score(a) || a.id.localeCompare(b.id);
+    });
+    const knownFaults = failures.filter((failure) => nextOrder.some((scenario) => scenario.name === failure.scenarioName));
+    const positions = knownFaults.map((failure) => nextOrder.findIndex((scenario) => scenario.name === failure.scenarioName) + 1).filter((position) => position > 0);
+    setDetectionPositions(positions);
+    setFaultCount(knownFaults.length);
+    const totalCost = nextOrder.reduce((sum, scenario) => sum + cost(scenario), 0);
+    const prefixCosts = nextOrder.map((scenario, index) => nextOrder.slice(0, index).reduce((sum, item) => sum + cost(item), 0) + cost(scenario) / 2);
+    const detectedAt = knownFaults.map((failure) => {
+      const index = nextOrder.findIndex((scenario) => scenario.name === failure.scenarioName);
+      return index < 0 ? undefined : prefixCosts[index] / totalCost;
+    }).filter((value): value is number => value !== undefined);
+    const apfd = positions.length && nextOrder.length
+      ? 1 - positions.reduce((sum, position) => sum + position, 0) / (nextOrder.length * positions.length) + 1 / (2 * nextOrder.length)
+      : undefined;
+    const baselineOrder = [...candidateScenarios].sort((a, b) => stableHash(`${campaign?.id ?? "baseline"}:${a.id}`) - stableHash(`${campaign?.id ?? "baseline"}:${b.id}`));
+    const baselinePositions = knownFaults.map((failure) => baselineOrder.findIndex((scenario) => scenario.name === failure.scenarioName) + 1).filter((position) => position > 0);
+    setBaselineDetectionPositions(baselinePositions);
+    const baselineApfd = baselinePositions.length && baselineOrder.length
+      ? 1 - baselinePositions.reduce((sum, position) => sum + position, 0) / (baselineOrder.length * baselinePositions.length) + 1 / (2 * baselineOrder.length)
+      : undefined;
+    const apfdc = detectedAt.length
+      ? 1 - detectedAt.reduce((sum, value) => sum + value, 0) / detectedAt.length + 1 / (2 * nextOrder.length)
+      : undefined;
+    let cumulative = 0;
+    const earlyFaults = knownFaults.filter((failure) => {
+      const index = nextOrder.findIndex((scenario) => scenario.name === failure.scenarioName);
+      cumulative = nextOrder.slice(0, index + 1).reduce((sum, item) => sum + cost(item), 0);
+      return cumulative / totalCost <= 0.4;
+    }).length;
+    setScores(Object.fromEntries(nextOrder.map((scenario) => [scenario.id, score(scenario)])));
+    setOrder(nextOrder);
+    const durationMinutes = Math.round(totalCost);
+    const duration = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)}h ${durationMinutes % 60}m` : `${durationMinutes}m`;
+    const result = {
+      apfd: apfd === undefined ? "Unavailable" : apfd.toFixed(2),
+      apfdc: apfdc === undefined ? "Unavailable" : apfdc.toFixed(2),
+      early: knownFaults.length ? `${earlyFaults} / ${knownFaults.length}` : "No linked faults",
+      duration,
+      baselineApfd: baselineApfd === undefined ? "Unavailable" : baselineApfd.toFixed(2),
+    };
+    setMetrics(result);
+    saveRanking(campaign?.id ?? "unassigned", { strategy, weights, order: nextOrder.map((scenario) => scenario.id), ...result, calculatedAt: new Date().toISOString() });
     setRanked(true);
-    notify("Scenario ranking generated with " + strategy.toLowerCase() + ".");
+    notify(`Scenario ranking generated for ${campaign?.name ?? "the active scenario set"} with ${strategy.toLowerCase()}.`);
   };
   return (
     <div className="content-stack">
       <div className="priority-banner">
         <div>
           <small className="section-kicker">CAMPAIGN TO OPTIMIZE</small>
+          <label className="field-inline">
+            Campaign
+            <select value={campaign?.id ?? ""} onChange={(event) => { setCampaignId(event.target.value); setRanked(false); }}>
+              {campaigns.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.id}</option>)}
+            </select>
+          </label>
           <div className="active-campaign">
             <Icon name="campaigns" size={18} />
             <span>
@@ -1923,33 +1996,33 @@ function Prioritization({
       <div className="metric-grid">
         <Metric
           label="APFD score"
-          value={ranked && strategy.startsWith("Proposed") ? "0.86" : "0.82"}
-          delta="+0.11"
-          text="vs. random baseline"
+          value={ranked ? metrics.apfd : "—"}
+          delta={ranked && metrics.apfd !== "Unavailable" && metrics.baselineApfd !== "Unavailable" ? `${Number(metrics.apfd) >= Number(metrics.baselineApfd) ? "+" : ""}${(Number(metrics.apfd) - Number(metrics.baselineApfd)).toFixed(2)} vs baseline` : "Not calculated"}
+          text={`proposed vs seeded baseline · ${faultCount} known faults`}
           icon="activity"
           color="purple"
         />
         <Metric
           label="APFDc score"
-          value="0.76"
-          delta="+0.08"
-          text="cost-aware effectiveness"
+          value={ranked ? metrics.apfdc : "—"}
+          delta={ranked && metrics.apfdc !== "Unavailable" ? "Estimated" : "Not calculated"}
+          text="weighted by estimated run cost"
           icon="clock"
           color="blue"
         />
         <Metric
           label="Faults found early"
-          value="4 / 5"
-          delta="80%"
-          text="within first 40% of runs"
+          value={ranked ? metrics.early : "—"}
+          delta={ranked && faultCount ? `${Math.round((Number(metrics.early.split(" /")[0]) / faultCount) * 100)}%` : "—"}
+          text="within first 40% of estimated cost"
           icon="failures"
           color="orange"
         />
         <Metric
           label="Estimated suite time"
-          value="2h 18m"
-          delta="−24m"
-          text="vs. default ordering"
+          value={ranked ? metrics.duration : "—"}
+          delta={ranked ? `${candidateScenarios.length} scenarios` : "—"}
+          text="based on actor count estimate"
           icon="route"
           color="green"
         />
@@ -1973,16 +2046,19 @@ function Prioritization({
                 "Runs critical and high-risk cases before others.",
                 "shield",
               ],
+              ["Risk-first", "Orders by scenario risk score.", "warning"],
+              ["History-based", "Uses prior pass rate and run history.", "activity"],
+              ["Shortest-first", "Reduces estimated execution time.", "clock"],
               [
                 "Random baseline",
-                "Shuffles scenarios to establish a baseline.",
+                "Uses a reproducible seeded baseline order.",
                 "refresh",
               ],
             ].map(([name, description, icon]) => (
               <button
                 className={strategy === name ? "picked" : ""}
                 key={name}
-                onClick={() => setStrategy(name)}
+                onClick={() => { setStrategy(name); setRanked(false); }}
               >
                 <Icon name={icon as IconName} size={17} />
                 <span>
@@ -1991,6 +2067,14 @@ function Prioritization({
                 </span>
                 <i>{strategy === name ? "●" : "○"}</i>
               </button>
+            ))}
+          </div>
+          <div className="priority-weights">
+            {(["risk", "history", "cost"] as const).map((key) => (
+              <label key={key}>
+                <span>{key === "risk" ? "Risk weight" : key === "history" ? "Failure-history weight" : "Cost weight"}<b>{weights[key]}%</b></span>
+                <input type="range" min="0" max="100" value={weights[key]} onChange={(event) => { setWeights((current) => ({ ...current, [key]: Number(event.target.value) })); setRanked(false); }} />
+              </label>
             ))}
           </div>
           <div className="note">
@@ -2004,7 +2088,7 @@ function Prioritization({
             title="Faults found earlier"
             note="Detection rate as the suite executes."
           />
-          <DetectionChart />
+          <DetectionChart positions={detectionPositions} baselinePositions={baselineDetectionPositions} scenarioCount={order.length || candidateScenarios.length} faultCount={faultCount} />
         </section>
       </div>
       <section className="card table-card">
@@ -2019,17 +2103,14 @@ function Prioritization({
             </h3>
             <p>
               {ranked
-                ? "Updated just now using " + strategy + "."
+                ? `${strategy} ranking for ${campaign?.name ?? "selected scenarios"}; ${faultCount ? `${faultCount} linked faults included` : "no linked failure clusters"}.`
                 : "Run prioritization to apply the selected strategy."}
             </p>
           </div>
           <button
             className="btn btn-light"
-            onClick={() =>
-              notify(
-                "Scenario ranking export will be available when the API is connected.",
-              )
-            }
+            disabled={!ranked || order.length === 0}
+            onClick={() => downloadCsv("scenario-ranking.csv", [["Rank", "Scenario ID", "Scenario", "Strategy", "Priority score"], ...order.map((scenario, index) => [index + 1, scenario.id, scenario.name, strategy, scores[scenario.id] ?? scenario.priorityScore])])}
           >
             <Icon name="download" size={14} />
             Export order
@@ -2064,16 +2145,16 @@ function Prioritization({
                   </td>
                   <td>
                     <span className="signal-count">
-                      {Math.max(1, Math.round((100 - s.passRate) / 4))} signals
+                      {Math.round((100 - s.passRate) / 4)} signals
                     </span>
                   </td>
                   <td>~{(4 + s.actors * 0.48).toFixed(1)} min</td>
                   <td>
-                    <Priority score={s.priorityScore} />
+                    <Priority score={scores[s.id] ?? s.priorityScore} />
                   </td>
                   <td>
                     {s.priorityScore > 90
-                      ? "High fault yield · recent regression"
+                      ? "High risk · prioritize early"
                       : s.severity === "Critical"
                         ? "Critical safety exposure"
                         : "Complements suite coverage"}
@@ -2090,11 +2171,7 @@ function Prioritization({
           </span>
           <button
             className="text-button"
-            onClick={() =>
-              notify(
-                "Evaluation compares the selected campaign with its baseline run.",
-              )
-            }
+            onClick={() => notify(ranked ? `APFD ${metrics.apfd}; estimated APFDc ${metrics.apfdc}; ${faultCount} linked failure clusters used for ${campaign?.name ?? "this ranking"}.` : "Run prioritization to calculate APFD/APFDc from the selected campaign's linked failures.")}
           >
             Evaluation details <Icon name="arrow-right" size={13} />
           </button>
@@ -3032,7 +3109,23 @@ function ActivityChart({ data }: { data: number[] }) {
     </svg>
   );
 }
-function DetectionChart() {
+function DetectionChart({ positions, baselinePositions, scenarioCount, faultCount }: {
+  positions: number[];
+  baselinePositions: number[];
+  scenarioCount: number;
+  faultCount: number;
+}) {
+  const makePath = (faultPositions: number[]) => {
+    const count = Math.max(1, scenarioCount);
+    let detected = 0;
+    const points = Array.from({ length: count }, (_, index) => {
+      detected += faultPositions.filter((position) => position === index + 1).length;
+      const x = 24 + (511 * (index + 1)) / count;
+      const y = 173 - 154 * (faultCount ? detected / faultCount : 0);
+      return `${x.toFixed(1)} ${y.toFixed(1)}`;
+    });
+    return `M24 173 L${points.join(" L")}`;
+  };
   return (
     <svg
       className="detection-chart"
@@ -3050,13 +3143,13 @@ function DetectionChart() {
         />
       ))}
       <path
-        d="M24 173 C76 163 90 145 136 140 S204 110 245 104 S312 76 350 68 S418 44 457 39 S508 25 535 19"
+        d={makePath(positions)}
         fill="none"
         stroke="#FF6363"
         strokeWidth="3"
       />
       <path
-        d="M24 173 C72 162 91 154 136 149 S202 134 245 127 S307 108 350 103 S414 83 457 76 S507 59 535 53"
+        d={makePath(baselinePositions)}
         fill="none"
         stroke="#bbc2cd"
         strokeWidth="2"
@@ -3077,6 +3170,7 @@ function DetectionChart() {
       <text x="514" y="188">
         100%
       </text>
+      {faultCount === 0 && <text x="190" y="94">No linked failure data</text>}
     </svg>
   );
 }

@@ -80,6 +80,14 @@ function translateDynamic(value: string) {
   if (match) return "Đã gửi " + match[1] + " để duyệt. Hãy lưu chỉnh sửa trước khi gửi duyệt.";
   match = value.match(/^(.+) cloned to (.+)\.$/);
   if (match) return "Đã nhân bản " + match[1] + " thành " + match[2] + ".";
+  match = value.match(/^Scenario ranking generated for (.+) with (.+)\.$/);
+  if (match) return "Đã tạo thứ tự ưu tiên cho " + match[1] + " bằng chiến lược " + (vietnameseTranslations[match[2]] ?? match[2]) + ".";
+  match = value.match(/^Select a campaign with scenarios before requesting prioritization\.$/);
+  if (match) return "Hãy chọn chiến dịch có kịch bản trước khi yêu cầu xếp ưu tiên.";
+  match = value.match(/^(.+) ranking for (.+); (.+)\.$/);
+  if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " cho " + match[2] + "; " + match[3] + ".";
+  match = value.match(/^APFD (.+); estimated APFDc (.+); (.+) used for (.+)\.$/);
+  if (match) return "APFD " + match[1] + "; APFDc ước tính " + match[2] + "; dùng " + match[3] + " cho " + match[4] + ".";
   match = value.match(/^Imported from (.+)\. Review the scenario definition before approval\.$/);
   if (match) return "Đã nhập từ " + match[1] + ". Hãy xem lại định nghĩa kịch bản trước khi phê duyệt.";
   match = value.match(/^(.+) was imported as a draft\.$/);

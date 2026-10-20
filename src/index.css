@@ -1945,6 +1945,51 @@ small {
   color: #e16868;
   font-size: 11px;
 }
+
+.priority-weights {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--line, #e8e8e8);
+  border-radius: 12px;
+  background: var(--surface-soft, #fff9ef);
+}
+
+.priority-weights label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted, #747474);
+  font-size: 12px;
+}
+
+.priority-weights label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.priority-weights input[type="range"] {
+  width: 100%;
+  accent-color: #ff6363;
+}
+
+.compare-similarity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 26px;
+}
+
+.compare-similarity h3 {
+  margin: 6px 0;
+}
+
+.compare-similarity p {
+  margin: 0;
+  color: var(--muted, #747474);
+}
 .note {
   display: flex;
   align-items: center;
