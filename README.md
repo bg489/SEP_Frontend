@@ -2,7 +2,7 @@
 
 **AutoScenarioX — Scenario Management and Explainable Failure Analytics**
 
-This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser.
+This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser. Authentication requests are managed with Redux Saga.
 
 The app starts in **mock mode**. Its API boundary is designed so the frontend can later use the .NET REST API without coupling screen components to HTTP or Supabase.
 
@@ -15,7 +15,7 @@ The app starts in **mock mode**. Its API boundary is designed so the frontend ca
 | **Test Reviewer** | Overview, scenario approval queue, failure evidence and root-cause review, run details, campaign reports, profile |
 | **Administrator** | Overview, user and role management, simulation nodes, test-oracle rules, analytics settings, audit log, profile |
 
-The sign-in screen also includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. After signing in, use the role selector in the top bar to preview each role's navigation and screens.
+The sign-in screen includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. In mock mode, the role selector previews each role's navigation. In API mode, the role comes from the backend and the preview selector is hidden.
 
 ## Run locally
 
@@ -23,6 +23,7 @@ The sign-in screen also includes registration and forgot-password views. Use the
 
 - Node.js 20.19 or newer
 - npm
+- .NET 10 SDK and PostgreSQL 18 to run backend authentication
 
 ### Install and start
 
@@ -42,31 +43,26 @@ Useful project scripts:
 | `npm run lint` | Run Oxlint |
 | `npm run preview` | Serve the production build locally |
 
-## Demo sign-in
+## Authentication
 
-Choose a role card on the login screen, or use one of these demo accounts:
-
-| Role | Demo email |
-| --- | --- |
-| Scenario Engineer | `scenario@autoscenariox.dev` |
-| Test Engineer | `tester@autoscenariox.dev` |
-| Test Reviewer | `reviewer@autoscenariox.dev` |
-| Administrator | `admin@autoscenariox.dev` |
-
-For manual sign-in, enter an email and any password with at least six characters. Registration saves a demo profile in this browser. Forgot-password only displays a mock confirmation; no authentication provider is connected yet.
-
-> Role-based navigation is for frontend preview only. Enforce identity, permissions, and role checks in the backend before using real data.
+Sign-in and registration always use the .NET authentication API. A user must exist in the PostgreSQL `autoscenariox` database (or register through the API) and provide the correct password. There are no demo credentials, local mock accounts, or role-preview sign-ins. If the API is unavailable or rejects the credentials, the frontend stays on the sign-in screen and displays the error.
 
 ## Mock data and API integration
 
-The app uses mock data by default. To point it at the .NET API, copy `.env.example` to `.env.local` and set the API URL:
+The app uses mock scenario-management data by default, while authentication always uses the .NET backend. Copy `.env.example` to `.env.local` to set the API URL:
 
 ```dotenv
-VITE_DATA_MODE=api
-VITE_API_BASE_URL=https://localhost:7001
+VITE_DATA_MODE=mock
+VITE_API_BASE_URL=http://localhost:5080
 ```
 
-Use the actual URL and port configured for your .NET API, then restart the Vite server. Set `VITE_DATA_MODE=mock` to return to the local demo.
+Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` only switches scenario-management data; it never changes authentication. Set `VITE_DATA_MODE=api` only when the scenario-management endpoints listed below are available.
+
+### Run backend authentication
+
+The separate backend project is in `../Backend`. It targets PostgreSQL 18 database `autoscenariox` and keeps its Identity tables in schema `app_auth`. Follow [the backend setup guide](../Backend/README.md) to configure .NET User Secrets, run the API, and optionally provision the first administrator. The API runs at `http://localhost:5080`.
+
+Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/forgot-password`, and `POST /api/auth/reset-password`. During registration, users may select Scenario Engineer, Test Engineer, or Test Reviewer; Administrator can only be assigned by an administrator. Administrator-only role management is provided by `GET /api/admin/users` and `PUT /api/admin/users/{id}/role`. Password-reset email delivery still needs a mail provider in production.
 
 ### Frontend service boundary
 
@@ -74,6 +70,9 @@ Use the actual URL and port configured for your .NET API, then restart the Vite 
 - `src/services/mockApi.ts` implements the demo API. Scenario and campaign creation, root-cause confirmation, and oracle edits are saved in browser `localStorage`.
 - `src/services/httpApi.ts` implements the .NET REST adapter.
 - `src/services/api.ts` selects the mock or HTTP implementation using `VITE_DATA_MODE`.
+- `src/services/authApi.ts` sends login, registration, password-reset, and session requests to the .NET authentication API.
+- `src/features/auth/authSaga.ts` handles login, registration, session restore, password-reset requests, and logout.
+- `src/app/store.ts` creates the Redux store and runs the authentication saga.
 - `src/types.ts` defines the API and screen data contracts.
 
 ### Expected .NET API endpoints
@@ -90,7 +89,7 @@ Use the actual URL and port configured for your .NET API, then restart the Vite 
 
 API responses should match the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. If an API request fails, the interface keeps its available demo data and displays a notification.
 
-Actual CARLA execution, OpenSCENARIO parsing, backend authentication and authorization, campaign approval, node registration, and report export still need backend support.
+Actual CARLA execution, OpenSCENARIO parsing, campaign approval, node registration, and report export still need backend support.
 
 ### Supabase and secrets
 
@@ -110,13 +109,14 @@ src/
 
 ## Git workflow
 
-This project is already a Git repository with an `origin` remote. From the project root, review and commit the README change with:
+This frontend folder is a Git repository with an `origin` remote. Create a feature branch for work intended to merge into `main`, then push that branch and open a pull request:
 
 ```powershell
+git switch -c feature/short-description
 git status
-git add README.md
-git commit -m "docs: update frontend README"
-git push
+git add <files-to-include>
+git commit -m "feat: describe the change"
+git push -u origin feature/short-description
 ```
 
-If you changed other files too, stage the files you intend to include (or use `git add .`), check `git status`, then commit. Do not run `git init` inside this existing repository. To verify the configured remote, run `git remote -v`.
+Review `git status` before committing. Do not push directly to `main`. The backend is a sibling folder and is not inside this frontend Git repository; version-control it in its own repository when your team creates one. To verify the frontend remote, run `git remote -v`.

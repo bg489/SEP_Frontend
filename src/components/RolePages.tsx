@@ -1,5 +1,9 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "./Icon";
+import { isAuthApiEnabled } from "../services/authConfig";
+import type { AppDispatch, RootState } from "../app/store";
+import { adminRoleChangeRequested, adminUsersRequested } from "../features/auth/authSlice";
 import type {
   AppPage,
   Campaign,
@@ -1619,6 +1623,9 @@ function CampaignReport({
 }
 
 function UserManagement({ onNotify }: RolePagesProps) {
+  const apiMode = isAuthApiEnabled;
+  const dispatch = useDispatch<AppDispatch>();
+  const auth = useSelector((state: RootState) => state.auth);
   const seed: (DemoUser & { status: "Active" | "Invited" })[] = [
     {
       name: "Linh Nguyen",
@@ -1656,9 +1663,16 @@ function UserManagement({ onNotify }: RolePagesProps) {
       (JSON.parse(localStorage.getItem("asx-admin-users") ?? "null") as
         typeof seed | null) ?? seed,
   );
+  useEffect(() => {
+    if (apiMode) dispatch(adminUsersRequested());
+  }, [apiMode, dispatch]);
+
   const [query, setQuery] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
-  const visible = users.filter((user) =>
+  const directoryUsers: (DemoUser & { id?: string; status: "Active" | "Invited" })[] = apiMode
+    ? auth.adminUsers.map((user) => ({ ...user, status: "Active" as const }))
+    : users;
+  const visible = directoryUsers.filter((user) =>
     `${user.name} ${user.email} ${user.role}`
       .toLowerCase()
       .includes(query.toLowerCase()),
@@ -1701,22 +1715,24 @@ function UserManagement({ onNotify }: RolePagesProps) {
             </p>
           </div>
         </div>
-        <button className="btn btn-primary" onClick={() => setInviteOpen(true)}>
-          <Icon name="plus" size={15} />
-          Invite user
-        </button>
+        {!apiMode && (
+          <button className="btn btn-primary" onClick={() => setInviteOpen(true)}>
+            <Icon name="plus" size={15} />
+            Invite user
+          </button>
+        )}
       </section>
       <div className="admin-stat-row">
         <MiniMetric
           label="TOTAL MEMBERS"
-          value={String(users.length).padStart(2, "0")}
+          value={String(directoryUsers.length).padStart(2, "0")}
           icon="users"
           tone="violet"
         />
         <MiniMetric
           label="ACTIVE USERS"
           value={String(
-            users.filter((user) => user.status === "Active").length,
+            directoryUsers.filter((user) => user.status === "Active").length,
           ).padStart(2, "0")}
           icon="check"
           tone="green"
@@ -1724,7 +1740,7 @@ function UserManagement({ onNotify }: RolePagesProps) {
         <MiniMetric
           label="PENDING INVITES"
           value={String(
-            users.filter((user) => user.status === "Invited").length,
+            directoryUsers.filter((user) => user.status === "Invited").length,
           ).padStart(2, "0")}
           icon="clock"
           tone="orange"
@@ -1756,12 +1772,12 @@ function UserManagement({ onNotify }: RolePagesProps) {
                 <th>Role</th>
                 <th>Status</th>
                 <th>Last active</th>
-                <th>Action</th>
+                {!apiMode && <th>Action</th>}
               </tr>
             </thead>
             <tbody>
               {visible.map((user) => (
-                <tr key={user.email}>
+                <tr key={user.id ?? user.email}>
                   <td>
                     <div className="user-cell">
                       <span>
@@ -1779,18 +1795,21 @@ function UserManagement({ onNotify }: RolePagesProps) {
                   <td>
                     <select
                       value={user.role}
-                      onChange={(event) =>
-                        update(
-                          users.map((item) =>
-                            item.email === user.email
-                              ? {
-                                  ...item,
-                                  role: event.target.value as UserRole,
-                                }
-                              : item,
-                          ),
-                        )
-                      }
+                      disabled={apiMode && auth.adminUsersBusy}
+                      onChange={(event) => {
+                        const nextRole = event.target.value as UserRole;
+                        if (apiMode && user.id) {
+                          dispatch(adminRoleChangeRequested({ id: user.id, role: nextRole }));
+                        } else {
+                          update(
+                            users.map((item) =>
+                              item.email === user.email
+                                ? { ...item, role: nextRole }
+                                : item,
+                            ),
+                          );
+                        }
+                      }}
                     >
                       {[
                         "Scenario Engineer",
@@ -1810,40 +1829,43 @@ function UserManagement({ onNotify }: RolePagesProps) {
                       {user.status}
                     </span>
                   </td>
-                  <td>
-                    {user.status === "Active"
-                      ? "Today, 09:42"
-                      : "Invitation sent"}
-                  </td>
-                  <td>
-                    <button
-                      className="link-button"
-                      onClick={() => {
-                        update(
-                          users.filter((item) => item.email !== user.email),
-                        );
-                        onNotify(
-                          `${user.email} removed from this mock directory.`,
-                        );
-                      }}
-                    >
-                      Remove
-                    </button>
-                  </td>
+                  <td>{apiMode ? "—" : user.status === "Active" ? "Today, 09:42" : "Invitation sent"}</td>
+                  {!apiMode && (
+                    <td>
+                      <button
+                        className="link-button"
+                        onClick={() => {
+                          update(users.filter((item) => item.email !== user.email));
+                          onNotify(`${user.email} removed from this mock directory.`);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+          {auth.adminUsersBusy && directoryUsers.length === 0 && (
+            <div className="empty-state">Loading users…</div>
+          )}
+          {auth.adminUsersError && (
+            <div className="auth-message auth-error" role="alert">{auth.adminUsersError}</div>
+          )}
         </div>
         <div className="admin-security-note">
           <Icon name="shield" size={16} />
           <span>
-            <b>Role-based navigation is a frontend preview.</b> Enforce all
-            permissions in the .NET API before connecting real accounts.
+            {apiMode ? (
+              <><b>Role changes are checked by the .NET API.</b> The affected user must sign in again for the new role to appear in their access token.</>
+            ) : (
+              <><b>Role-based navigation is a frontend preview.</b> Enforce all permissions in the .NET API before connecting real accounts.</>
+            )}
           </span>
         </div>
       </section>
-      {inviteOpen && (
+      {inviteOpen && !apiMode && (
         <div
           className="modal-backdrop"
           onMouseDown={(event) => {

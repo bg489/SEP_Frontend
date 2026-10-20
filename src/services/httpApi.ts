@@ -10,6 +10,7 @@ import type {
   FailureCluster,
   WorkerNode,
 } from "../types";
+import { getAccessToken } from "./authToken";
 
 export class HttpAutoScenarioApi implements AutoScenarioApi {
   private readonly baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
@@ -18,9 +19,14 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
   );
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
+    const accessToken = getAccessToken();
     const response = await fetch(this.baseUrl + path, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...init?.headers,
+      },
     });
     if (!response.ok) {
       const message = await response.text().catch(() => "");

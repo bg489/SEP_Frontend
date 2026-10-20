@@ -3909,6 +3909,43 @@ small {
 .auth-message svg {
   flex: none;
 }
+.auth-message.auth-error {
+  border-color: #ffd4d4;
+  background: #fff4f4;
+  color: #b33a3a;
+}
+.auth-role-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 2px 0 12px;
+  padding: 10px;
+  border: 1px solid #e9eaa9;
+  border-radius: 8px;
+  background: #fffef0;
+  color: #6b6333;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.auth-role-note svg {
+  flex: none;
+  color: #df6565;
+}
+.auth-submit:disabled,
+.demo-role:disabled,
+.auth-switch button:disabled,
+.auth-forgot:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.auth-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #fffef5;
+  color: #3e3434;
+  font-size: 13px;
+}
 .role-preview-select {
   display: flex;
   flex-direction: column;
