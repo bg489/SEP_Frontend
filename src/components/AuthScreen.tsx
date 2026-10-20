@@ -144,20 +144,20 @@ export function AuthScreen({
               <path
                 d="M10 100C70 76 58 39 124 48s60 44 114 25 54-48 94-39 42 3 58-22"
                 fill="none"
-                stroke="rgba(255,255,255,.12)"
+                stroke="rgba(52,35,39,.14)"
                 strokeWidth="23"
                 strokeLinecap="round"
               />
               <path
                 d="M10 100C70 76 58 39 124 48s60 44 114 25 54-48 94-39 42 3 58-22"
                 fill="none"
-                stroke="#a4f0cf"
+                stroke="#FF6363"
                 strokeWidth="2.5"
                 strokeDasharray="4 8"
                 strokeLinecap="round"
               />
-              <circle cx="10" cy="100" r="4" fill="#a4f0cf" />
-              <circle cx="390" cy="12" r="6" fill="#a4f0cf" />
+              <circle cx="10" cy="100" r="4" fill="#FF6363" />
+              <circle cx="390" cy="12" r="6" fill="#FF6363" />
             </svg>
           </div>
         </div>

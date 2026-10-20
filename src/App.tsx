@@ -2972,8 +2972,8 @@ function ActivityChart({ data }: { data: number[] }) {
     >
       <defs>
         <linearGradient id="fill" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#8c7cf4" stopOpacity=".2" />
-          <stop offset="1" stopColor="#8c7cf4" stopOpacity="0" />
+          <stop offset="0" stopColor="#FF6363" stopOpacity=".2" />
+          <stop offset="1" stopColor="#FF6363" stopOpacity="0" />
         </linearGradient>
       </defs>
       {[0, 1, 2, 3].map((n) => (
@@ -2990,7 +2990,7 @@ function ActivityChart({ data }: { data: number[] }) {
       <path
         d={line}
         fill="none"
-        stroke="#7667e9"
+        stroke="#FF6363"
         strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -3002,7 +3002,7 @@ function ActivityChart({ data }: { data: number[] }) {
           cy={p[1]}
           r="3"
           fill="#fff"
-          stroke="#7667e9"
+          stroke="#FF6363"
           strokeWidth="2"
         />
       ))}
@@ -3029,7 +3029,7 @@ function DetectionChart() {
       <path
         d="M24 173 C76 163 90 145 136 140 S204 110 245 104 S312 76 350 68 S418 44 457 39 S508 25 535 19"
         fill="none"
-        stroke="#7667e9"
+        stroke="#FF6363"
         strokeWidth="3"
       />
       <path
@@ -3070,13 +3070,13 @@ function RouteArt() {
       <path
         d="M38 196C89 163 128 181 151 143S101 101 126 72C150 43 196 64 223 78S232 142 276 143 306 85 351 69 388 79 409 35"
         fill="none"
-        stroke="#9beac9"
+        stroke="#FCFFA7"
         strokeWidth="3"
         strokeDasharray="4 8"
         strokeLinecap="round"
       />
-      <circle cx="38" cy="196" r="5" fill="#9beac9" />
-      <circle cx="409" cy="35" r="7" fill="#9beac9" />
+      <circle cx="38" cy="196" r="5" fill="#FCFFA7" />
+      <circle cx="409" cy="35" r="7" fill="#FCFFA7" />
     </svg>
   );
 }
