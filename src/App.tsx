@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -11,7 +12,17 @@ import { AuthScreen } from "./components/AuthScreen";
 import { RolePages, RoleWelcome } from "./components/RolePages";
 import { LanguageProvider, LanguageSwitcher } from "./i18n";
 import { api, isMockMode } from "./services/api";
-import { saveRanking } from "./services/workflowStore";
+import {
+  appendAuditEvent,
+  getCarlaConfig as readCarlaConfig,
+  getOracleProfileState,
+  getRanking,
+  listRuns as loadRuns,
+  saveRanking,
+  saveCarlaConfig as persistCarlaConfig,
+  saveOracleProfileState,
+  saveRuns as persistRuns,
+} from "./services/workflowStore";
 import { downloadCsv } from "./utils/download";
 import { isAuthApiEnabled } from "./services/authConfig";
 import type { AppDispatch, RootState } from "./app/store";
@@ -33,6 +44,7 @@ import {
 import type {
   Campaign,
   AppPage,
+  CarlaIntegrationConfig,
   CreateCampaignInput,
   CreateScenarioInput,
   DemoUser,
@@ -40,6 +52,7 @@ import type {
   OracleRule,
   OverviewData,
   Scenario,
+  ScenarioRun,
   ScenarioVersionRecord,
   UserRole,
   WorkerNode,
@@ -255,7 +268,10 @@ function AppContent() {
   const [scenarios, setScenarios] = useState<Scenario[]>(mockScenarios);
   const [campaigns, setCampaigns] = useState<Campaign[]>(mockCampaigns);
   const [failures, setFailures] = useState<FailureCluster[]>(mockFailures);
+  const [runs, setRuns] = useState<ScenarioRun[]>(loadRuns);
   const [workers, setWorkers] = useState<WorkerNode[]>(mockWorkers);
+  const [carlaConfig, setCarlaConfig] = useState<CarlaIntegrationConfig>(readCarlaConfig);
+  const [oracleProfile, setOracleProfile] = useState(getOracleProfileState);
   const [rules, setRules] = useState<OracleRule[]>(mockOracleRules);
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<"scenario" | "campaign" | null>(null);
@@ -272,6 +288,7 @@ function AppContent() {
   >();
   const [statusFilter, setStatusFilter] = useState("All statuses");
   const [ready, setReady] = useState(false);
+  const cancelledRunIds = useRef(new Set<string>());
   const role = user?.role ?? "Test Engineer";
   useEffect(() => {
     dispatch(bootstrapAuthRequested());
@@ -327,6 +344,48 @@ function AppContent() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!runs.length) return;
+    const terminalStates = new Set(["Passed", "Failed", "Cancelled", "Timed Out"]);
+    const updates: Campaign[] = [];
+    const nextCampaigns = campaigns.map((campaign) => {
+      const campaignRuns = runs.filter((run) => run.campaignId === campaign.id);
+      if (!campaignRuns.length) return campaign;
+      const completed = campaignRuns.filter((run) => terminalStates.has(run.state));
+      const progress = Math.round(campaignRuns.reduce((sum, run) => sum + run.progress, 0) / campaignRuns.length);
+      let status: Campaign["status"] = "Running";
+      if (completed.length === campaignRuns.length) {
+        status = completed.every((run) => run.state === "Cancelled")
+          ? "Cancelled"
+          : completed.some((run) => run.state === "Timed Out")
+            ? "Failed"
+            : "Completed";
+      }
+      const verdictRuns = campaignRuns.filter((run) => run.verdict === "PASS" || run.verdict === "FAIL" || run.verdict === "TIMEOUT");
+      const updated = {
+        ...campaign,
+        status,
+        progress,
+        passRate: verdictRuns.length ? (verdictRuns.filter((run) => run.verdict === "PASS").length / verdictRuns.length) * 100 : 0,
+        failedRuns: verdictRuns.filter((run) => run.verdict === "FAIL" || run.verdict === "TIMEOUT").length,
+      };
+      if (updated.status !== campaign.status || updated.progress !== campaign.progress || updated.passRate !== campaign.passRate || updated.failedRuns !== campaign.failedRuns) updates.push(updated);
+      return updated;
+    });
+    if (!updates.length) return;
+    setCampaigns(nextCampaigns);
+    updates.forEach((campaign) => {
+      void api.updateCampaign(campaign.id, campaign).catch((error: unknown) => {
+        if (!isMockMode) notify(error instanceof Error ? error.message : "Could not persist campaign progress.");
+      });
+    });
+    setOverview((current) => ({
+      ...current,
+      activeCampaigns: nextCampaigns.filter((campaign) => campaign.status === "Running" || campaign.status === "Queued").length,
+      passRate: Math.round(nextCampaigns.reduce((sum, campaign) => sum + campaign.passRate, 0) / Math.max(1, nextCampaigns.length) * 10) / 10,
+    }));
+  }, [runs]);
 
   useEffect(() => {
     if (!toast) return;
@@ -391,6 +450,196 @@ function AppContent() {
       notify(error instanceof Error ? error.message : "Could not clone scenario.");
     }
   };
+  const updateRunRecords = (update: (current: ScenarioRun[]) => ScenarioRun[]) => {
+    setRuns((current) => {
+      const next = update(current);
+      persistRuns(next);
+      return next;
+    });
+  };
+  const startCampaign = (campaignId: string, requestedScenarioIds?: string[], retryOf?: string, overrideCampaign?: Campaign) => {
+    const campaign = overrideCampaign ?? campaigns.find((item) => item.id === campaignId);
+    if (!campaign) return notify("Campaign not found.");
+    const targetScenarioIds = requestedScenarioIds ?? campaign.scenarioIds;
+    const campaignScenarios = targetScenarioIds
+      .map((id) => scenarios.find((scenario) => scenario.id === id))
+      .filter((scenario): scenario is Scenario => Boolean(scenario));
+    const inactive = campaignScenarios.filter((scenario) => scenario.status !== "Active" && scenario.status !== "Approved");
+    if (!campaignScenarios.length || inactive.length) {
+      return notify(inactive.length
+        ? `Execution blocked: ${inactive.map((scenario) => scenario.id).join(", ")} must be Active first.`
+        : "Execution blocked: campaign has no scenarios.");
+    }
+    const availableWorkers = workers.filter((worker) => worker.status !== "Offline" && worker.activeRuns < worker.capacity);
+    if (!availableWorkers.length) return notify("Execution blocked: no healthy worker has available capacity.");
+    const workerSlots = availableWorkers.flatMap((worker) =>
+      Array.from({ length: worker.capacity - worker.activeRuns }, () => worker.id),
+    );
+    const ranking = getRanking<{ order: string[] }>(campaignId);
+    const rankedIds = ranking?.order ?? [];
+    const orderedScenarios = [...campaignScenarios].sort((a, b) => {
+      const ai = rankedIds.indexOf(a.id);
+      const bi = rankedIds.indexOf(b.id);
+      if (ai < 0 && bi < 0) return campaign.scenarioIds.indexOf(a.id) - campaign.scenarioIds.indexOf(b.id);
+      if (ai < 0) return 1;
+      if (bi < 0) return -1;
+      return ai - bi;
+    });
+    const startedAt = new Date().toLocaleString();
+    const createdAt = Date.now();
+    const executionItems = orderedScenarios.flatMap((scenario) =>
+      Array.from({ length: Math.min(100, Math.max(1, campaign.repetitions ?? 1)) }, (_, repetition) => ({ scenario, repetition: repetition + 1 })),
+    );
+    const newRuns: ScenarioRun[] = executionItems.map(({ scenario, repetition }, index) => ({
+      id: `RUN-${createdAt}-${String(index + 1).padStart(2, "0")}`,
+      campaignId,
+      scenarioId: scenario.id,
+      scenarioName: scenario.name,
+      scenarioVersion: scenario.version,
+      repetition,
+      state: "Queued",
+      progress: 0,
+      startedAt,
+      workerId: workerSlots[index % workerSlots.length],
+      retryOf,
+      sutVersion: campaign.sutVersion ?? "1.0.0",
+      agent: campaign.agent ?? "Behavior Agent",
+      randomSeed: (campaign.randomSeed ?? 42) + repetition - 1,
+      oracleProfile: campaign.oracleProfile ?? "Default safety profile",
+      artifacts: ["telemetry.json", "events.json", "scenario-run.log"],
+      evidence: [],
+    }));
+    persistRuns([...runs, ...newRuns]);
+    setRuns((current) => [...current, ...newRuns]);
+    setCampaigns((current) => current.map((item) => item.id === campaignId
+      ? { ...item, status: "Running", progress: 0, failedRuns: 0, passRate: 0 }
+      : item));
+    void api.updateCampaign(campaignId, { status: "Running", progress: 0, failedRuns: 0, passRate: 0 }).catch((error: unknown) => {
+      if (!isMockMode) notify(error instanceof Error ? error.message : "Could not start the campaign.");
+    });
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Start campaign execution (mock)", target: campaignId, result: "Success" });
+    notify(`${campaign.name} queued ${newRuns.length} scenario runs in the local mock simulator. No CARLA process was started.`);
+
+    newRuns.forEach((run, index) => {
+      const wave = Math.floor(index / workerSlots.length);
+      const waveRuns = newRuns.slice(wave * workerSlots.length, (wave + 1) * workerSlots.length);
+      const waveOffset = wave * 2200;
+      if (index % workerSlots.length === 0) {
+        window.setTimeout(() => {
+          const scheduledRuns = waveRuns.filter((item) => !cancelledRunIds.current.has(item.id));
+          if (!scheduledRuns.length) return;
+          const waveCounts = new Map<string, number>();
+          scheduledRuns.forEach((item) => {
+            if (item.workerId) waveCounts.set(item.workerId, (waveCounts.get(item.workerId) ?? 0) + 1);
+          });
+          setWorkers((current) => current.map((worker) => {
+            const activeRuns = Math.min(worker.capacity, worker.activeRuns + (waveCounts.get(worker.id) ?? 0));
+            return { ...worker, activeRuns, status: activeRuns ? "Busy" : worker.status };
+          }));
+          updateRunRecords((items) => items.map((item) => scheduledRuns.some((scheduled) => scheduled.id === item.id)
+            ? { ...item, state: "Assigned", progress: 15 }
+            : item));
+        }, waveOffset + 100);
+      }
+      window.setTimeout(() => {
+        if (!cancelledRunIds.current.has(run.id)) updateRunRecords((items) => items.map((item) => item.id === run.id ? { ...item, state: "Running", progress: 55 } : item));
+      }, waveOffset + 850);
+      window.setTimeout(() => {
+        if (cancelledRunIds.current.has(run.id)) return;
+        const scenario = executionItems[index].scenario;
+        const sourceFailure = failures.find((failure) => failure.scenarioName === scenario.name);
+        const evidence = evaluateOracleEvidence(sourceFailure?.evidence ?? [], rules);
+        const passed = evidence.length === 0;
+        const finished: ScenarioRun = {
+          ...run,
+          state: passed ? "Passed" : "Failed",
+          verdict: passed ? "PASS" : "FAIL",
+          progress: 100,
+          durationSeconds: 12 + scenario.actors * 3,
+          evidence,
+          artifacts: ["telemetry.json", "events.json", "scenario-run.log", ...(passed ? [] : ["oracle-evidence.json"])],
+        };
+        updateRunRecords((items) => items.map((item) => item.id === run.id ? finished : item));
+        const lastRun = new Date().toLocaleString();
+        void api.listScenarios().then((storedScenarios) => {
+          const latest = storedScenarios.find((item) => item.id === scenario.id) ?? scenario;
+          const totalRuns = latest.runCount + 1;
+          const passRate = ((latest.passRate * latest.runCount / 100 + (passed ? 1 : 0)) / totalRuns) * 100;
+          setScenarios((current) => current.map((item) => item.id === scenario.id ? { ...item, runCount: totalRuns, passRate, lastRun } : item));
+          return api.updateScenarioMetrics(scenario.id, { runCount: totalRuns, passRate, lastRun });
+        }).catch(() => undefined);
+        const workerId = run.workerId;
+        if (workerId) setWorkers((current) => current.map((worker) => worker.id === workerId
+          ? { ...worker, activeRuns: Math.max(0, worker.activeRuns - 1), status: worker.activeRuns <= 1 ? "Online" : "Busy", lastHeartbeat: "Just now" }
+          : worker));
+        if (!passed) {
+          const failure: FailureCluster = {
+            id: `FCL-${run.id}`,
+            label: sourceFailure?.label ?? evidence[0]?.rule ?? "Oracle violation",
+            rootCause: sourceFailure?.rootCause ?? `The ${evidence[0]?.rule ?? "oracle"} rule was violated during this execution.`,
+            reviewStatus: "Needs review",
+            similarity: sourceFailure?.similarity ?? 1,
+            affectedRuns: 1,
+            lastDetected: lastRun,
+            map: scenario.map,
+            scenarioName: scenario.name,
+            confidence: sourceFailure?.confidence ?? 85,
+            evidence,
+            sourceRunId: run.id,
+          };
+          void api.addFailureCluster(failure).then((saved) => {
+            setFailures((current) => [saved, ...current]);
+            setOverview((current) => ({ ...current, failureClusters: current.failureClusters + 1 }));
+          }).catch((error: unknown) => {
+            if (!isMockMode) notify(error instanceof Error ? error.message : "Could not save failure analysis.");
+          });
+        }
+        appendAuditEvent({ actor: "AutoScenarioX System", action: `Oracle verdict ${finished.verdict}`, target: run.id, result: passed ? "Success" : "Rejected" });
+      }, waveOffset + 1600);
+    });
+  };
+  const cancelCampaign = (campaignId: string) => {
+    const activeRuns = runs.filter((run) => run.campaignId === campaignId && (run.state === "Queued" || run.state === "Assigned" || run.state === "Running"));
+    if (!activeRuns.length) return notify("There are no active runs to cancel.");
+    activeRuns.forEach((run) => cancelledRunIds.current.add(run.id));
+    updateRunRecords((items) => items.map((run) => activeRuns.some((active) => active.id === run.id) ? { ...run, state: "Cancelled", progress: 0 } : run));
+    const cancelledByWorker = new Map<string, number>();
+    activeRuns.filter((run) => run.state === "Assigned" || run.state === "Running").forEach((run) => {
+      if (run.workerId) cancelledByWorker.set(run.workerId, (cancelledByWorker.get(run.workerId) ?? 0) + 1);
+    });
+    setWorkers((current) => current.map((worker) => {
+      const activeRuns = Math.max(0, worker.activeRuns - (cancelledByWorker.get(worker.id) ?? 0));
+      return { ...worker, activeRuns, status: activeRuns ? "Busy" : "Online" };
+    }));
+    appendAuditEvent({ actor: user?.name ?? "Current user", action: "Cancel campaign execution", target: campaignId, result: "Info" });
+    notify("Campaign cancellation requested; queued mock runs were stopped.");
+  };
+  const reexecuteFailure = async (failure: FailureCluster) => {
+    const scenario = scenarios.find((item) => item.name === failure.scenarioName);
+    if (!scenario) return notify("The source scenario for this failure is no longer available.");
+    if (scenario.status !== "Active" && scenario.status !== "Approved") return notify(`${scenario.id} must be Active before re-execution.`);
+    try {
+      const campaign = await api.createCampaign({
+        name: `Re-execution · ${scenario.name}`,
+        description: `Reviewer-requested verification of ${failure.id}.`,
+        scenarioIds: [scenario.id],
+        strategy: "Failure re-execution",
+        sutName: "AutoScenarioX SUT",
+        sutVersion: "1.0.0",
+        agent: "Behavior Agent",
+        randomSeed: 42,
+        repetitions: 1,
+        timeoutSeconds: 300,
+        oracleProfile: "Default safety profile",
+      });
+      setCampaigns((items) => [campaign, ...items]);
+      setSelectedCampaignId(campaign.id);
+      setPage("run-detail");
+      startCampaign(campaign.id, [scenario.id], failure.sourceRunId, campaign);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not create a verification run.");
+    }
+  };
   const createScenario = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -432,6 +681,13 @@ function AppContent() {
       description: String(form.get("description") ?? "").trim(),
       scenarioIds: ids,
       strategy: String(form.get("strategy") ?? "Proposed (APFD)"),
+      sutName: String(form.get("sutName") ?? "AutoScenarioX SUT").trim(),
+      sutVersion: String(form.get("sutVersion") ?? "1.0.0").trim(),
+      agent: String(form.get("agent") ?? "Behavior Agent") as CreateCampaignInput["agent"],
+      randomSeed: Number(form.get("randomSeed") ?? 42),
+      repetitions: Number(form.get("repetitions") ?? 1),
+      timeoutSeconds: Number(form.get("timeoutSeconds") ?? 300),
+      oracleProfile: "Default safety profile",
     };
     try {
       const item = await api.createCampaign(input);
@@ -830,6 +1086,7 @@ function AppContent() {
               scenarios={scenarios}
               campaigns={campaigns}
               failures={failures}
+              runs={runs}
               workers={workers}
               onNavigate={navigate}
               onNotify={notify}
@@ -853,24 +1110,9 @@ function AppContent() {
                 return saved;
               }}
               onFailureConfirm={confirmFailure}
-              onCampaignStatus={(id, status) =>
-                setCampaigns((items) =>
-                  items.map((item) =>
-                    item.id === id
-                      ? {
-                          ...item,
-                          status,
-                          progress:
-                            status === "Completed"
-                              ? 100
-                              : status === "Running"
-                                ? Math.max(item.progress, 8)
-                                : item.progress,
-                        }
-                      : item,
-                  ),
-                )
-              }
+              onScenarioReexecute={reexecuteFailure}
+              onCampaignStart={startCampaign}
+              onCampaignCancel={cancelCampaign}
               onUserUpdate={updateUser}
               onLogout={signOut}
               initialScenarioId={editorScenarioId}
@@ -1022,6 +1264,43 @@ function AppContent() {
               ))}
             </select>
           </label>
+          <div className="form-row">
+            <label>
+              SUT name
+              <input name="sutName" required defaultValue="AutoScenarioX SUT" maxLength={120} />
+            </label>
+            <label>
+              SUT version
+              <input name="sutVersion" required defaultValue="1.0.0" maxLength={80} />
+            </label>
+          </div>
+          <div className="form-row">
+            <label>
+              Driving agent
+              <select name="agent" defaultValue="Behavior Agent">
+                <option>Behavior Agent</option>
+                <option>Autopilot</option>
+              </select>
+            </label>
+            <label>
+              Oracle profile
+              <input value="Default safety profile" readOnly />
+            </label>
+          </div>
+          <div className="form-row">
+            <label>
+              Random seed
+              <input name="randomSeed" type="number" min="0" max="2147483647" defaultValue="42" required />
+            </label>
+            <label>
+              Repetitions
+              <input name="repetitions" type="number" min="1" max="100" defaultValue="1" required />
+            </label>
+            <label>
+              Timeout (seconds)
+              <input name="timeoutSeconds" type="number" min="1" max="86400" defaultValue="300" required />
+            </label>
+          </div>
           <div className="picker-label">
             Approved scenarios <span>Select at least one</span>
           </div>
@@ -2782,12 +3061,10 @@ function Oracles({
                 </b>
               </span>
               <span>
-                LAST UPDATED <b>14/10/2026 08:30</b>
+                LAST UPDATED <b>{profile.updatedAt}</b>
               </span>
             </div>
-            <button className="link-button" onClick={() => onSave(draft)}>
-              View version history <Icon name="arrow-right" size={13} />
-            </button>
+            <span className="oracle-history-note">Each save creates a new local profile version and audit event.</span>
           </section>
           <div className="oracle-note">
             <Icon name="spark" size={16} />
@@ -3197,6 +3474,36 @@ function RouteArt() {
     </svg>
   );
 }
+function evaluateOracleEvidence(evidence: FailureCluster["evidence"], rules: OracleRule[]) {
+  const aliases: Record<string, string[]> = {
+    collision: ["collision", "contact"],
+    "lane-invasion": ["lane invasion", "lane marking"],
+    ttc: ["time-to-collision", "ttc"],
+    speed: ["speed"],
+    "traffic-light": ["traffic-light", "red signal"],
+    route: ["route", "incomplete", "stationary"],
+    freezing: ["freez", "stationary", "stagnation"],
+  };
+  return evidence.flatMap((item) => {
+    const text = `${item.rule} ${item.note}`.toLowerCase();
+    const rule = rules.find((candidate) => candidate.enabled && (aliases[candidate.id] ?? [candidate.name.toLowerCase()]).some((alias) => text.includes(alias)));
+    if (!rule) return [];
+    const measured = Number(item.measured.match(/-?\d+(?:\.\d+)?/)?.[0] ?? NaN);
+    let violated = true;
+    if (rule.id === "ttc" && Number.isFinite(measured)) violated = measured <= rule.threshold;
+    else if (rule.id === "lane-invasion" && Number.isFinite(measured)) violated = measured > rule.threshold;
+    else if (rule.id === "speed" && Number.isFinite(measured)) violated = measured > rule.threshold;
+    else if (rule.id === "freezing") {
+      const seconds = Number(item.measured.match(/([\d.]+)\s*s/i)?.[1] ?? NaN);
+      violated = Number.isFinite(seconds) ? seconds > rule.threshold : /stationary|stagnant|freez/i.test(text);
+    } else if (rule.id === "route") {
+      const percent = Number(item.measured.match(/([\d.]+)\s*%/)?.[1] ?? NaN);
+      violated = Number.isFinite(percent) ? percent < rule.threshold : /incomplete|0\.0\s*m|stationary/i.test(text);
+    }
+    return violated ? [{ ...item, threshold: `${rule.threshold} ${rule.unit}` }] : [];
+  });
+}
+
 function severity(v: Scenario["severity"]) {
   return v === "Critical" ? 4 : v === "High" ? 3 : v === "Medium" ? 2 : 1;
 }

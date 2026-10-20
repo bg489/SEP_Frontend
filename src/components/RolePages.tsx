@@ -2,15 +2,26 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "
 import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "./Icon";
 import { downloadCsv } from "../utils/download";
+import { downloadTextFile } from "../utils/download";
+import {
+  appendAuditEvent,
+  getAnalyticsPreferences,
+  getRanking,
+  listAuditEvents,
+  saveAnalyticsPreferences,
+} from "../services/workflowStore";
 import { isAuthApiEnabled } from "../services/authConfig";
 import type { AppDispatch, RootState } from "../app/store";
 import { adminRoleChangeRequested, adminUsersRequested } from "../features/auth/authSlice";
 import type {
   AppPage,
+  AnalyticsPreferences,
+  AuditEvent,
   Campaign,
   DemoUser,
   FailureCluster,
   Scenario,
+  ScenarioRun,
   ScenarioStatus,
   UserRole,
   WorkerNode,
@@ -22,14 +33,17 @@ interface RolePagesProps {
   scenarios: Scenario[];
   campaigns: Campaign[];
   failures: FailureCluster[];
+  runs: ScenarioRun[];
   workers: WorkerNode[];
   onNavigate: (page: AppPage) => void;
   onNotify: (message: string) => void;
   onScenarioStatus: (id: string, status: ScenarioStatus) => void;
   onScenarioUpdate: (id: string, changes: Partial<Scenario>) => void;
   onImport: (scenario: Scenario) => Promise<Scenario>;
-  onFailureConfirm: (failure: FailureCluster) => void;
-  onCampaignStatus: (id: string, status: Campaign["status"]) => void;
+  onFailureConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
+  onScenarioReexecute: (failure: FailureCluster) => void;
+  onCampaignStart: (id: string) => void;
+  onCampaignCancel: (id: string) => void;
   onUserUpdate: (user: DemoUser) => void;
   onLogout: () => void;
   initialScenarioId?: string;
@@ -887,17 +901,14 @@ function ScenarioClusters({ scenarios, onNavigate, onNotify }: RolePagesProps) {
 function ExecutionQueue({
   campaigns,
   workers,
+  runs,
   onNavigate,
   onOpenCampaign,
-  onCampaignStatus,
-  onNotify,
+  onCampaignStart,
+  onCampaignCancel,
 }: RolePagesProps) {
-  const running = campaigns.filter(
-    (campaign) => campaign.status === "Running",
-  ).length;
-  const queued = campaigns.filter(
-    (campaign) => campaign.status === "Queued",
-  ).length;
+  const running = runs.filter((run) => run.state === "Running").length;
+  const queued = runs.filter((run) => run.state === "Queued" || run.state === "Assigned").length;
   const totalCapacity = workers.reduce(
     (sum, worker) => sum + worker.capacity,
     0,
@@ -926,7 +937,7 @@ function ExecutionQueue({
         />
         <MiniMetric
           label="COMPLETED TODAY"
-          value="18"
+          value={String(runs.filter((run) => run.state === "Passed" || run.state === "Failed").length)}
           icon="check"
           tone="blue"
         />
@@ -998,26 +1009,16 @@ function ExecutionQueue({
                     campaign.status === "Draft" ? (
                       <button
                         className="btn btn-primary btn-xs"
-                        onClick={() => {
-                          onCampaignStatus(campaign.id, "Running");
-                          onNotify(
-                            `${campaign.name} started in the mock queue.`,
-                          );
-                        }}
+                        onClick={() => onCampaignStart(campaign.id)}
                       >
                         Start run
                       </button>
                     ) : campaign.status === "Running" ? (
                       <button
                         className="btn btn-light btn-xs"
-                        onClick={() => {
-                          onCampaignStatus(campaign.id, "Completed");
-                          onNotify(
-                            `${campaign.name} marked complete in the mock queue.`,
-                          );
-                        }}
+                        onClick={() => onCampaignCancel(campaign.id)}
                       >
-                        Complete
+                        Cancel
                       </button>
                     ) : (
                       <button
@@ -1052,10 +1053,11 @@ function ExecutionQueue({
 function RunDetails({
   campaigns,
   scenarios,
+  runs,
+  workers,
   user,
   selectedCampaignId,
   onNavigate,
-  onNotify,
 }: RolePagesProps) {
   const campaign =
     campaigns.find((item) => item.id === selectedCampaignId) ??
@@ -1064,6 +1066,10 @@ function RunDetails({
   const runScenarios = campaign
     ? scenarios.filter((scenario) => campaign.scenarioIds.includes(scenario.id))
     : [];
+  const campaignRuns = campaign ? runs.filter((run) => run.campaignId === campaign.id) : [];
+  const completedRuns = campaignRuns.filter((run) => run.verdict === "PASS" || run.verdict === "FAIL" || run.verdict === "TIMEOUT");
+  const passedRuns = campaignRuns.filter((run) => run.verdict === "PASS").length;
+  const activeWorker = workers.find((worker) => worker.id === campaignRuns.at(-1)?.workerId);
   return (
     <div className="role-page-stack">
       <section className="run-detail-hero">
@@ -1079,10 +1085,10 @@ function RunDetails({
               ? "Back to review queue"
               : "Back to execution queue"}
           </button>
-          <small>RUN DETAILS · RUN-2026-1048</small>
+          <small>RUN DETAILS · {campaignRuns.at(-1)?.id ?? "AWAITING FIRST EXECUTION"}</small>
           <h2>{campaign?.name ?? "No active campaign"}</h2>
           <p>
-            CARLA 0.9.15 · Behavior Agent 2.4.0-rc2 · Started today at 08:20
+            Local mock execution · {campaignRuns.length} run records · scenario versions retained at dispatch
           </p>
         </div>
         <Badge value={campaign?.status ?? "Queued"} />
@@ -1097,22 +1103,20 @@ function RunDetails({
         <MiniMetric
           label="COMPLETED"
           value={String(
-            Math.round(
-              (runScenarios.length || 0) * ((campaign?.progress ?? 0) / 100),
-            ),
+            completedRuns.length,
           )}
           icon="check"
           tone="green"
         />
         <MiniMetric
           label="PASS RATE"
-          value={`${campaign?.passRate ?? 0}%`}
+          value={`${completedRuns.length ? Math.round((passedRuns / completedRuns.length) * 100) : 0}%`}
           icon="activity"
           tone="blue"
         />
         <MiniMetric
           label="FAILED RUNS"
-          value={String(campaign?.failedRuns ?? 0)}
+          value={String(campaignRuns.filter((run) => run.verdict === "FAIL" || run.verdict === "TIMEOUT").length)}
           icon="warning"
           tone="orange"
         />
@@ -1127,52 +1131,54 @@ function RunDetails({
             </div>
             <button
               className="btn btn-light"
-              onClick={() =>
-                onNotify(
-                  "Run logs are generated when the .NET execution service is connected.",
-                )
-              }
+              disabled={!campaignRuns.length}
+              onClick={() => downloadTextFile(`${campaign?.id ?? "campaign"}-run-logs.json`, JSON.stringify(campaignRuns, null, 2), "application/json")}
             >
               <Icon name="external" size={14} />
               Open logs
             </button>
           </div>
-          {runScenarios.length ? (
-            runScenarios.map((scenario, index) => (
-              <div className="run-item" key={scenario.id}>
+          {campaignRuns.length ? (
+            campaignRuns.map((run, index) => (
+              <div className="run-item run-item-detail" key={run.id}>
                 <span className={`run-dot run-dot-${index % 3}`}>
-                  {index < 2 ? (
+                  {run.state === "Passed" ? (
                     <Icon name="check" size={12} />
+                  ) : run.state === "Failed" ? (
+                    <Icon name="warning" size={12} />
                   ) : (
                     <Icon name="clock" size={12} />
                   )}
                 </span>
                 <div>
-                  <b>{scenario.name}</b>
+                  <b>{run.scenarioName}</b>
                   <small>
-                    {scenario.id} · {scenario.map} · {scenario.weather}
+                    {run.id} · {run.scenarioId} · {run.scenarioVersion} · repeat {run.repetition ?? 1} · {run.workerId ?? "Unassigned"}
                   </small>
+                  {run.evidence.map((item, evidenceIndex) => <small className="run-evidence-line" key={`${item.rule}-${evidenceIndex}`}>{item.timestamp} · {item.rule}: {item.measured} / {item.threshold}</small>)}
+                  <small className="run-evidence-line">Artifacts: {run.artifacts.join(", ") || "None"}</small>
                 </div>
                 <span className="run-duration">
-                  {index < 2 ? "00:03:42" : "Waiting"}
+                  {run.durationSeconds ? `${Math.floor(run.durationSeconds / 60)}m ${run.durationSeconds % 60}s` : `${run.progress}%`}
                 </span>
-                <Badge
-                  value={index === 1 ? "FAIL" : index < 1 ? "PASS" : "Queued"}
-                />
+                <Badge value={run.verdict ?? run.state} />
               </div>
             ))
           ) : (
-            <EmptyPanel text="This campaign does not have linked scenarios." />
+            <EmptyPanel text={runScenarios.length ? "No execution records yet. Start the campaign from the execution queue." : "This campaign does not have linked scenarios."} />
           )}
         </section>
         <aside className="card run-context">
           <small className="section-kicker">EXECUTION CONTEXT</small>
           <h3>Environment</h3>
           {[
-            ["Simulation node", "carla-worker-02"],
+            ["Simulation node", activeWorker?.name ?? "No worker assigned"],
             ["Map", runScenarios[0]?.map ?? "Town05"],
-            ["Oracle profile", "Default safety profile v1.8"],
+            ["SUT", `${campaign?.sutName ?? "AutoScenarioX SUT"} ${campaign?.sutVersion ?? "1.0.0"}`],
+            ["Driving agent", campaign?.agent ?? "Behavior Agent"],
+            ["Oracle profile", campaign?.oracleProfile ?? "Default safety profile"],
             ["Execution strategy", campaign?.strategy ?? "Risk-first"],
+            ["Random seed", String(campaign?.randomSeed ?? 42)],
           ].map(([label, value]) => (
             <div className="context-row" key={label}>
               <span>{label}</span>
