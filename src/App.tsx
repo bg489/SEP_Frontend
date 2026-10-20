@@ -1119,6 +1119,7 @@ function AppContent() {
               failures={failures}
               notify={notify}
               onConfirm={confirmFailure}
+              onReexecute={reexecuteFailure}
             />
           )}
           {page === "nodes" && (
@@ -2524,10 +2525,12 @@ function Failures({
   failures,
   notify,
   onConfirm,
+  onReexecute,
 }: {
   failures: FailureCluster[];
   notify: (s: string) => void;
-  onConfirm: (failure: FailureCluster) => void;
+  onConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
+  onReexecute: (failure: FailureCluster) => void;
 }) {
   const [open, setOpen] = useState<FailureCluster | null>(null);
   const [reviewFilter, setReviewFilter] = useState("All statuses");
@@ -2536,6 +2539,7 @@ function Failures({
     (failure) =>
       reviewFilter === "All statuses" || failure.reviewStatus === reviewFilter,
   );
+  const similarFailures = open ? failures.filter((failure) => failure.id !== open.id && (failure.map === open.map || failure.evidence.some((item) => open.evidence.some((source) => source.rule === item.rule)))).slice(0, 3) : [];
   const types = [
     ["Collision", 9, "red"],
     ["Time-to-collision", 7, "orange"],
@@ -2753,12 +2757,30 @@ function Failures({
           onClose={() => setOpen(null)}
           onSubmit={(e) => {
             e.preventDefault();
-            onConfirm(open);
+            const form = new FormData(e.currentTarget);
+            onConfirm(open, {
+              label: String(form.get("label") ?? open.label).trim(),
+              rootCause: String(form.get("rootCause") ?? open.rootCause).trim(),
+              reviewerNote: String(form.get("reviewerNote") ?? "").trim(),
+              reviewedBy: "Test Reviewer",
+            });
             setOpen(null);
           }}
           submitLabel="Confirm root cause"
         >
           <div className="evidence-modal">
+            <button className="btn btn-light" type="button" onClick={() => downloadCsv(`${open.id}-failure-report.csv`, [
+              ["Failure cluster", open.id],
+              ["Classification", open.label],
+              ["Root cause", open.rootCause],
+              ["Scenario", open.scenarioName],
+              ["Map", open.map],
+              ["Source run", open.sourceRunId ?? "Seeded example"],
+              ["Rule", "Timestamp", "Measured", "Threshold", "Evidence"],
+              ...open.evidence.map((item) => [item.rule, item.timestamp, item.measured, item.threshold, item.note]),
+            ])}>
+              <Icon name="download" size={14} /> Export failure report
+            </button>
             <Badge value={open.reviewStatus} />
             <h3>Root-cause explanation</h3>
             <p>{open.rootCause}</p>
@@ -2772,6 +2794,28 @@ function Failures({
                 <p>{e.note}</p>
               </div>
             ))}
+            <h3>Verify classification</h3>
+            <label>
+              Root-cause label
+              <input name="label" defaultValue={open.label} required maxLength={160} />
+            </label>
+            <label>
+              Verified explanation
+              <textarea name="rootCause" defaultValue={open.rootCause} rows={3} required maxLength={1200} />
+            </label>
+            <label>
+              Reviewer note
+              <textarea name="reviewerNote" rows={2} maxLength={1000} placeholder="Why does the evidence support this classification?" />
+            </label>
+            {similarFailures.length > 0 && (
+              <div className="similar-failures">
+                <h3>Similar historical failures</h3>
+                {similarFailures.map((failure) => <small key={failure.id}>{failure.id} · {failure.label} · {Math.round(failure.similarity * 100)}% similarity</small>)}
+              </div>
+            )}
+            <button className="btn btn-light" type="button" onClick={() => { onReexecute(open); setOpen(null); }}>
+              Request scenario re-execution
+            </button>
           </div>
         </Modal>
       )}

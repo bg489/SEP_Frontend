@@ -1198,10 +1198,12 @@ function RunDetails({
 }
 
 function ReviewQueue({
+  user,
   scenarios,
   failures,
   onScenarioStatus,
   onFailureConfirm,
+  onScenarioReexecute,
   onNotify,
   onNavigate,
 }: RolePagesProps) {
@@ -1210,6 +1212,13 @@ function ReviewQueue({
   );
   const [inspectingFailure, setInspectingFailure] =
     useState<FailureCluster | null>(null);
+  const [verifiedLabel, setVerifiedLabel] = useState("");
+  const [verifiedRootCause, setVerifiedRootCause] = useState("");
+  const inspectFailure = (failure: FailureCluster) => {
+    setInspectingFailure(failure);
+    setVerifiedLabel(failure.label);
+    setVerifiedRootCause(failure.rootCause);
+  };
   const pendingScenarios = scenarios.filter(
     (scenario) => scenario.status === "In review",
   );
@@ -1355,7 +1364,7 @@ function ReviewQueue({
               <div className="review-actions">
                 <button
                   className="btn btn-light btn-xs"
-                  onClick={() => setInspectingFailure(failure)}
+                  onClick={() => inspectFailure(failure)}
                 >
                   Inspect evidence
                 </button>
@@ -1507,6 +1516,14 @@ function ReviewQueue({
                 </div>
               ))}
             </div>
+            <label>
+              Verified root-cause classification
+              <input value={verifiedLabel} onChange={(event) => setVerifiedLabel(event.target.value)} maxLength={160} required />
+            </label>
+            <label>
+              Reviewer explanation
+              <textarea value={verifiedRootCause} onChange={(event) => setVerifiedRootCause(event.target.value)} rows={3} maxLength={1200} required />
+            </label>
             <div className="modal-actions">
               <button
                 className="btn btn-light"
@@ -1516,13 +1533,28 @@ function ReviewQueue({
               </button>
               <button
                 className="btn btn-primary"
+                disabled={!verifiedLabel.trim() || !verifiedRootCause.trim()}
                 onClick={() => {
-                  onFailureConfirm(inspectingFailure);
+                  onFailureConfirm(inspectingFailure, {
+                    label: verifiedLabel.trim(),
+                    rootCause: verifiedRootCause.trim(),
+                    reviewerNote: "Reviewed in the failure queue.",
+                    reviewedBy: user.name,
+                  });
                   setInspectingFailure(null);
                 }}
               >
                 <Icon name="check" size={15} />
                 Confirm root cause
+              </button>
+              <button
+                className="btn btn-light"
+                onClick={() => {
+                  onScenarioReexecute(inspectingFailure);
+                  setInspectingFailure(null);
+                }}
+              >
+                Request re-execution
               </button>
             </div>
           </section>
@@ -1535,7 +1567,8 @@ function ReviewQueue({
 function CampaignReport({
   campaigns,
   scenarios,
-  onNotify,
+  runs,
+  failures,
   onNavigate,
 }: RolePagesProps) {
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
@@ -1544,6 +1577,14 @@ function CampaignReport({
   const selectedScenarios = campaign
     ? scenarios.filter((scenario) => campaign.scenarioIds.includes(scenario.id))
     : [];
+  const campaignRuns = campaign ? runs.filter((run) => run.campaignId === campaign.id) : [];
+  const completedRuns = campaignRuns.filter((run) => run.verdict === "PASS" || run.verdict === "FAIL" || run.verdict === "TIMEOUT");
+  const passRate = completedRuns.length ? (completedRuns.filter((run) => run.verdict === "PASS").length / completedRuns.length) * 100 : undefined;
+  const duration = completedRuns.length
+    ? `${Math.floor(completedRuns.reduce((sum, run) => sum + (run.durationSeconds ?? 0), 0) / 60)}m`
+    : "No run data";
+  const ranking = campaign ? getRanking<{ apfd: string; apfdc: string; baselineApfd: string; strategy: string }>(campaign.id) : undefined;
+  const campaignFailures = failures.filter((failure) => selectedScenarios.some((scenario) => scenario.name === failure.scenarioName));
   return (
     <div className="role-page-stack">
       <section className="report-hero">
@@ -1554,11 +1595,16 @@ function CampaignReport({
         </div>
         <button
           className="btn btn-white"
-          onClick={() =>
-            onNotify(
-              "PDF export will be available when the reporting API is connected.",
-            )
-          }
+          disabled={!campaign}
+          onClick={() => campaign && downloadCsv(`${campaign.id}-campaign-report.csv`, [
+            ["Campaign", campaign.name],
+            ["Status", campaign.status],
+            ["Strategy", ranking?.strategy ?? campaign.strategy],
+            ["APFD", ranking?.apfd ?? "Unavailable"],
+            ["APFDc (estimated)", ranking?.apfdc ?? "Unavailable"],
+            ["Run ID", "Scenario ID", "Scenario version", "Verdict", "Duration seconds", "Worker", "Evidence"],
+            ...campaignRuns.map((run) => [run.id, run.scenarioId, run.scenarioVersion, run.verdict ?? run.state, run.durationSeconds ?? "", run.workerId ?? "", run.evidence.map((evidence) => `${evidence.rule} ${evidence.measured} threshold ${evidence.threshold}`).join("; ")]),
+          ])}
         >
           <Icon name="download" size={15} />
           Export report
@@ -1594,19 +1640,19 @@ function CampaignReport({
             />
             <MiniMetric
               label="PASS RATE"
-              value={`${campaign.passRate}%`}
+              value={passRate === undefined ? "—" : `${passRate.toFixed(1)}%`}
               icon="check"
               tone="green"
             />
             <MiniMetric
               label="FAILED RUNS"
-              value={String(campaign.failedRuns)}
+              value={String(completedRuns.filter((run) => run.verdict === "FAIL" || run.verdict === "TIMEOUT").length)}
               icon="warning"
               tone="orange"
             />
             <MiniMetric
               label="EXECUTION TIME"
-              value={campaign.estimatedDuration}
+              value={duration}
               icon="clock"
               tone="blue"
             />
@@ -1622,16 +1668,9 @@ function CampaignReport({
                 <Badge value={campaign.status} />
               </div>
               <div className="report-bars">
-                {[
-                  72,
-                  82,
-                  77,
-                  91,
-                  86,
-                  96,
-                  88,
-                  Math.max(12, campaign.passRate),
-                ].map((value, index) => (
+                {(completedRuns.length
+                  ? completedRuns.map((_, index) => Math.round(((completedRuns.slice(0, index + 1).filter((run) => run.verdict === "PASS").length) / (index + 1)) * 100))
+                  : [0]).map((value, index) => (
                   <div key={index}>
                     <span style={{ height: `${value}%` }} title={`${value}%`} />
                     <small>
@@ -1645,16 +1684,16 @@ function CampaignReport({
                   <i />
                   Pass rate
                 </span>
-                <small>Mock values · illustrative</small>
+                <small>{completedRuns.length ? `${completedRuns.length} completed run records` : "No completed run records"}</small>
               </div>
             </section>
             <section className="card report-findings">
               <small className="section-kicker">KEY FINDINGS</small>
               <h3>Recommended follow-up</h3>
               {[
-                [
-                  "Review high-risk failures",
-                  "2 failure clusters have evidence ready for review",
+                  [
+                    "Review high-risk failures",
+                    `${campaignFailures.length} linked failure clusters have evidence ready for review`,
                   "warning",
                 ],
                 [
@@ -1664,7 +1703,7 @@ function CampaignReport({
                 ],
                 [
                   "Tune campaign order",
-                  "Risk-first ordering can surface critical cases earlier",
+                    ranking ? `${ranking.strategy} · APFD ${ranking.apfd} vs baseline ${ranking.baselineApfd}` : "Run prioritization to calculate APFD/APFDc for this campaign",
                   "priority",
                 ],
               ].map(([title, detail, icon]) => (
