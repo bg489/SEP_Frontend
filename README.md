@@ -91,11 +91,13 @@ Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, 
 | `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm or correct a root cause |
 | `GET`, `PUT` | `/api/simulation-nodes` | Read or configure simulation node records |
 | `GET`, `PUT` | `/api/oracles/rules` | Read and save oracle rules |
-| `GET`, `PUT` | `/api/integration/carla` | Save CARLA profile; quality is fixed to Low |
+| `GET`, `PUT`, `POST` | `/api/integration/carla`, `/api/integration/carla/test` | Save/check real CARLA and ScenarioRunner readiness; quality is fixed to Low |
+| `GET` | `/api/runs/{id}/artifacts/{fileName}` | Download the worker run log |
+| `POST` | `/api/worker-callbacks/runs/{id}` | Receive authenticated external worker callbacks |
 | `GET`, `PUT` | `/api/analytics/preferences` | Persist similarity and reporting settings |
 | `GET` | `/api/audit-log` | Read administrator audit history |
 
-API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. Campaign execution currently persists queue records; a running CARLA/ScenarioRunner worker and worker callback API are still required to execute them. The CARLA connection check is a mock and does not launch CARLA. The scenario import flow validates XML in the browser before sending the definition to the API; report files are generated in the browser from persisted run and ranking data.
+API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. In API mode, imported OpenSCENARIO XML is stored with its scenario version. After the Administrator configures and activates the local .NET CARLA worker, campaigns execute through the matching CARLA 0.9.16/ScenarioRunner installation. The worker reports run states and results to PostgreSQL; the UI polls active runs and lets users download the saved ScenarioRunner log. CARLA is always started at Low quality. See `../Backend/README.md` for installation and worker callback setup. Report files are generated in the browser from persisted run and ranking data.
 
 ### Supabase and secrets
 
