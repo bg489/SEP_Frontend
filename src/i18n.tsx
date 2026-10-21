@@ -26,7 +26,19 @@ function normalize(value: string) {
 }
 
 function translateDynamic(value: string) {
-  let match = value.match(
+  let match = value.match(/^Loading (\d+) requests?…$/);
+  if (match) return `Đang tải ${match[1]} yêu cầu…`;
+  match = value.match(/^(\d+) selected · (\d+) shown$/);
+  if (match) return `${match[1]} đã chọn · ${match[2]} đang hiển thị`;
+  match = value.match(/^(\d+) selected$/);
+  if (match) return `${match[1]} đã chọn`;
+  match = value.match(/^(\d+) vehicle models · (\d+) categories$/);
+  if (match) return `${match[1]} mẫu xe · ${match[2]} nhóm phương tiện`;
+  match = value.match(/^(.+) · (Car|Truck|Van|Bus|Motorcycle|Bicycle|Selected)$/);
+  if (match) return `${match[1]} · ${vietnameseTranslations[match[2]] ?? match[2]}`;
+  match = value.match(/^(.+) · ((?:walker\.pedestrian|static\.prop)\.[\w-]+)$/);
+  if (match && vietnameseTranslations[match[1]]) return `${vietnameseTranslations[match[1]]} · ${match[2]}`;
+  match = value.match(
     /^A password reset link is ready to send to (.+) when authentication is connected\.$/,
   );
   if (match) return "Liên kết đặt lại mật khẩu sẽ được gửi tới " + match[1] + " khi kết nối xác thực được thiết lập.";

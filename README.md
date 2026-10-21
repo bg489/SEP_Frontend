@@ -15,7 +15,24 @@ The app uses the .NET REST API and PostgreSQL by default for all five workflows.
 | **Test Reviewer** | Overview, failure evidence and root-cause review, run details, campaign reports, profile |
 | **Administrator** | Overview, user and role management, simulation nodes, test-oracle rules, analytics settings, audit log, profile |
 
-The sign-in screen includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. In mock mode, the role selector previews each role's navigation. In API mode, the role comes from the backend and the preview selector is hidden.
+The sign-in screen includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. The signed-in role always comes from the backend; mock workflow data does not enable role-preview sign-ins.
+
+## Scenario authoring and campaigns
+
+The create form and Scenario Engineer editor configure the map, weather, ego vehicle, traffic vehicle and count, pedestrian and obstacle blueprints and counts, simulation duration, speed offset, and test intent notes. The vehicle picker includes **41 models in 6 categories** (car, truck, van, bus, motorcycle, and bicycle), with model search and category filters, from the [official CARLA vehicle catalogue](https://carla.readthedocs.io/en/latest/catalogue_vehicles/). Blueprint availability is checked against the installed simulator during execution.
+
+The campaign picker lists scenarios that are **Ready for testing** (`Active` or `Approved`). Search by name, ID, map, description, or tag, and filter by map, scenario type, and severity. Selected scenarios remain selected when filters change; the picker displays the selected and visible counts.
+
+API requests show activity in the top bar. Actions such as saving, validation, import, campaign execution, artifact download, review, and worker configuration show loading states and prevent duplicate submissions while their requests finish.
+
+### Execution modes and current limits
+
+| Mode | Runtime behavior |
+| --- | --- |
+| **CARLA actor scene** | Creates the configured ego vehicle, traffic vehicles, pedestrians, and props, applies the map, weather, counts, duration, and driving settings, and follows a seeded road path. Route, trigger, and action free-text fields document test intent; they do not define executable trajectories. |
+| **OpenSCENARIO source** | Runs the original `.xosc` / `.osc` file saved with that scenario version through ScenarioRunner. The actor form does not rewrite the imported file. Use this mode for exact spawn positions, custom trajectories, triggers, and maneuvers. |
+
+Native actor scenes currently support collision, speed / speeding, and freezing / stagnation checks. Other enabled oracle rules are rejected before a native run is queued; use an imported OpenSCENARIO file with executable safety criteria for those checks. CARLA runs at **Low quality**. A successful native result requires the configured actors to spawn, the simulation to run, and the supported safety checks to pass; launching CARLA alone is insufficient.
 
 ## Run locally
 
@@ -88,19 +105,19 @@ Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, 
 | `GET`, `POST`, `PATCH` | `/api/campaigns`, `/api/campaigns/{id}` | Campaign list, create, and update |
 | `GET`, `PUT` | `/api/campaigns/{id}/ranking` | Persist prioritization order and APFD/APFDc evaluation |
 | `GET`, `POST` | `/api/runs`, `/api/campaigns/{id}/runs` | Read and queue backend run records |
-| `POST` | `/api/campaigns/{id}/runs/cancel` | Cancel queued runs |
+| `POST` | `/api/campaigns/{id}/runs/cancel` | Cancel queued and active campaign runs |
 | `GET`, `POST` | `/api/analytics/failure-clusters` | Failure groups and oracle evidence |
 | `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm or correct a root cause |
 | `GET`, `PUT` | `/api/simulation-nodes` | Read or configure simulation node records |
 | `GET`, `PUT` | `/api/oracles/rules` | Read and save oracle rules |
 | `GET`, `PUT` | `/api/oracles/profile` | Read and save oracle profile version and activation state |
 | `GET`, `PUT`, `POST` | `/api/integration/carla`, `/api/integration/carla/test` | Save/check real CARLA and ScenarioRunner readiness; quality is fixed to Low |
-| `GET` | `/api/runs/{id}/artifacts/{fileName}` | Download the worker run log |
+| `GET` | `/api/runs/{id}/artifacts/{fileName}` | Download saved run logs, execution options, and simulation results |
 | `POST` | `/api/worker-callbacks/runs/{id}` | Receive authenticated external worker callbacks |
 | `GET`, `PUT` | `/api/analytics/preferences` | Persist similarity and reporting settings |
 | `GET` | `/api/audit-log` | Read administrator audit history |
 
-API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. In API mode, imported OpenSCENARIO XML is stored with its scenario version. After the Administrator configures and activates the local .NET CARLA worker, campaigns execute through the matching CARLA 0.9.16/ScenarioRunner installation. The worker reports run states and results to PostgreSQL; the UI polls active runs and lets users download the saved ScenarioRunner log. CARLA is always started at Low quality. See `../Backend/README.md` for the database tables, installation, and worker callback setup. Report files are generated in the browser from persisted run and ranking data.
+API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. In API mode, scenario definitions and imported OpenSCENARIO XML are stored with their versions. After the Administrator configures and activates the local .NET CARLA worker, campaigns run against CARLA 0.9.16 using the mode above. The worker reports run states and results to PostgreSQL; the UI polls active runs and lets users download saved execution logs and evidence. See `../Backend/README.md` for database tables, installation, and worker callbacks. Report files are generated in the browser from persisted run and ranking data.
 
 ### Supabase and secrets
 
@@ -111,7 +128,8 @@ The frontend is intended to call the .NET API. Keep Supabase database access and
 ```text
 src/
   components/   Authentication and role-specific screens
-  data/         Initial mock data
+  data/         Initial mock data and official CARLA vehicle catalogue
+  hooks/        Shared API action loading and duplicate-submit protection
   services/     Saga API facade, HTTP adapter, and mock adapter
   features/     Authentication and workflow sagas
   App.tsx       App shell, role navigation, shared flows
@@ -131,4 +149,4 @@ git commit -m "feat: describe the change"
 git push -u origin feature/short-description
 ```
 
-Review `git status` before committing. Do not push directly to `main`. The backend is a sibling folder and is not inside this frontend Git repository; version-control it in its own repository when your team creates one. To verify the frontend remote, run `git remote -v`.
+Review `git status` before committing. Do not push directly to `main`. The backend is a sibling repository; commit and push its changes separately. To verify the frontend remote, run `git remote -v`.
