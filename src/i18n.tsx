@@ -130,6 +130,10 @@ function translateDynamic(value: string) {
   if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " chiến dịch; " + match[2] + ".";
   match = value.match(/^Imported from (.+)\. Review the scenario definition before approval\.$/);
   if (match) return "Đã nhập từ " + match[1] + ". Hãy xem lại định nghĩa kịch bản trước khi phê duyệt.";
+  match = value.match(/^Imported from (.+)\. Configure and validate the scenario before testing\.$/);
+  if (match) return "Đã nhập từ " + match[1] + ". Hãy cấu hình và kiểm tra kịch bản trước khi kiểm thử.";
+  match = value.match(/^Scenario (.+) passed system validation and is ready for testing\.$/);
+  if (match) return "Kịch bản " + match[1] + " đã vượt qua bước kiểm tra của hệ thống và sẵn sàng kiểm thử.";
   match = value.match(/^(.+) was imported as a draft\.$/);
   if (match) return match[1] + " đã được nhập dưới dạng bản nháp.";
   match = value.match(/^Invitation prepared for (.+)\.$/);

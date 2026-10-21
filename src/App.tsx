@@ -1306,14 +1306,14 @@ function AppContent() {
               workers={workers}
               onNavigate={navigate}
               onNotify={notify}
-              onScenarioStatus={async (id, status) => {
+              onScenarioStatus={async (id, status, note) => {
                 try {
-                  const updated = await api.updateScenarioStatus(id, status);
+                  const updated = await api.updateScenarioStatus(id, status, note);
                   setScenarios((items) => items.map((item) => item.id === id ? updated : item));
-                  notify(status === "In review" ? `${id} submitted for review.` : `${id} status changed to ${status}.`);
+                  notify(status === "Active" ? `Scenario ${id} passed system validation and is ready for testing.` : `${id} status changed to ${status}.`);
                   return true;
                 } catch (error) {
-                  notify(error instanceof Error ? error.message : "Could not update review status.");
+                  notify(error instanceof Error ? error.message : "Could not update scenario status.");
                   return false;
                 }
               }}
@@ -1454,7 +1454,7 @@ function AppContent() {
           </div>
           <div className="modal-note">
             <Icon name="shield" size={15} /> New scenarios are saved as Draft
-            and reviewed before use.
+            and become ready for testing after system validation.
           </div>
         </Modal>
       )}
@@ -1534,7 +1534,7 @@ function AppContent() {
             </label>
           </div>
           <div className="picker-label">
-            Approved scenarios <span>Select at least one</span>
+            Ready for testing <span>Select at least one</span>
           </div>
           <div className="scenario-picker">
             {scenarios
@@ -1698,13 +1698,13 @@ function pageDescription(page: Page) {
     nodes: "Monitor CARLA workers and available simulation capacity.",
     oracles: "Manage the safety rules used to evaluate each simulation run.",
     "scenario-editor":
-      "Edit a scenario definition before submitting it for review.",
+      "Configure a scenario and validate it automatically before testing.",
     import: "Validate and bring OpenSCENARIO files into your reusable library.",
     compare: "Compare scenario context, risk, coverage and execution results.",
     clusters: "Explore scenarios grouped by road context and shared tags.",
     execution: "Monitor campaigns waiting for simulation capacity.",
     "run-detail": "Inspect scenario-level outcomes and execution evidence.",
-    review: "Approve scenario definitions and confirm explainable root causes.",
+    review: "Review failure evidence and confirm explainable root causes.",
     report: "Review campaign quality trends and scenario coverage.",
     users: "Manage workspace members and role assignments.",
     analytics: "Configure default report scope and insight delivery.",
@@ -2079,7 +2079,7 @@ function ScenarioLibrary({
         <label className="filter-box">
           <Icon name="filter" size={15} />
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {["All statuses", "Active", "Approved", "In review", "Draft", "Archived"].map(
+            {["All statuses", "Active", "Draft", "Archived"].map(
               (x) => (
                 <option key={x}>{x}</option>
               ),
@@ -2095,8 +2095,8 @@ function ScenarioLibrary({
         </span>
         <span>
           <i className="green-dot" />
-          Approved <i className="orange-dot" />
-          In review{" "}
+          Ready for testing <i className="orange-dot" />
+          Draft{" "}
           <span className="updated">
             <Icon name="clock" size={13} />
             Updated moments ago
@@ -2183,7 +2183,7 @@ function ScenarioLibrary({
         <div>
           <b>Reusable scenarios, reliable results</b>
           <small>
-            Approved scenarios are versioned and traceable to each campaign,
+            Validated scenarios are versioned and traceable to each campaign,
             oracle configuration and execution artifact.
           </small>
         </div>
@@ -2344,10 +2344,10 @@ function Campaigns({
         <div className="info-callout">
           <Icon name="shield" size={18} />
           <div>
-            <b>Approval keeps runs reproducible</b>
+            <b>System validation keeps runs reproducible</b>
             <small>
-              Submit for Test Reviewer approval before execution. Running
-              campaigns cannot be modified.
+              The system validates scenario configuration before it is ready
+              for execution. Running campaigns cannot be modified.
             </small>
           </div>
           <button onClick={() => onNavigate("execution")}>

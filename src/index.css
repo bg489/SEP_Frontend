@@ -4421,6 +4421,28 @@ small {
   font-size: 8px;
   line-height: 1.45;
 }
+.scenario-validation-errors,
+.scenario-validation-success {
+  margin-top: 12px;
+  padding: 10px 11px;
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 1.5;
+}
+.scenario-validation-errors {
+  color: #8f3535;
+  background: #fff1ef;
+  border: 1px solid #ffd5d0;
+}
+.scenario-validation-errors ul {
+  margin: 7px 0 0;
+  padding-left: 15px;
+}
+.scenario-validation-success {
+  color: #267455;
+  background: #eaf8f0;
+  border: 1px solid #ccebd9;
+}
 .import-intro {
   justify-content: flex-start;
 }

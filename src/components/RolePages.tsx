@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type MouseEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "./Icon";
 import { downloadCsv } from "../utils/download";
@@ -38,7 +38,7 @@ interface RolePagesProps {
   workers: WorkerNode[];
   onNavigate: (page: AppPage) => void;
   onNotify: (message: string) => void;
-  onScenarioStatus: (id: string, status: ScenarioStatus) => Promise<boolean>;
+  onScenarioStatus: (id: string, status: ScenarioStatus, note?: string) => Promise<boolean>;
   onScenarioUpdate: (id: string, changes: Partial<Scenario>) => Promise<boolean>;
   onImport: (scenario: Scenario, sourceContent: string) => Promise<Scenario>;
   onFailureConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
@@ -63,7 +63,7 @@ const roleNotes: Record<
 > = {
   "Scenario Engineer": {
     title: "Build a stronger scenario library",
-    text: "Create, import and compare reusable road situations. Submitted scenarios go to review before they can be used in campaigns.",
+    text: "Create, import and compare reusable road situations. The system validates each configuration before it becomes ready for testing.",
     icon: "scenarios",
   },
   "Test Engineer": {
@@ -73,7 +73,7 @@ const roleNotes: Record<
   },
   "Test Reviewer": {
     title: "Review evidence with context",
-    text: "Validate scenario definitions and failure labels before the team relies on them.",
+    text: "Review execution evidence and confirm explainable failure labels.",
     icon: "shield",
   },
   Administrator: {
@@ -144,7 +144,7 @@ export function RoleWelcome({
     "Test Reviewer": [
       {
         title: "Review queue",
-        detail: "Approve scenarios and root causes",
+        detail: "Review failure evidence and root causes",
         page: "review",
         icon: "failures",
       },
@@ -256,28 +256,53 @@ function ScenarioEditor({
 }: RolePagesProps) {
   const [id, setId] = useState(initialScenarioId ?? scenarios[0]?.id ?? "");
   const [preview, setPreview] = useState<Scenario | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validating, setValidating] = useState(false);
+  const [editingChanged, setEditingChanged] = useState(false);
   const selected = scenarios.find((scenario) => scenario.id === id);
+  const selectedReady = (selected?.status === "Active" || selected?.status === "Approved") && !editingChanged;
   function changesFromForm(form: HTMLFormElement): Partial<Scenario> {
     const data = new FormData(form);
+    const field = (name: string) => String(data.get(name) ?? "").trim();
     return {
-      name: String(data.get("name")),
-      description: String(data.get("description")),
-      map: String(data.get("map")),
-      weather: String(data.get("weather")),
-      category: String(data.get("category")),
-      routeDescription: String(data.get("routeDescription")),
-      egoVehicle: String(data.get("egoVehicle")),
-      trafficDensity: String(data.get("trafficDensity")) as Scenario["trafficDensity"],
-      pedestrianCount: Number(data.get("pedestrianCount")),
-      obstacleCount: Number(data.get("obstacleCount")),
-      triggerCondition: String(data.get("triggerCondition")),
-      actions: String(data.get("actions")),
+      name: field("name"),
+      description: field("description"),
+      map: field("map"),
+      weather: field("weather"),
+      category: field("category"),
+      routeDescription: field("routeDescription"),
+      egoVehicle: field("egoVehicle"),
+      trafficDensity: field("trafficDensity") as Scenario["trafficDensity"],
+      pedestrianCount: data.get("pedestrianCount") === "" ? Number.NaN : Number(data.get("pedestrianCount")),
+      obstacleCount: data.get("obstacleCount") === "" ? Number.NaN : Number(data.get("obstacleCount")),
+      triggerCondition: field("triggerCondition"),
+      actions: field("actions"),
     };
   }
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
-    await onScenarioUpdate(selected.id, { ...changesFromForm(event.currentTarget), status: "Draft" });
+    setValidationErrors([]);
+    if (await onScenarioUpdate(selected.id, { ...changesFromForm(event.currentTarget), status: "Draft" })) {
+      setEditingChanged(false);
+    }
+  }
+  async function validateConfiguration(event: MouseEvent<HTMLButtonElement>) {
+    const form = event.currentTarget.form;
+    if (!selected || !form) return;
+    const changes = changesFromForm(form);
+    const issues = getScenarioConfigurationIssues(changes);
+    setValidationErrors(issues);
+    if (issues.length) return;
+    setValidating(true);
+    try {
+      const saved = await onScenarioUpdate(selected.id, { ...changes, status: "Draft" });
+      if (!saved) return;
+      await onScenarioStatus(selected.id, "Active", "System configuration validation passed; ready for testing.");
+      setEditingChanged(false);
+    } finally {
+      setValidating(false);
+    }
   }
   return (
     <div className="role-page-stack">
@@ -285,11 +310,11 @@ function ScenarioEditor({
         <div>
           <small className="section-kicker">SCENARIO AUTHORING</small>
           <h3>Scenario editor</h3>
-          <p>Edit a reusable test case and save a local draft.</p>
+          <p>Configure the scenario, then let the system validate it for testing.</p>
         </div>
         <label className="field-inline">
           Editing
-          <select value={id} onChange={(event) => setId(event.target.value)}>
+          <select value={id} onChange={(event) => { setId(event.target.value); setEditingChanged(false); setValidationErrors([]); }}>
             {scenarios.map((scenario) => (
               <option key={scenario.id} value={scenario.id}>
                 {scenario.id} · {scenario.name}
@@ -301,7 +326,7 @@ function ScenarioEditor({
       {!selected ? (
         <EmptyPanel text="Create a scenario first to open the editor." />
       ) : (
-        <form className="card editor-form" key={id} onSubmit={save}>
+        <form className="card editor-form" key={id} onSubmit={save} onChange={() => { setEditingChanged(true); setValidationErrors([]); }}>
           <div className="editor-form-main">
             <div className="editor-form-heading">
               <span className="editor-step">01</span>
@@ -309,7 +334,9 @@ function ScenarioEditor({
                 <h3>Scenario definition</h3>
                 <p>Describe the road context and environment variables.</p>
               </div>
-              <span className="badge draft">DRAFT EDIT</span>
+              <span className={selectedReady ? "badge approved" : "badge draft"}>
+                {selectedReady ? "READY FOR TESTING" : "DRAFT EDIT"}
+              </span>
             </div>
             <label>
               Scenario name
@@ -432,29 +459,24 @@ function ScenarioEditor({
               <button
                 className="btn btn-light"
                 type="button"
-                disabled={selected.status === "In review"}
-                onClick={async (event) => {
-                  const form = event.currentTarget.form;
-                  if (!form || !form.reportValidity()) return;
-                  const saved = await onScenarioUpdate(selected.id, { ...changesFromForm(form), status: "Draft" });
-                  if (!saved) return;
-                  await onScenarioStatus(selected.id, "In review");
-                }}
+                disabled={validating}
+                onClick={(event) => void validateConfiguration(event)}
               >
-                Submit for review
+                <Icon name="check" size={15} />
+                {validating ? "Validating…" : "Validate configuration"}
               </button>
             </div>
           </div>
           <aside className="editor-aside">
             <small className="section-kicker">VALIDATION CHECKLIST</small>
             {[
-              ["Road context", "Map and category are defined"],
-              ["Environment", "Weather preset is configured"],
-              ["Review status", "Approval is required before campaign use"],
-            ].map(([title, text], index) => (
+              ["Road context", "Map, route and category are defined"],
+              ["Environment", "Weather, vehicle and traffic are configured"],
+              ["Scenario behavior", "Trigger and action are defined"],
+            ].map(([title, text]) => (
               <div className="check-row" key={title}>
-                <span className={index < 2 ? "check-on" : "check-wait"}>
-                  <Icon name={index < 2 ? "check" : "clock"} size={13} />
+                <span className={selectedReady ? "check-on" : "check-wait"}>
+                  <Icon name={selectedReady ? "check" : "clock"} size={13} />
                 </span>
                 <span>
                   <b>{title}</b>
@@ -465,10 +487,19 @@ function ScenarioEditor({
             <div className="editor-risk">
               <Icon name="shield" size={16} />
               <span>
-                <b>Risk score {selected.priorityScore}/100</b>
-                <small>Based on severity and recent execution history.</small>
+                <b>{selectedReady ? "Ready for testing" : "System validation"}</b>
+                <small>Valid configurations become ready automatically. No manual scenario approval is needed.</small>
               </span>
             </div>
+            {validationErrors.length > 0 && (
+              <div className="scenario-validation-errors" role="alert">
+                <b>Configuration needs changes</b>
+                <ul>{validationErrors.map((issue) => <li key={issue}>{issue}</li>)}</ul>
+              </div>
+            )}
+            {validationErrors.length === 0 && selectedReady && (
+              <p className="scenario-validation-success">This version passed system validation.</p>
+            )}
           </aside>
         </form>
       )}
@@ -503,6 +534,32 @@ function ScenarioEditor({
       )}
     </div>
   );
+}
+
+function getScenarioConfigurationIssues(scenario: Partial<Scenario>) {
+  const requiredFields: [string, string | undefined][] = [
+    ["Scenario name", scenario.name],
+    ["CARLA map", scenario.map],
+    ["Scenario category", scenario.category],
+    ["Weather preset", scenario.weather],
+    ["Route description", scenario.routeDescription],
+    ["Ego vehicle", scenario.egoVehicle],
+    ["Traffic density", scenario.trafficDensity],
+    ["Trigger condition", scenario.triggerCondition],
+    ["Scenario action", scenario.actions],
+  ];
+  const issues = requiredFields
+    .filter(([, value]) => !value?.trim())
+    .map(([label]) => `${label} is required.`);
+  for (const [label, value] of [
+    ["Pedestrian count", scenario.pedestrianCount],
+    ["Obstacle count", scenario.obstacleCount],
+  ] as const) {
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100) {
+      issues.push(`${label} must be a whole number between 0 and 100.`);
+    }
+  }
+  return issues;
 }
 
 function ImportScenarios({
@@ -570,7 +627,7 @@ function ImportScenarios({
     const scenario: Scenario = {
       id: "SCN-IMPORT",
       name,
-      description: `Imported from ${file.name}. Review the scenario definition before approval.`,
+      description: `Imported from ${file.name}. Configure and validate the scenario before testing.`,
       map: mapMatch?.[0] ?? "Town05",
       category: "Urban",
       severity: "Medium",
@@ -606,8 +663,8 @@ function ImportScenarios({
           <small className="section-kicker">SCENARIO LIBRARY · IMPORT</small>
           <h3>Bring an OpenSCENARIO file into your library</h3>
           <p>
-            Upload a .xosc or .osc file. The API stores the validated source
-            with the draft so a CARLA worker can run that exact version.
+            Upload a .xosc or .osc file. It starts as a draft; configure it in
+            the editor and system validation will make it ready for testing.
           </p>
         </div>
         <span className="badge approved">DRAFT FIRST</span>
@@ -656,9 +713,9 @@ function ImportScenarios({
           <h3>What happens next?</h3>
           {[
             ["File type", "OpenSCENARIO XML format"],
-            ["Schema validation", "Structure and required fields"],
-            ["Duplicate scan", "Compare against scenario library"],
-            ["Review workflow", "Imported item starts as Draft"],
+            ["XML structure", "OpenSCENARIO root and Storyboard are present"],
+            ["Name conflict check", "Compare normalized names in the library"],
+            ["Next step", "Configure and validate before testing"],
           ].map(([label, text], index) => (
             <div className="check-row" key={label}>
               <span className="check-on">
@@ -1266,16 +1323,11 @@ function RunDetails({
 
 function ReviewQueue({
   user,
-  scenarios,
   failures,
-  onScenarioStatus,
   onFailureConfirm,
   onScenarioReexecute,
   onNavigate,
 }: RolePagesProps) {
-  const [inspectingScenario, setInspectingScenario] = useState<Scenario | null>(
-    null,
-  );
   const [inspectingFailure, setInspectingFailure] =
     useState<FailureCluster | null>(null);
   const [verifiedLabel, setVerifiedLabel] = useState("");
@@ -1285,9 +1337,6 @@ function ReviewQueue({
     setVerifiedLabel(failure.label);
     setVerifiedRootCause(failure.rootCause);
   };
-  const pendingScenarios = scenarios.filter(
-    (scenario) => scenario.status === "In review",
-  );
   const pendingFailures = failures.filter(
     (failure) => failure.reviewStatus === "Needs review",
   );
@@ -1300,85 +1349,18 @@ function ReviewQueue({
           </span>
           <div>
             <small>REVIEW WORKSPACE</small>
-            <h2>Decisions backed by evidence</h2>
+            <h2>Failure analysis backed by evidence</h2>
             <p>
-              Review scenario quality and root-cause labels before they become
-              trusted team data.
+              Confirm explainable root-cause labels using execution evidence.
             </p>
           </div>
         </div>
         <div className="review-counts">
           <span>
-            <b>{pendingScenarios.length}</b>
-            <small>scenarios</small>
-          </span>
-          <i />
-          <span>
             <b>{pendingFailures.length}</b>
-            <small>failure labels</small>
+            <small>failure labels to confirm</small>
           </span>
         </div>
-      </section>
-      <section className="card review-card">
-        <div className="section-head">
-          <div>
-            <small className="section-kicker">SCENARIO APPROVAL</small>
-            <h3>Scenarios waiting for review</h3>
-            <p>Inspect the definition, then approve or return it to draft.</p>
-          </div>
-          <span className="badge needs-review">
-            {pendingScenarios.length} PENDING
-          </span>
-        </div>
-        {pendingScenarios.length ? (
-          pendingScenarios.map((scenario) => (
-            <article className="review-row" key={scenario.id}>
-              <div className="review-scenario-symbol">
-                <Icon
-                  name={scenario.category === "Highway" ? "route" : "car"}
-                  size={16}
-                />
-              </div>
-              <div className="review-row-main">
-                <b>{scenario.name}</b>
-                <small>
-                  {scenario.id} · {scenario.category} · {scenario.map} · owner{" "}
-                  {scenario.owner}
-                </small>
-                <p>{scenario.description}</p>
-                <span className="review-tags">
-                  <Badge value={scenario.severity} />{" "}
-                  <Badge value={scenario.status} />{" "}
-                  <small>
-                    {scenario.actors} actors · {scenario.weather}
-                  </small>
-                </span>
-              </div>
-              <div className="review-actions">
-                <button
-                  className="btn btn-light btn-xs"
-                  onClick={() => setInspectingScenario(scenario)}
-                >
-                  Inspect
-                </button>
-                <button
-                  className="btn btn-light btn-xs"
-                  onClick={() => { void onScenarioStatus(scenario.id, "Draft"); }}
-                >
-                  Request changes
-                </button>
-                <button
-                  className="btn btn-primary btn-xs"
-                  onClick={() => { void onScenarioStatus(scenario.id, "Active"); }}
-                >
-                  Approve
-                </button>
-              </div>
-            </article>
-          ))
-        ) : (
-          <EmptyPanel text="There are no scenarios waiting for approval." />
-        )}
       </section>
       <section className="card review-card">
         <div className="section-head">
@@ -1439,80 +1421,6 @@ function ReviewQueue({
           <EmptyPanel text="All detected root causes have been reviewed." />
         )}
       </section>
-      {inspectingScenario && (
-        <div
-          className="modal-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget)
-              setInspectingScenario(null);
-          }}
-        >
-          <section className="modal review-detail-modal">
-            <div className="modal-head">
-              <div>
-                <small className="section-kicker">
-                  SCENARIO REVIEW · {inspectingScenario.id}
-                </small>
-                <h2>{inspectingScenario.name}</h2>
-                <p>{inspectingScenario.description}</p>
-              </div>
-              <button
-                onClick={() => setInspectingScenario(null)}
-                aria-label="Close scenario review"
-              >
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-            <div className="review-detail-grid">
-              {[
-                ["Category", inspectingScenario.category],
-                ["CARLA map", inspectingScenario.map],
-                ["Weather", inspectingScenario.weather],
-                ["Severity", inspectingScenario.severity],
-                ["Entities", `${inspectingScenario.actors} actors`],
-                ["Owner", inspectingScenario.owner],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <small>{label}</small>
-                  <b>{value}</b>
-                </div>
-              ))}
-            </div>
-            <div className="review-detail-note">
-              <Icon name="shield" size={15} />
-              <span>
-                Confirm that the description is reproducible and has enough
-                context for another engineer to recreate the test.
-              </span>
-            </div>
-            <div className="modal-actions">
-              <button
-                className="btn btn-light"
-                onClick={() => setInspectingScenario(null)}
-              >
-                Close
-              </button>
-              <button
-                className="btn btn-light"
-                onClick={async () => {
-                  if (await onScenarioStatus(inspectingScenario.id, "Draft")) setInspectingScenario(null);
-                }}
-              >
-                Request changes
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={async () => {
-                  if (await onScenarioStatus(inspectingScenario.id, "Active")) setInspectingScenario(null);
-                }}
-              >
-                <Icon name="check" size={15} />
-                Approve
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
       {inspectingFailure && (
         <div
           className="modal-backdrop"
