@@ -779,8 +779,8 @@ function AppContent() {
       setPage("scenarios");
       setSearch("");
       notify("Scenario " + item.id + " saved as draft.");
-    } catch {
-      notify("Could not save scenario. Check the API connection.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Could not save scenario. Check the API connection.");
     }
   };
   const createCampaign = async (event: FormEvent<HTMLFormElement>) => {

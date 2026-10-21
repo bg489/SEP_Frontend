@@ -262,6 +262,7 @@ const entries: [string, string][] = [
   ["Submit for Test Reviewer approval before execution. Running campaigns cannot be modified.", "Gửi Chuyên viên duyệt kiểm thử phê duyệt trước khi chạy. Không thể sửa chiến dịch đang chạy."],
   [" saved as draft.", " đã được lưu thành bản nháp."],
   ["Could not save scenario. Check the API connection.", "Không thể lưu kịch bản. Hãy kiểm tra kết nối API."],
+  ["The server could not complete this request (HTTP 500). Check the backend console for details.", "Máy chủ không thể hoàn tất yêu cầu (HTTP 500). Hãy kiểm tra cửa sổ chạy backend để xem chi tiết."],
   ["Scenario preview refreshed from mock data.", "Đã làm mới bản xem trước kịch bản từ dữ liệu mẫu."],
   ["Bring an OpenSCENARIO file into your library", "Đưa tệp OpenSCENARIO vào thư viện"],
   ["Validate an OpenSCENARIO file", "Xác thực tệp OpenSCENARIO"],

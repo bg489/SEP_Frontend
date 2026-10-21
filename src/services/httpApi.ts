@@ -39,11 +39,19 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       const body = await response.text().catch(() => "");
       let message = body;
       try {
-        const payload = JSON.parse(body) as { message?: unknown; title?: unknown };
+        const payload = JSON.parse(body) as {
+          message?: unknown;
+          title?: unknown;
+          detail?: unknown;
+        };
         if (typeof payload.message === "string") message = payload.message;
+        else if (typeof payload.detail === "string") message = payload.detail;
         else if (typeof payload.title === "string") message = payload.title;
       } catch {
         // Keep plain-text API errors readable.
+      }
+      if (response.status >= 500 && (!message || message === body || message === "An error occurred while processing your request.")) {
+        message = `The server could not complete this request (HTTP ${response.status}). Check the backend console for details.`;
       }
       throw new Error(
         message || "Request failed with status " + response.status,
