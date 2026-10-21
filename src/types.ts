@@ -57,6 +57,13 @@ export interface Scenario {
   triggerCondition?: string;
   actions?: string;
   sourceFileName?: string;
+  executionMode?: "CARLA actors" | "OpenSCENARIO source";
+  trafficVehicle?: string;
+  trafficVehicleCount?: number;
+  pedestrianBlueprint?: string;
+  obstacleBlueprint?: string;
+  executionDurationSeconds?: number;
+  speedLimitOffsetPercent?: number;
 }
 
 export interface ScenarioVersionRecord {
@@ -222,6 +229,20 @@ export interface CreateScenarioInput {
   category: string;
   severity: Scenario["severity"];
   weather: string;
+  routeDescription: string;
+  egoVehicle: string;
+  trafficDensity: "Low" | "Medium" | "High";
+  pedestrianCount: number;
+  obstacleCount: number;
+  triggerCondition: string;
+  actions: string;
+  executionMode: "CARLA actors" | "OpenSCENARIO source";
+  trafficVehicle: string;
+  trafficVehicleCount: number;
+  pedestrianBlueprint: string;
+  obstacleBlueprint: string;
+  executionDurationSeconds: number;
+  speedLimitOffsetPercent: number;
 }
 
 export interface CreateCampaignInput {

@@ -13,6 +13,9 @@ import {
 import { isAuthApiEnabled } from "../services/authConfig";
 import { api, isMockMode } from "../services/api";
 import type { AppDispatch, RootState } from "../app/store";
+import { carlaObstacleOptions, carlaPedestrians, carlaVehicles } from "../data/carlaVehicles";
+import { VehicleSelect } from "./VehicleSelect";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { adminRoleChangeRequested, adminUsersRequested } from "../features/auth/authSlice";
 import type {
   AppPage,
@@ -41,11 +44,11 @@ interface RolePagesProps {
   onScenarioStatus: (id: string, status: ScenarioStatus, note?: string) => Promise<boolean>;
   onScenarioUpdate: (id: string, changes: Partial<Scenario>) => Promise<boolean>;
   onImport: (scenario: Scenario, sourceContent: string) => Promise<Scenario>;
-  onFailureConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
-  onScenarioReexecute: (failure: FailureCluster) => void;
-  onCampaignStart: (id: string) => void;
-  onCampaignCancel: (id: string) => void;
-  onDownloadArtifact: (runId: string, fileName: string) => void;
+  onFailureConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => Promise<void>;
+  onScenarioReexecute: (failure: FailureCluster) => Promise<void>;
+  onCampaignStart: (id: string) => Promise<void>;
+  onCampaignCancel: (id: string) => Promise<void>;
+  onDownloadArtifact: (runId: string, fileName: string) => Promise<void>;
   onUserUpdate: (user: DemoUser) => void;
   onLogout: () => void;
   initialScenarioId?: string;
@@ -258,23 +261,39 @@ function ScenarioEditor({
   const [preview, setPreview] = useState<Scenario | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validating, setValidating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editingChanged, setEditingChanged] = useState(false);
+  const [modeOverride, setModeOverride] = useState<{ id: string; mode: NonNullable<Scenario["executionMode"]> } | null>(null);
   const selected = scenarios.find((scenario) => scenario.id === id);
+  const executionMode = modeOverride?.id === id ? modeOverride.mode
+    : selected?.executionMode ?? (selected?.sourceFileName ? "OpenSCENARIO source" : "CARLA actors");
   const selectedReady = (selected?.status === "Active" || selected?.status === "Approved") && !editingChanged;
   function changesFromForm(form: HTMLFormElement): Partial<Scenario> {
     const data = new FormData(form);
     const field = (name: string) => String(data.get(name) ?? "").trim();
-    return {
+    const definition: Partial<Scenario> = {
       name: field("name"),
       description: field("description"),
       map: field("map"),
       weather: field("weather"),
       category: field("category"),
+      severity: field("severity") as Scenario["severity"],
       routeDescription: field("routeDescription"),
+      executionMode: field("executionMode") as Scenario["executionMode"],
+    };
+    if (definition.executionMode === "OpenSCENARIO source") return definition;
+    return {
+      ...definition,
       egoVehicle: field("egoVehicle"),
       trafficDensity: field("trafficDensity") as Scenario["trafficDensity"],
       pedestrianCount: data.get("pedestrianCount") === "" ? Number.NaN : Number(data.get("pedestrianCount")),
       obstacleCount: data.get("obstacleCount") === "" ? Number.NaN : Number(data.get("obstacleCount")),
+      trafficVehicle: field("trafficVehicle"),
+      trafficVehicleCount: data.get("trafficVehicleCount") === "" ? Number.NaN : Number(data.get("trafficVehicleCount")),
+      pedestrianBlueprint: field("pedestrianBlueprint"),
+      obstacleBlueprint: field("obstacleBlueprint"),
+      executionDurationSeconds: data.get("executionDurationSeconds") === "" ? Number.NaN : Number(data.get("executionDurationSeconds")),
+      speedLimitOffsetPercent: data.get("speedLimitOffsetPercent") === "" ? Number.NaN : Number(data.get("speedLimitOffsetPercent")),
       triggerCondition: field("triggerCondition"),
       actions: field("actions"),
     };
@@ -283,8 +302,13 @@ function ScenarioEditor({
     event.preventDefault();
     if (!selected) return;
     setValidationErrors([]);
-    if (await onScenarioUpdate(selected.id, { ...changesFromForm(event.currentTarget), status: "Draft" })) {
-      setEditingChanged(false);
+    setSaving(true);
+    try {
+      if (await onScenarioUpdate(selected.id, { ...changesFromForm(event.currentTarget), status: "Draft" })) {
+        setEditingChanged(false);
+      }
+    } finally {
+      setSaving(false);
     }
   }
   async function validateConfiguration(event: MouseEvent<HTMLButtonElement>) {
@@ -298,8 +322,8 @@ function ScenarioEditor({
     try {
       const saved = await onScenarioUpdate(selected.id, { ...changes, status: "Draft" });
       if (!saved) return;
-      await onScenarioStatus(selected.id, "Active", "System configuration validation passed; ready for testing.");
-      setEditingChanged(false);
+      if (await onScenarioStatus(selected.id, "Active", "System configuration validation passed; ready for testing."))
+        setEditingChanged(false);
     } finally {
       setValidating(false);
     }
@@ -314,7 +338,7 @@ function ScenarioEditor({
         </div>
         <label className="field-inline">
           Editing
-          <select value={id} onChange={(event) => { setId(event.target.value); setEditingChanged(false); setValidationErrors([]); }}>
+          <select value={id} disabled={saving || validating} onChange={(event) => { setId(event.target.value); setModeOverride(null); setEditingChanged(false); setValidationErrors([]); }}>
             {scenarios.map((scenario) => (
               <option key={scenario.id} value={scenario.id}>
                 {scenario.id} · {scenario.name}
@@ -369,7 +393,7 @@ function ScenarioEditor({
                     "Town07",
                     "Town10HD",
                   ].map((item) => (
-                    <option key={item}>{item}</option>
+                    <option key={item} value={item}>{item}</option>
                   ))}
                 </select>
               </label>
@@ -378,12 +402,13 @@ function ScenarioEditor({
                 <select name="category" defaultValue={selected.category}>
                   {["Urban", "Highway", "Intersection", "Rural", "Parking"].map(
                     (item) => (
-                      <option key={item}>{item}</option>
+                      <option key={item} value={item}>{item}</option>
                     ),
                   )}
                 </select>
               </label>
             </div>
+            <div className="form-row">
             <label>
               Weather preset
               <select name="weather" defaultValue={selected.weather}>
@@ -396,37 +421,88 @@ function ScenarioEditor({
                   "Heavy rain",
                   "Fog",
                 ].map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             </label>
+            <label>
+              Risk severity
+              <select name="severity" defaultValue={selected.severity}>
+                {["Critical", "High", "Medium", "Low"].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            </div>
             <div className="form-row">
+              <label>
+                Execution format
+                <select name="executionMode" value={executionMode} onChange={(event) => setModeOverride({ id, mode: event.target.value as NonNullable<Scenario["executionMode"]> })}>
+                  <option value="CARLA actors">CARLA actor scene · native</option>
+                  {(selected.sourceFileName || selected.executionMode === "OpenSCENARIO source") && <option value="OpenSCENARIO source">OpenSCENARIO source file</option>}
+                </select>
+              </label>
               <label>
                 Route description
                 <input name="routeDescription" defaultValue={selected.routeDescription ?? "Start → junction → goal"} maxLength={500} />
               </label>
-              <label>
-                Ego vehicle
-                <select name="egoVehicle" defaultValue={selected.egoVehicle ?? "vehicle.tesla.model3"}>
-                  {["vehicle.tesla.model3", "vehicle.lincoln.mkz_2020", "vehicle.mercedes.coupe", "vehicle.audi.tt"].map((item) => <option key={item}>{item}</option>)}
-                </select>
-              </label>
             </div>
+            <p className="scenario-execution-note">
+              {executionMode === "OpenSCENARIO source"
+                ? "This version runs the imported OpenSCENARIO file as authored. Choose CARLA actor scene to run the vehicle, pedestrian and obstacle settings below instead."
+                : "CARLA actor scene uses the selected blueprints, actor counts, weather and traffic settings below."}
+            </p>
+            <fieldset className="carla-config-grid" disabled={executionMode === "OpenSCENARIO source"}>
+            <div className="form-row">
+              <VehicleSelect name="egoVehicle" label="Ego vehicle · CARLA blueprint" defaultValue={selected.egoVehicle ?? "vehicle.tesla.model3"} />
+              <VehicleSelect name="trafficVehicle" label="Traffic vehicle · CARLA blueprint" defaultValue={selected.trafficVehicle ?? "vehicle.lincoln.mkz_2020"} />
+            </div>
+            <div className="vehicle-catalogue-note"><span>41 vehicle models · 6 categories</span><a href="https://carla.readthedocs.io/en/latest/catalogue_vehicles/" target="_blank" rel="noreferrer">Official CARLA vehicle catalogue</a></div>
             <div className="form-row">
               <label>
                 Traffic density
                 <select name="trafficDensity" defaultValue={selected.trafficDensity ?? "Medium"}>
-                  {["Low", "Medium", "High"].map((item) => <option key={item}>{item}</option>)}
+                  {["Low", "Medium", "High"].map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </label>
               <label>
-                Pedestrians / obstacles
-                <span className="form-row">
-                  <input name="pedestrianCount" type="number" min="0" max="100" defaultValue={selected.pedestrianCount ?? 1} aria-label="Pedestrians" />
-                  <input name="obstacleCount" type="number" min="0" max="100" defaultValue={selected.obstacleCount ?? 0} aria-label="Obstacles" />
-                </span>
+                Traffic vehicle count
+                <input name="trafficVehicleCount" type="number" min="0" max="50" defaultValue={selected.trafficVehicleCount ?? 3} />
               </label>
             </div>
+            <div className="form-row">
+              <label>
+                Pedestrian model
+                <select name="pedestrianBlueprint" defaultValue={selected.pedestrianBlueprint ?? "walker.pedestrian.0001"}>
+                  {carlaPedestrians.map((walker) => <option key={walker.blueprint} value={walker.blueprint}>{walker.label} · {walker.blueprint}</option>)}
+                </select>
+              </label>
+              <label>
+                Pedestrian count
+                <input name="pedestrianCount" type="number" min="0" max="100" defaultValue={selected.pedestrianCount ?? 0} />
+              </label>
+            </div>
+            <div className="form-row">
+              <label>
+                Obstacle model
+                <select name="obstacleBlueprint" defaultValue={selected.obstacleBlueprint ?? "static.prop.streetbarrier"}>
+                  {carlaObstacleOptions.map((obstacle) => <option key={obstacle.blueprint} value={obstacle.blueprint}>{obstacle.label} · {obstacle.blueprint}</option>)}
+                </select>
+              </label>
+              <label>
+                Obstacle count
+                <input name="obstacleCount" type="number" min="0" max="100" defaultValue={selected.obstacleCount ?? 0} />
+              </label>
+            </div>
+            <div className="form-row">
+              <label>
+                Simulation duration · seconds
+                <input name="executionDurationSeconds" type="number" min="5" max="600" defaultValue={selected.executionDurationSeconds ?? 30} />
+              </label>
+              <label>
+                Speed offset from road limit · %
+                <input name="speedLimitOffsetPercent" type="number" min="-30" max="70" defaultValue={selected.speedLimitOffsetPercent ?? 0} />
+              </label>
+            </div>
+            <p className="scenario-execution-note">Positive values slow Autopilot below the road limit; negative values increase its speed. Behavior Agent uses its own speed policy.</p>
             <div className="form-row">
               <label>
                 Trigger condition
@@ -437,6 +513,8 @@ function ScenarioEditor({
                 <input name="actions" defaultValue={selected.actions ?? "Actor enters ego lane"} maxLength={300} />
               </label>
             </div>
+            <p className="scenario-execution-note">Route, trigger and action notes describe the test intent. CARLA actor scenes follow a seeded road path; import OpenSCENARIO for a custom trajectory.</p>
+            </fieldset>
             <div className="editor-form-actions">
               <button
                 className="btn btn-light"
@@ -452,17 +530,17 @@ function ScenarioEditor({
               >
                 Preview definition
               </button>
-              <button className="btn btn-primary" type="submit">
-                <Icon name="check" size={15} />
-                Save draft
+              <button className="btn btn-primary" type="submit" disabled={saving || validating}>
+                {saving ? <i className="button-spinner" /> : <Icon name="check" size={15} />}
+                {saving ? "Saving…" : "Save draft"}
               </button>
               <button
                 className="btn btn-light"
                 type="button"
-                disabled={validating}
+                disabled={validating || saving}
                 onClick={(event) => void validateConfiguration(event)}
               >
-                <Icon name="check" size={15} />
+                {validating ? <i className="button-spinner" /> : <Icon name="check" size={15} />}
                 {validating ? "Validating…" : "Validate configuration"}
               </button>
             </div>
@@ -537,6 +615,12 @@ function ScenarioEditor({
 }
 
 function getScenarioConfigurationIssues(scenario: Partial<Scenario>) {
+  if (scenario.executionMode === "OpenSCENARIO source") {
+    return [
+      ["Scenario name", scenario.name], ["CARLA map", scenario.map],
+      ["Scenario category", scenario.category], ["Weather preset", scenario.weather],
+    ].filter(([, value]) => !value?.trim()).map(([label]) => `${label} is required.`);
+  }
   const requiredFields: [string, string | undefined][] = [
     ["Scenario name", scenario.name],
     ["CARLA map", scenario.map],
@@ -544,6 +628,7 @@ function getScenarioConfigurationIssues(scenario: Partial<Scenario>) {
     ["Weather preset", scenario.weather],
     ["Route description", scenario.routeDescription],
     ["Ego vehicle", scenario.egoVehicle],
+    ["Traffic vehicle", scenario.trafficVehicle],
     ["Traffic density", scenario.trafficDensity],
     ["Trigger condition", scenario.triggerCondition],
     ["Scenario action", scenario.actions],
@@ -554,11 +639,23 @@ function getScenarioConfigurationIssues(scenario: Partial<Scenario>) {
   for (const [label, value] of [
     ["Pedestrian count", scenario.pedestrianCount],
     ["Obstacle count", scenario.obstacleCount],
+    ["Traffic vehicle count", scenario.trafficVehicleCount],
   ] as const) {
-    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 100) {
-      issues.push(`${label} must be a whole number between 0 and 100.`);
+    const max = label === "Traffic vehicle count" ? 50 : 100;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > max) {
+      issues.push(`${label} must be a whole number between 0 and ${max}.`);
     }
   }
+  if (typeof scenario.executionDurationSeconds !== "number" || !Number.isInteger(scenario.executionDurationSeconds) || scenario.executionDurationSeconds < 5 || scenario.executionDurationSeconds > 600)
+    issues.push("Simulation duration must be a whole number between 5 and 600 seconds.");
+  if (typeof scenario.speedLimitOffsetPercent !== "number" || !Number.isInteger(scenario.speedLimitOffsetPercent) || scenario.speedLimitOffsetPercent < -30 || scenario.speedLimitOffsetPercent > 70)
+    issues.push("Speed offset must be a whole number between -30 and 70 percent.");
+  if (scenario.executionMode !== "CARLA actors" && scenario.executionMode !== "OpenSCENARIO source")
+    issues.push("Execution format is required.");
+  if (!carlaVehicles.some((vehicle) => vehicle.blueprint === scenario.egoVehicle))
+    issues.push("Choose a vehicle from the CARLA catalogue for the ego vehicle.");
+  if (!carlaVehicles.some((vehicle) => vehicle.blueprint === scenario.trafficVehicle))
+    issues.push("Choose a vehicle from the CARLA catalogue for traffic.");
   return issues;
 }
 
@@ -569,6 +666,7 @@ function ImportScenarios({
   onNavigate,
 }: RolePagesProps) {
   const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
   const acceptFile = (candidate?: File) => {
     if (!candidate) return;
     if (!/\.(xosc|osc)$/i.test(candidate.name)) {
@@ -624,6 +722,7 @@ function ImportScenarios({
     const logicFile = parsed.getElementsByTagName("LogicFile")[0]?.getAttribute("filepath") ?? "";
     const mapMatch = logicFile.match(/Town\d+|Town10HD/i);
     const actorCount = parsed.getElementsByTagName("ScenarioObject").length;
+    const importedEgoBlueprint = parsed.getElementsByTagName("Vehicle")[0]?.getAttribute("name");
     const scenario: Scenario = {
       id: "SCN-IMPORT",
       name,
@@ -634,7 +733,7 @@ function ImportScenarios({
       status: "Draft",
       version: "v0.1",
       weather: "Clear noon",
-      actors: Math.max(1, actorCount + 1),
+      actors: Math.max(1, actorCount),
       runCount: 0,
       passRate: 0,
       lastRun: "Not run",
@@ -642,15 +741,27 @@ function ImportScenarios({
       tags: ["imported"],
       priorityScore: 52,
       routeDescription: "Imported route configuration",
-      egoVehicle: "Imported from OpenSCENARIO",
+      egoVehicle: carlaVehicles.some((vehicle) => vehicle.blueprint === importedEgoBlueprint)
+        ? importedEgoBlueprint!
+        : "vehicle.tesla.model3",
       sourceFileName: file.name,
+      executionMode: "OpenSCENARIO source",
+      trafficVehicle: "vehicle.lincoln.mkz_2020",
+      trafficVehicleCount: 0,
+      pedestrianBlueprint: "walker.pedestrian.0001",
+      obstacleBlueprint: "static.prop.streetbarrier",
+      executionDurationSeconds: 30,
+      speedLimitOffsetPercent: 0,
     };
+    setImporting(true);
     try {
       const saved = await onImport(scenario, contents);
       setFile(null);
       onNotify(`${saved.id} was imported as a draft from ${file.name}.`);
     } catch (error) {
       onNotify(error instanceof Error ? error.message : "Could not save the imported scenario.");
+    } finally {
+      setImporting(false);
     }
   }
   return (
@@ -754,11 +865,11 @@ function ImportScenarios({
         <span>Accepted formats: .xosc, .osc</span>
         <button
           className="btn btn-primary"
-          disabled={!file || duplicate}
+          disabled={!file || duplicate || importing}
           onClick={importFile}
         >
-          <Icon name="check" size={15} />
-          Validate and import
+          {importing ? <i className="button-spinner" /> : <Icon name="check" size={15} />}
+          {importing ? "Importing…" : "Validate and import"}
         </button>
       </div>
     </div>
@@ -766,6 +877,8 @@ function ImportScenarios({
 }
 
 function ScenarioCompare({ scenarios }: RolePagesProps) {
+  const [loadingPreferences, setLoadingPreferences] = useState(!isMockMode);
+  const [preferencesError, setPreferencesError] = useState<string | null>(null);
   const [preferences, setPreferences] = useState(() => isMockMode ? getAnalyticsPreferences() : {
     similarityWarning: 0.78, similarityBlock: 0.93,
     featureWeights: { map: 1, category: 1, weather: 1, severity: 1, actors: 1 },
@@ -778,7 +891,11 @@ function ScenarioCompare({ scenarios }: RolePagesProps) {
       if (!active) return;
       setPreferences(value);
       if (isMockMode) saveAnalyticsPreferences(value);
-    }).catch(() => undefined);
+    }).catch((error: unknown) => {
+      if (active) setPreferencesError(error instanceof Error ? error.message : "Could not load analytics settings.");
+    }).finally(() => {
+      if (active) setLoadingPreferences(false);
+    });
     return () => { active = false; };
   }, []);
   const [leftId, setLeftId] = useState(scenarios[0]?.id ?? "");
@@ -835,7 +952,7 @@ function ScenarioCompare({ scenarios }: RolePagesProps) {
         </div>
         <button
           className="btn btn-light"
-          disabled={!left || !right}
+          disabled={!left || !right || loadingPreferences || !!preferencesError}
           onClick={() => left && right && downloadCsv("scenario-comparison.csv", [
             ["Feature", left.id, right.id],
             ...rows,
@@ -846,6 +963,8 @@ function ScenarioCompare({ scenarios }: RolePagesProps) {
           Export comparison
         </button>
       </section>
+      {loadingPreferences && <ApiLoadingNotice />}
+      {preferencesError && <div className="auth-message auth-error" role="alert">{preferencesError}</div>}
       <div className="compare-selectors">
         <label className="card compare-select compare-a">
           <span>SCENARIO A</span>
@@ -900,7 +1019,7 @@ function ScenarioCompare({ scenarios }: RolePagesProps) {
           </div>
         ))}
       </section>
-      {similarity !== undefined && (
+      {!loadingPreferences && !preferencesError && similarity !== undefined && (
         <section className="card compare-similarity">
           <div>
             <small className="section-kicker">GOWER SIMILARITY · CONFIGURATION FEATURES</small>
@@ -1029,6 +1148,7 @@ function ExecutionQueue({
   onCampaignStart,
   onCampaignCancel,
 }: RolePagesProps) {
+  const actions = useAsyncAction();
   const running = runs.filter((run) => run.state === "Running").length;
   const queued = runs.filter((run) => run.state === "Queued" || run.state === "Assigned").length;
   const totalCapacity = workers.reduce(
@@ -1131,16 +1251,22 @@ function ExecutionQueue({
                     campaign.status === "Draft" ? (
                       <button
                         className="btn btn-primary btn-xs"
-                        onClick={() => onCampaignStart(campaign.id)}
+                        disabled={actions.isPending(campaign.id)}
+                        aria-busy={actions.isPending(campaign.id)}
+                        onClick={() => void actions.run(campaign.id, () => onCampaignStart(campaign.id))}
                       >
-                        Start run
+                        {actions.isPending(campaign.id) && <i className="button-spinner" aria-hidden="true" />}
+                        {actions.isPending(campaign.id) ? "Please wait…" : "Start run"}
                       </button>
                     ) : campaign.status === "Running" ? (
                       <button
                         className="btn btn-light btn-xs"
-                        onClick={() => onCampaignCancel(campaign.id)}
+                        disabled={actions.isPending(campaign.id)}
+                        aria-busy={actions.isPending(campaign.id)}
+                        onClick={() => void actions.run(campaign.id, () => onCampaignCancel(campaign.id))}
                       >
-                        Cancel
+                        {actions.isPending(campaign.id) && <i className="button-spinner" aria-hidden="true" />}
+                        {actions.isPending(campaign.id) ? "Please wait…" : "Cancel"}
                       </button>
                     ) : (
                       <button
@@ -1182,6 +1308,7 @@ function RunDetails({
   onDownloadArtifact,
   onNavigate,
 }: RolePagesProps) {
+  const downloads = useAsyncAction();
   const campaign =
     campaigns.find((item) => item.id === selectedCampaignId) ??
     campaigns.find((item) => item.status === "Running") ??
@@ -1281,8 +1408,15 @@ function RunDetails({
                   {run.evidence.map((item, evidenceIndex) => <small className="run-evidence-line" key={`${item.rule}-${evidenceIndex}`}>{item.timestamp} · {item.rule}: {item.measured} / {item.threshold}</small>)}
                   <small className="run-evidence-line">Artifacts: {run.artifacts.length ? run.artifacts.join(", ") : "None"}</small>
                   {!isMockMode && run.artifacts.map((fileName) => (
-                    <button className="link-button" key={fileName} onClick={() => onDownloadArtifact(run.id, fileName)}>
-                      Download {fileName} <Icon name="download" size={12} />
+                    <button
+                      className="link-button"
+                      key={fileName}
+                      disabled={downloads.isPending(`${run.id}:${fileName}`)}
+                      aria-busy={downloads.isPending(`${run.id}:${fileName}`)}
+                      onClick={() => void downloads.run(`${run.id}:${fileName}`, () => onDownloadArtifact(run.id, fileName))}
+                    >
+                      {downloads.isPending(`${run.id}:${fileName}`) ? "Loading…" : "Download"} {fileName}
+                      {downloads.isPending(`${run.id}:${fileName}`) ? <i className="button-spinner" aria-hidden="true" /> : <Icon name="download" size={12} />}
                     </button>
                   ))}
                 </div>
@@ -1332,6 +1466,7 @@ function ReviewQueue({
   onScenarioReexecute,
   onNavigate,
 }: RolePagesProps) {
+  const actions = useAsyncAction();
   const [inspectingFailure, setInspectingFailure] =
     useState<FailureCluster | null>(null);
   const [verifiedLabel, setVerifiedLabel] = useState("");
@@ -1408,15 +1543,19 @@ function ReviewQueue({
               <div className="review-actions">
                 <button
                   className="btn btn-light btn-xs"
+                  disabled={actions.isPending(failure.id)}
                   onClick={() => inspectFailure(failure)}
                 >
                   Inspect evidence
                 </button>
                 <button
                   className="btn btn-primary btn-xs"
-                  onClick={() => onFailureConfirm(failure)}
+                  disabled={actions.isPending(failure.id)}
+                  aria-busy={actions.isPending(failure.id)}
+                  onClick={() => void actions.run(failure.id, () => onFailureConfirm(failure))}
                 >
-                  Confirm root cause
+                  {actions.isPending(failure.id) && <i className="button-spinner" aria-hidden="true" />}
+                  {actions.isPending(failure.id) ? "Please wait…" : "Confirm root cause"}
                 </button>
               </div>
             </article>
@@ -1429,7 +1568,7 @@ function ReviewQueue({
         <div
           className="modal-backdrop"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget)
+            if (event.target === event.currentTarget && !actions.pending)
               setInspectingFailure(null);
           }}
         >
@@ -1443,6 +1582,7 @@ function ReviewQueue({
                 <p>{inspectingFailure.rootCause}</p>
               </div>
               <button
+                disabled={actions.pending}
                 onClick={() => setInspectingFailure(null)}
                 aria-label="Close failure evidence"
               >
@@ -1482,41 +1622,44 @@ function ReviewQueue({
             </div>
             <label>
               Verified root-cause classification
-              <input value={verifiedLabel} onChange={(event) => setVerifiedLabel(event.target.value)} maxLength={160} required />
+              <input value={verifiedLabel} disabled={actions.pending} onChange={(event) => setVerifiedLabel(event.target.value)} maxLength={160} required />
             </label>
             <label>
               Reviewer explanation
-              <textarea value={verifiedRootCause} onChange={(event) => setVerifiedRootCause(event.target.value)} rows={3} maxLength={1200} required />
+              <textarea value={verifiedRootCause} disabled={actions.pending} onChange={(event) => setVerifiedRootCause(event.target.value)} rows={3} maxLength={1200} required />
             </label>
             <div className="modal-actions">
               <button
                 className="btn btn-light"
+                disabled={actions.pending}
                 onClick={() => setInspectingFailure(null)}
               >
                 Close
               </button>
               <button
                 className="btn btn-primary"
-                disabled={!verifiedLabel.trim() || !verifiedRootCause.trim()}
-                onClick={() => {
-                  onFailureConfirm(inspectingFailure, {
-                    label: verifiedLabel.trim(),
-                    rootCause: verifiedRootCause.trim(),
-                    reviewerNote: "Reviewed in the failure queue.",
-                    reviewedBy: user.name,
-                  });
-                  setInspectingFailure(null);
-                }}
+                disabled={actions.pending || !verifiedLabel.trim() || !verifiedRootCause.trim()}
+                aria-busy={actions.isPending(inspectingFailure.id)}
+                onClick={() => void actions.run(inspectingFailure.id, async () => {
+                    await onFailureConfirm(inspectingFailure, {
+                      label: verifiedLabel.trim(),
+                      rootCause: verifiedRootCause.trim(),
+                      reviewerNote: "Reviewed in the failure queue.",
+                      reviewedBy: user.name,
+                    });
+                    setInspectingFailure(null);
+                  })}
               >
-                <Icon name="check" size={15} />
-                Confirm root cause
+                {actions.isPending(inspectingFailure.id) ? <i className="button-spinner" aria-hidden="true" /> : <Icon name="check" size={15} />}
+                {actions.isPending(inspectingFailure.id) ? "Please wait…" : "Confirm root cause"}
               </button>
               <button
                 className="btn btn-light"
-                onClick={() => {
-                  onScenarioReexecute(inspectingFailure);
+                disabled={actions.pending}
+                onClick={() => void actions.run(inspectingFailure.id, async () => {
+                  await onScenarioReexecute(inspectingFailure);
                   setInspectingFailure(null);
-                }}
+                })}
               >
                 Request re-execution
               </button>
@@ -1535,6 +1678,7 @@ function CampaignReport({
   failures,
   onNavigate,
 }: RolePagesProps) {
+  const [loadingRanking, setLoadingRanking] = useState(false);
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id ?? "");
   const campaign =
     campaigns.find((item) => item.id === campaignId) ?? campaigns[0];
@@ -1551,16 +1695,24 @@ function CampaignReport({
     () => campaign && isMockMode ? getRanking<{ apfd: string; apfdc: string; baselineApfd: string; baselineApfdc: string; strategy: string }>(campaign.id) : undefined,
   );
   useEffect(() => {
-    if (!campaign) return;
+    if (!campaign) {
+      setRanking(undefined);
+      setLoadingRanking(false);
+      return;
+    }
     if (isMockMode) {
       setRanking(getRanking(campaign.id));
       return;
     }
     let active = true;
+    setRanking(undefined);
+    setLoadingRanking(true);
     void api.getCampaignRanking(campaign.id).then((value) => {
       if (active) setRanking(value as typeof ranking);
     }).catch(() => {
       if (active) setRanking(undefined);
+    }).finally(() => {
+      if (active) setLoadingRanking(false);
     });
     return () => { active = false; };
   }, [campaign?.id]);
@@ -1575,7 +1727,7 @@ function CampaignReport({
         </div>
         <button
           className="btn btn-white"
-          disabled={!campaign}
+          disabled={!campaign || loadingRanking}
           onClick={() => campaign && downloadCsv(`${campaign.id}-campaign-report.csv`, [
             ["Campaign", campaign.name],
             ["Status", campaign.status],
@@ -1588,8 +1740,8 @@ function CampaignReport({
             ...campaignRuns.map((run) => [run.id, run.scenarioId, run.scenarioVersion, run.verdict ?? run.state, run.durationSeconds ?? "", run.workerId ?? "", run.evidence.map((evidence) => `${evidence.rule} ${evidence.measured} threshold ${evidence.threshold}`).join("; ")]),
           ])}
         >
-          <Icon name="download" size={15} />
-          Export report
+          {loadingRanking ? <i className="api-spinner" aria-hidden="true" /> : <Icon name="download" size={15} />}
+          {loadingRanking ? "Loading…" : "Export report"}
         </button>
       </section>
       <div className="report-filter">
@@ -1982,8 +2134,9 @@ function UserManagement({ onNotify }: RolePagesProps) {
             </tbody>
           </table>
           {auth.adminUsersBusy && directoryUsers.length === 0 && (
-            <div className="empty-state">Loading users…</div>
+            <ApiLoadingNotice />
           )}
+          {auth.adminUsersBusy && directoryUsers.length > 0 && <ApiLoadingNotice />}
           {auth.adminUsersError && (
             <div className="auth-message auth-error" role="alert">{auth.adminUsersError}</div>
           )}
@@ -2063,6 +2216,9 @@ function UserManagement({ onNotify }: RolePagesProps) {
 }
 
 function AnalyticsSettings({ onNotify }: RolePagesProps) {
+  const actions = useAsyncAction();
+  const [loadingSettings, setLoadingSettings] = useState(!isMockMode);
+  const [settingsLoaded, setSettingsLoaded] = useState(isMockMode);
   const [settings, setSettings] = useState<AnalyticsPreferences>(() => {
     const stored: AnalyticsPreferences = isMockMode ? getAnalyticsPreferences() : {
       similarityWarning: 0.78, similarityBlock: 0.93,
@@ -2091,9 +2247,12 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
     void api.getAnalyticsPreferences().then((value) => {
       if (!active) return;
       setSettings(value);
+      setSettingsLoaded(true);
       if (isMockMode) saveAnalyticsPreferences(value);
     }).catch((error: unknown) => {
       if (active) onNotify(error instanceof Error ? error.message : "Could not load analytics settings.");
+    }).finally(() => {
+      if (active) setLoadingSettings(false);
     });
     return () => { active = false; };
   }, []);
@@ -2107,6 +2266,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
     }));
   }
   async function save() {
+    if (loadingSettings || !settingsLoaded) return;
     if (!(settings.similarityWarning >= 0 && settings.similarityWarning < settings.similarityBlock && settings.similarityBlock <= 1)) {
       onNotify("Similarity thresholds must satisfy 0 ≤ warning < block ≤ 1.");
       return;
@@ -2120,24 +2280,27 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
       onNotify("Evidence retention must be at least one day.");
       return;
     }
-    let saved = settings;
-    try {
-      saved = await api.saveAnalyticsPreferences(settings);
-    } catch (error) {
-      onNotify(error instanceof Error ? error.message : "Could not save analytics settings.");
-      return;
-    }
-    if (isMockMode) {
-      saveAnalyticsPreferences(saved);
-      localStorage.setItem("asx-analytics", JSON.stringify({
-        days: settings.reportDays,
-        includeDrafts: settings.includeDrafts,
-        group: settings.group,
-        weeklyEmail: settings.weeklyEmail,
-      }));
-      appendAuditEvent({ actor: "Current administrator", action: "Updated analytics and similarity settings", target: "Workspace analytics", result: "Success" });
-    }
-    onNotify(isMockMode ? "Analytics settings saved in this browser." : "Analytics settings saved to the backend.");
+    await actions.run("save", async () => {
+      let saved = settings;
+      try {
+        saved = await api.saveAnalyticsPreferences(settings);
+      } catch (error) {
+        onNotify(error instanceof Error ? error.message : "Could not save analytics settings.");
+        return;
+      }
+      if (isMockMode) {
+        saveAnalyticsPreferences(saved);
+        localStorage.setItem("asx-analytics", JSON.stringify({
+          days: saved.reportDays,
+          includeDrafts: saved.includeDrafts,
+          group: saved.group,
+          weeklyEmail: saved.weeklyEmail,
+        }));
+        appendAuditEvent({ actor: "Current administrator", action: "Updated analytics and similarity settings", target: "Workspace analytics", result: "Success" });
+      }
+      setSettings(saved);
+      onNotify(isMockMode ? "Analytics settings saved in this browser." : "Analytics settings saved to the backend.");
+    });
   }
   return (
     <div className="role-page-stack">
@@ -2153,11 +2316,12 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             map to backend query options.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={save}>
-          <Icon name="check" size={15} />
-          Save settings
+        <button className="btn btn-primary" onClick={save} disabled={loadingSettings || !settingsLoaded || actions.pending} aria-busy={loadingSettings || actions.pending}>
+          {loadingSettings || actions.pending ? <i className="button-spinner" aria-hidden="true" /> : <Icon name="check" size={15} />}
+          {loadingSettings ? "Loading…" : actions.pending ? "Please wait…" : "Save settings"}
         </button>
       </section>
+      {loadingSettings && <ApiLoadingNotice />}
       <div className="analytics-settings-grid">
         <section className="card settings-card">
           <small className="section-kicker">REPORT DEFAULTS</small>
@@ -2167,6 +2331,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             Time range
             <select
               value={settings.reportDays}
+              disabled={loadingSettings || !settingsLoaded || actions.pending}
               onChange={(event) => patch({ reportDays: event.target.value })}
             >
               <option value="7">Last 7 days</option>
@@ -2179,6 +2344,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             Group results by
             <select
               value={settings.group}
+              disabled={loadingSettings || !settingsLoaded || actions.pending}
               onChange={(event) => patch({ group: event.target.value })}
             >
               <option value="severity">Risk severity</option>
@@ -2191,18 +2357,19 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             title="Include draft scenarios"
             detail="Include scenarios that have not passed review."
             checked={settings.includeDrafts}
+            disabled={loadingSettings || !settingsLoaded || actions.pending}
             onChange={(checked) => patch({ includeDrafts: checked })}
           />
           <div className="setting-divider" />
           <small className="section-kicker">SCENARIO SIMILARITY · GOWER</small>
           <div className="analytics-number-grid">
-            <label>Review warning threshold<input type="number" min="0" max="1" step="0.01" value={settings.similarityWarning} onChange={(event) => patch({ similarityWarning: Number(event.target.value) })} /></label>
-            <label>Duplicate block threshold<input type="number" min="0" max="1" step="0.01" value={settings.similarityBlock} onChange={(event) => patch({ similarityBlock: Number(event.target.value) })} /></label>
+            <label>Review warning threshold<input type="number" min="0" max="1" step="0.01" value={settings.similarityWarning} disabled={loadingSettings || !settingsLoaded || actions.pending} onChange={(event) => patch({ similarityWarning: Number(event.target.value) })} /></label>
+            <label>Duplicate block threshold<input type="number" min="0" max="1" step="0.01" value={settings.similarityBlock} disabled={loadingSettings || !settingsLoaded || actions.pending} onChange={(event) => patch({ similarityBlock: Number(event.target.value) })} /></label>
           </div>
           <p>Feature weights used by scenario comparison</p>
           <div className="analytics-weight-grid">
             {(["map", "category", "weather", "severity", "actors"] as const).map((feature) => (
-              <label key={feature}>{feature[0].toUpperCase() + feature.slice(1)}<input type="number" min="0" step="0.1" value={settings.featureWeights[feature]} onChange={(event) => patchWeight(feature, Number(event.target.value))} /></label>
+              <label key={feature}>{feature[0].toUpperCase() + feature.slice(1)}<input type="number" min="0" step="0.1" value={settings.featureWeights[feature]} disabled={loadingSettings || !settingsLoaded || actions.pending} onChange={(event) => patchWeight(feature, Number(event.target.value))} /></label>
             ))}
           </div>
         </section>
@@ -2214,12 +2381,13 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
             title="Weekly summary email"
             detail="Prepare a weekly report for workspace administrators."
             checked={settings.weeklyEmail}
+            disabled={loadingSettings || !settingsLoaded || actions.pending}
             onChange={(checked) => patch({ weeklyEmail: checked })}
           />
           <div className="setting-divider" />
           <label>
             Evidence retention (days)
-            <input type="number" min="1" max="3650" value={settings.retentionDays} onChange={(event) => patch({ retentionDays: Number(event.target.value) })} />
+            <input type="number" min="1" max="3650" value={settings.retentionDays} disabled={loadingSettings || !settingsLoaded || actions.pending} onChange={(event) => patch({ retentionDays: Number(event.target.value) })} />
           </label>
           <div className="privacy-box">
             <Icon name="shield" size={17} />
@@ -2264,14 +2432,22 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
 }
 
 function AuditLog({ onNotify }: RolePagesProps) {
-  void onNotify;
+  const [loadingEvents, setLoadingEvents] = useState(!isMockMode);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>(() => isMockMode ? listAuditEvents() : []);
   useEffect(() => {
     if (isMockMode) return;
     let active = true;
     void api.listAuditEvents().then((events) => {
       if (active) setAuditEvents(events);
-    }).catch(() => undefined);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      const message = error instanceof Error ? error.message : "Could not load audit events.";
+      setLoadError(message);
+      onNotify(message);
+    }).finally(() => {
+      if (active) setLoadingEvents(false);
+    });
     return () => { active = false; };
   }, []);
   const entries = useMemo(() => auditEvents.map((event: AuditEvent) => {
@@ -2309,10 +2485,11 @@ function AuditLog({ onNotify }: RolePagesProps) {
         </div>
         <button
           className="btn btn-light"
+          disabled={loadingEvents || !!loadError}
           onClick={() => downloadCsv("autoscenariox-audit-log.csv", [["Time", "Event", "Resource", "Actor", "Result", "Category"], ...visible.map(({ time, action, target, actor, result, category }) => [time, action, target, actor, result, category])])}
         >
-          <Icon name="download" size={15} />
-          Export log
+          {loadingEvents ? <i className="api-spinner" aria-hidden="true" /> : <Icon name="download" size={15} />}
+          {loadingEvents ? "Loading…" : "Export log"}
         </button>
       </section>
       <section className="card audit-card">
@@ -2383,13 +2560,17 @@ function AuditLog({ onNotify }: RolePagesProps) {
               ))}
             </tbody>
           </table>
-          {visible.length === 0 && (
+          {loadingEvents && <ApiLoadingNotice />}
+          {loadError && <div className="auth-message auth-error" role="alert">{loadError}</div>}
+          {!loadingEvents && !loadError && visible.length === 0 && (
             <EmptyPanel text="No activity matches this filter." />
           )}
         </div>
         <div className="audit-foot">
           <Icon name="shield" size={14} />
-          Events are stored in this browser for the frontend mock. The backend audit endpoint can replace this source later.
+          {isMockMode
+            ? "Events are stored in this browser for the frontend mock. The backend audit endpoint can replace this source later."
+            : "Events are stored in the backend database."}
         </div>
       </section>
     </div>
@@ -2529,11 +2710,13 @@ function ToggleRow({
   title,
   detail,
   checked,
+  disabled = false,
   onChange,
 }: {
   title: string;
   detail: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (value: boolean) => void;
 }) {
   return (
@@ -2546,10 +2729,18 @@ function ToggleRow({
         type="button"
         className={`toggle ${checked ? "on" : ""}`}
         aria-pressed={checked}
+        disabled={disabled}
         onClick={() => onChange(!checked)}
       >
         <i />
       </button>
+    </div>
+  );
+}
+function ApiLoadingNotice() {
+  return (
+    <div className="loading-line" role="status" aria-live="polite">
+      <i aria-hidden="true" /> Loading…
     </div>
   );
 }

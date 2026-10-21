@@ -22,6 +22,10 @@ import {
 } from "./services/workflowStore";
 import { downloadCsv } from "./utils/download";
 import { isAuthApiEnabled } from "./services/authConfig";
+import { subscribeToApiActivity } from "./services/apiActivity";
+import { carlaObstacleOptions, carlaPedestrians } from "./data/carlaVehicles";
+import { VehicleSelect } from "./components/VehicleSelect";
+import { useAsyncAction } from "./hooks/useAsyncAction";
 import type { AppDispatch, RootState } from "./app/store";
 import {
   bootstrapAuthRequested,
@@ -288,12 +292,23 @@ function AppContent() {
     string | undefined
   >();
   const [statusFilter, setStatusFilter] = useState("All statuses");
+  const [apiRequestCount, setApiRequestCount] = useState(0);
+  const [campaignScenarioQuery, setCampaignScenarioQuery] = useState("");
+  const [campaignScenarioMap, setCampaignScenarioMap] = useState("All maps");
+  const [campaignScenarioCategory, setCampaignScenarioCategory] = useState("All types");
+  const [campaignScenarioSeverity, setCampaignScenarioSeverity] = useState("All severities");
+  const [selectedCampaignScenarioIds, setSelectedCampaignScenarioIds] = useState<string[]>([]);
+  const [scenarioSaving, setScenarioSaving] = useState(false);
+  const [campaignSaving, setCampaignSaving] = useState(false);
+  const actions = useAsyncAction();
   const [ready, setReady] = useState(false);
   const cancelledRunIds = useRef(new Set<string>());
   const role = user?.role ?? "Test Engineer";
   useEffect(() => {
     dispatch(bootstrapAuthRequested());
   }, [dispatch]);
+
+  useEffect(() => subscribeToApiActivity(setApiRequestCount), []);
 
   useEffect(() => {
     if (isMockMode) return;
@@ -537,7 +552,7 @@ function AppContent() {
       return next;
     });
   };
-  const startCampaign = (campaignId: string, requestedScenarioIds?: string[], retryOf?: string, overrideCampaign?: Campaign) => {
+  const startCampaign = async (campaignId: string, requestedScenarioIds?: string[], retryOf?: string, overrideCampaign?: Campaign): Promise<void> => {
     const campaign = overrideCampaign ?? campaigns.find((item) => item.id === campaignId);
     if (!campaign) return notify("Campaign not found.");
     const targetScenarioIds = requestedScenarioIds ?? campaign.scenarioIds;
@@ -561,7 +576,7 @@ function AppContent() {
       return ai - bi;
     });
     if (!isMockMode) {
-      void api.getCampaignRanking(campaignId).catch(() => null).then((savedRanking) => {
+      await api.getCampaignRanking(campaignId).catch(() => null).then((savedRanking) => {
         const savedOrder = Array.isArray(savedRanking?.order) ? savedRanking.order as string[] : [];
         const effectiveOrder = savedOrder.length
           ? [...orderedScenarios].sort((left, right) => {
@@ -701,9 +716,9 @@ function AppContent() {
       }, waveOffset + 1600);
     });
   };
-  const cancelCampaign = (campaignId: string) => {
+  const cancelCampaign = async (campaignId: string): Promise<void> => {
     if (!isMockMode) {
-      void api.cancelCampaignRuns(campaignId).then((cancelledRuns) => {
+      await api.cancelCampaignRuns(campaignId).then((cancelledRuns) => {
         const cancelledIds = new Set(cancelledRuns.map((run) => run.id));
         setRuns((current) => current.map((run) => cancelledIds.has(run.id) ? { ...run, state: "Cancelled", progress: 0 } : run));
         if (cancelledRuns.length) {
@@ -750,7 +765,7 @@ function AppContent() {
       setCampaigns((items) => [campaign, ...items]);
       setSelectedCampaignId(campaign.id);
       setPage("run-detail");
-      startCampaign(campaign.id, [scenario.id], failure.sourceRunId, campaign);
+      await startCampaign(campaign.id, [scenario.id], failure.sourceRunId, campaign);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Could not create a verification run.");
     }
@@ -767,7 +782,22 @@ function AppContent() {
         form.get("severity") ?? "High",
       ) as CreateScenarioInput["severity"],
       weather: String(form.get("weather") ?? "Clear noon"),
+      routeDescription: String(form.get("routeDescription") ?? "Start → route → goal").trim(),
+      egoVehicle: String(form.get("egoVehicle") ?? "vehicle.tesla.model3"),
+      trafficDensity: String(form.get("trafficDensity") ?? "Medium") as CreateScenarioInput["trafficDensity"],
+      pedestrianCount: Number(form.get("pedestrianCount") ?? 0),
+      obstacleCount: Number(form.get("obstacleCount") ?? 0),
+      triggerCondition: String(form.get("triggerCondition") ?? "Simulation starts").trim(),
+      actions: String(form.get("actions") ?? "Autopilot follows map traffic rules").trim(),
+      executionMode: String(form.get("executionMode") ?? "CARLA actors") as CreateScenarioInput["executionMode"],
+      trafficVehicle: String(form.get("trafficVehicle") ?? "vehicle.lincoln.mkz_2020"),
+      trafficVehicleCount: Number(form.get("trafficVehicleCount") ?? 3),
+      pedestrianBlueprint: String(form.get("pedestrianBlueprint") ?? "walker.pedestrian.0001"),
+      obstacleBlueprint: String(form.get("obstacleBlueprint") ?? "static.prop.streetbarrier"),
+      executionDurationSeconds: Number(form.get("executionDurationSeconds") ?? 30),
+      speedLimitOffsetPercent: Number(form.get("speedLimitOffsetPercent") ?? 0),
     };
+    setScenarioSaving(true);
     try {
       const item = await api.createScenario(input);
       setScenarios((items) => [item, ...items]);
@@ -781,12 +811,14 @@ function AppContent() {
       notify("Scenario " + item.id + " saved as draft.");
     } catch (error) {
       notify(error instanceof Error ? error.message : "Could not save scenario. Check the API connection.");
+    } finally {
+      setScenarioSaving(false);
     }
   };
   const createCampaign = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const ids = form.getAll("scenarioIds").map(String);
+    const ids = selectedCampaignScenarioIds;
     if (!ids.length) {
       notify("Select at least one scenario.");
       return;
@@ -804,6 +836,7 @@ function AppContent() {
       timeoutSeconds: Number(form.get("timeoutSeconds") ?? 300),
       oracleProfile: "Default safety profile",
     };
+    setCampaignSaving(true);
     try {
       const item = await api.createCampaign(input);
       setCampaigns((items) => [item, ...items]);
@@ -812,6 +845,8 @@ function AppContent() {
       notify("Campaign " + item.name + " has been created.");
     } catch {
       notify("Could not create campaign. Check the API connection.");
+    } finally {
+      setCampaignSaving(false);
     }
   };
   const saveRules = async (next: OracleRule[]) => {
@@ -946,6 +981,23 @@ function AppContent() {
     setPage("scenarios");
     setStatusFilter("All statuses");
   };
+  const openCampaignDialog = () => {
+    setCampaignScenarioQuery("");
+    setCampaignScenarioMap("All maps");
+    setCampaignScenarioCategory("All types");
+    setCampaignScenarioSeverity("All severities");
+    setSelectedCampaignScenarioIds([]);
+    setDialog("campaign");
+  };
+  const readyCampaignScenarios = scenarios.filter((scenario) => scenario.status === "Active" || scenario.status === "Approved");
+  const visibleCampaignScenarios = readyCampaignScenarios.filter((scenario) => {
+    const query = campaignScenarioQuery.trim().toLowerCase();
+    const searchable = [scenario.id, scenario.name, scenario.description, scenario.map, scenario.category, ...scenario.tags].join(" ").toLowerCase();
+    return (!query || searchable.includes(query)) &&
+      (campaignScenarioMap === "All maps" || scenario.map === campaignScenarioMap) &&
+      (campaignScenarioCategory === "All types" || scenario.category === campaignScenarioCategory) &&
+      (campaignScenarioSeverity === "All severities" || scenario.severity === campaignScenarioSeverity);
+  });
   const action =
     page === "scenarios" ? (
       <div className="actions">
@@ -961,19 +1013,20 @@ function AppContent() {
       </div>
     ) : (page === "campaigns" || page === "overview") &&
       role === "Test Engineer" ? (
-      <button className="btn btn-primary" onClick={() => setDialog("campaign")}>
+      <button className="btn btn-primary" onClick={openCampaignDialog}>
         <Icon name="plus" size={16} /> New campaign
       </button>
     ) : page === "oracles" && role === "Administrator" ? (
-      <button className="btn btn-light" onClick={() => saveRules(rules)}>
-        <Icon name="check" size={15} /> Save changes
+      <button className="btn btn-light" disabled={actions.isPending("rules")} onClick={() => void actions.run("rules", () => saveRules(rules))}>
+        {actions.isPending("rules") ? <i className="button-spinner" /> : <Icon name="check" size={15} />} {actions.isPending("rules") ? "Please wait…" : "Save changes"}
       </button>
     ) : page === "failures" || page === "nodes" ? (
       <button
         className="btn btn-light"
-        onClick={() => void refreshWorkspace()}
+        disabled={actions.isPending("refresh")}
+        onClick={() => void actions.run("refresh", refreshWorkspace)}
       >
-        <Icon name="refresh" size={15} /> Refresh
+        {actions.isPending("refresh") ? <i className="button-spinner" /> : <Icon name="refresh" size={15} />} {actions.isPending("refresh") ? "Loading…" : "Refresh"}
       </button>
     ) : null;
 
@@ -1126,6 +1179,12 @@ function AppContent() {
             </form>
           )}
           <div className="topbar-right">
+            {apiRequestCount > 0 && !isMockMode && (
+              <span className="api-activity" role="status" aria-live="polite" aria-busy="true">
+                <i className="api-spinner" />
+                {apiRequestCount > 1 ? `Loading ${apiRequestCount} requests…` : "Loading…"}
+              </span>
+            )}
             <span className="project-pill">
               <i>U</i> Urban Mobility Lab <Icon name="chevron" size={13} />
             </span>
@@ -1287,10 +1346,11 @@ function AppContent() {
                   setWorkers(await api.saveWorkers(next));
                 } catch (error) {
                   notify(error instanceof Error ? error.message : "Could not register the simulation node.");
-                  return;
+                  return false;
                 }
                 recordAuditEvent({ actor: user?.name ?? "Current user", action: "Registered simulation worker", target: worker.id, result: "Success" });
                 notify(`${worker.name} registered.`);
+                return true;
               }}
             />
           )}
@@ -1330,7 +1390,7 @@ function AppContent() {
                   const updated = await api.updateScenario(id, changes);
                   setScenarios((items) => items.map((item) => item.id === id ? updated : item));
                   setSelectedScenario((item) => item?.id === id ? updated : item);
-                  void api.listScenarioVersions(id).then(setScenarioVersions);
+                  await api.listScenarioVersions(id).then(setScenarioVersions).catch(() => setScenarioVersions([]));
                   notify(`${id} saved as immutable version ${updated.version}.`);
                   return true;
                 } catch (error) {
@@ -1348,8 +1408,8 @@ function AppContent() {
               onScenarioReexecute={reexecuteFailure}
               onCampaignStart={startCampaign}
               onCampaignCancel={cancelCampaign}
-              onDownloadArtifact={(runId, fileName) => {
-                void api.downloadRunArtifact(runId, fileName).catch((error: unknown) =>
+              onDownloadArtifact={async (runId, fileName) => {
+                await api.downloadRunArtifact(runId, fileName).catch((error: unknown) =>
                   notify(error instanceof Error ? error.message : "Could not download the run artifact."),
                 );
               }}
@@ -1386,6 +1446,9 @@ function AppContent() {
           subtitle="Add a reusable case to the scenario library."
           onClose={() => setDialog(null)}
           onSubmit={createScenario}
+          wide
+          pending={scenarioSaving}
+          pendingText="Saving scenario…"
         >
           <label>
             Scenario name <em>*</em>
@@ -1419,7 +1482,7 @@ function AppContent() {
                   "Town07",
                   "Town10HD",
                 ].map((x) => (
-                  <option key={x}>{x}</option>
+                  <option key={x} value={x}>{x}</option>
                 ))}
               </select>
             </label>
@@ -1428,7 +1491,7 @@ function AppContent() {
               <select name="category">
                 {["Urban", "Highway", "Intersection", "Rural", "Parking"].map(
                   (x) => (
-                    <option key={x}>{x}</option>
+                    <option key={x} value={x}>{x}</option>
                   ),
                 )}
               </select>
@@ -1439,7 +1502,7 @@ function AppContent() {
               Risk severity
               <select name="severity">
                 {["Critical", "High", "Medium", "Low"].map((x) => (
-                  <option key={x}>{x}</option>
+                  <option key={x} value={x}>{x}</option>
                 ))}
               </select>
             </label>
@@ -1455,14 +1518,83 @@ function AppContent() {
                   "Heavy rain",
                   "Fog",
                 ].map((x) => (
-                  <option key={x}>{x}</option>
+                  <option key={x} value={x}>{x}</option>
                 ))}
               </select>
             </label>
           </div>
+          <div className="form-row">
+            <VehicleSelect name="egoVehicle" label="Ego vehicle · CARLA blueprint" defaultValue="vehicle.tesla.model3" />
+            <VehicleSelect name="trafficVehicle" label="Traffic vehicle · CARLA blueprint" defaultValue="vehicle.lincoln.mkz_2020" />
+          </div>
+          <div className="vehicle-catalogue-note">
+            <span>41 vehicle models · 6 categories</span>
+            <a href="https://carla.readthedocs.io/en/latest/catalogue_vehicles/" target="_blank" rel="noreferrer">Official CARLA vehicle catalogue</a>
+          </div>
+          <div className="form-row">
+            <label>
+              Traffic vehicle count
+              <input name="trafficVehicleCount" type="number" min="0" max="50" defaultValue="3" required />
+            </label>
+            <label>
+              Traffic density
+              <select name="trafficDensity" defaultValue="Medium">
+                {["Low", "Medium", "High"].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="form-row">
+            <label>
+              Speed offset from road limit · %
+              <input name="speedLimitOffsetPercent" type="number" min="-30" max="70" defaultValue="0" required />
+            </label>
+            <p className="scenario-execution-note">Positive values slow Autopilot below the road limit; negative values increase its speed. Behavior Agent uses its own speed policy.</p>
+          </div>
+          <div className="form-row">
+            <label>
+              Pedestrian model
+              <select name="pedestrianBlueprint" defaultValue="walker.pedestrian.0001">
+                {carlaPedestrians.map((walker) => <option key={walker.blueprint} value={walker.blueprint}>{walker.label} · {walker.blueprint}</option>)}
+              </select>
+            </label>
+            <label>
+              Pedestrian count
+              <input name="pedestrianCount" type="number" min="0" max="100" defaultValue="1" required />
+            </label>
+          </div>
+          <div className="form-row">
+            <label>
+              Obstacle model
+              <select name="obstacleBlueprint" defaultValue="static.prop.streetbarrier">
+                {carlaObstacleOptions.map((obstacle) => <option key={obstacle.blueprint} value={obstacle.blueprint}>{obstacle.label} · {obstacle.blueprint}</option>)}
+              </select>
+            </label>
+            <label>
+              Obstacle count
+              <input name="obstacleCount" type="number" min="0" max="100" defaultValue="0" required />
+            </label>
+          </div>
+          <div className="form-row">
+            <label>
+              Route description
+              <input name="routeDescription" maxLength={500} defaultValue="Start → main road → goal" required />
+            </label>
+            <label>
+              Simulation duration · seconds
+              <input name="executionDurationSeconds" type="number" min="5" max="600" defaultValue="30" required />
+            </label>
+          </div>
+          <label>
+            Trigger condition
+            <input name="triggerCondition" maxLength={300} defaultValue="Simulation starts" required />
+          </label>
+          <label>
+            Scenario action
+            <input name="actions" maxLength={300} defaultValue="Autopilot follows map traffic rules" required />
+          </label>
+          <p className="scenario-execution-note">Route, trigger and action notes describe the test intent. CARLA actor scenes follow a seeded road path; import OpenSCENARIO for a custom trajectory.</p>
           <div className="modal-note">
-            <Icon name="shield" size={15} /> New scenarios are saved as Draft
-            and become ready for testing after system validation.
+            <Icon name="shield" size={15} /> CARLA actor scenes spawn the selected vehicle, traffic, pedestrians and props in the low-quality simulator. New scenarios are saved as Draft and become ready after system validation.
           </div>
         </Modal>
       )}
@@ -1472,6 +1604,9 @@ function AppContent() {
           subtitle="Select scenarios and a prioritization strategy."
           onClose={() => setDialog(null)}
           onSubmit={createCampaign}
+          wide
+          pending={campaignSaving}
+          pendingText="Creating campaign…"
         >
           <label>
             Campaign name <em>*</em>
@@ -1527,6 +1662,7 @@ function AppContent() {
               <input value="Default safety profile" readOnly />
             </label>
           </div>
+          <p className="scenario-execution-note">CARLA actor scenes evaluate Collision, Speed limit and Vehicle freezing. Other checks require an imported OpenSCENARIO source with executable safety criteria.</p>
           <div className="form-row">
             <label>
               Random seed
@@ -1542,15 +1678,48 @@ function AppContent() {
             </label>
           </div>
           <div className="picker-label">
-            Ready for testing <span>Select at least one</span>
+            Ready for testing <span>{selectedCampaignScenarioIds.length} selected · {visibleCampaignScenarios.length} shown</span>
+          </div>
+          <div className="campaign-scenario-filters">
+            <label className="campaign-scenario-search">
+              <Icon name="search" size={15} />
+              <input
+                placeholder="Search by name, ID, map or tag…"
+                value={campaignScenarioQuery}
+                onChange={(event) => setCampaignScenarioQuery(event.target.value)}
+              />
+            </label>
+            <label>
+              Map
+              <select value={campaignScenarioMap} onChange={(event) => setCampaignScenarioMap(event.target.value)}>
+                {["All maps", ...Array.from(new Set(readyCampaignScenarios.map((scenario) => scenario.map))).sort()].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label>
+              Type
+              <select value={campaignScenarioCategory} onChange={(event) => setCampaignScenarioCategory(event.target.value)}>
+                {["All types", ...Array.from(new Set(readyCampaignScenarios.map((scenario) => scenario.category))).sort()].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
+            <label>
+              Severity
+              <select value={campaignScenarioSeverity} onChange={(event) => setCampaignScenarioSeverity(event.target.value)}>
+                {["All severities", "Critical", "High", "Medium", "Low"].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </label>
           </div>
           <div className="scenario-picker">
-            {scenarios
-              .filter((s) => s.status === "Active" || s.status === "Approved")
-              .slice(0, 7)
-              .map((s) => (
+            {visibleCampaignScenarios.map((s) => (
                 <label className="pick-item" key={s.id}>
-                  <input type="checkbox" name="scenarioIds" value={s.id} />
+                  <input
+                    type="checkbox"
+                    name="scenarioIds"
+                    value={s.id}
+                    checked={selectedCampaignScenarioIds.includes(s.id)}
+                    onChange={(event) => setSelectedCampaignScenarioIds((current) => event.target.checked
+                      ? [...current, s.id]
+                      : current.filter((id) => id !== s.id))}
+                  />
                   <span>
                     <b>{s.name}</b>
                     <small>
@@ -1560,6 +1729,9 @@ function AppContent() {
                   <Badge value={s.severity} />
                 </label>
               ))}
+            {visibleCampaignScenarios.length === 0 && (
+              <div className="campaign-empty-results">No ready scenarios match these filters.</div>
+            )}
           </div>
         </Modal>
       )}
@@ -1615,6 +1787,10 @@ function AppContent() {
                 </span>
                 <b>{selectedScenario.actors} actors including ego</b>
               </div>
+              <div><span>Ego vehicle</span><b>{selectedScenario.egoVehicle ?? "—"}</b></div>
+              <div><span>Traffic</span><b>{selectedScenario.trafficVehicleCount ?? 0} × {selectedScenario.trafficVehicle ?? "vehicle"}</b></div>
+              <div><span>Pedestrians / obstacles</span><b>{selectedScenario.pedestrianCount ?? 0} / {selectedScenario.obstacleCount ?? 0}</b></div>
+              <div><span>Execution</span><b>{selectedScenario.executionMode ?? (selectedScenario.sourceFileName ? "OpenSCENARIO source" : "CARLA actors")}</b></div>
               <div>
                 <span>
                   <Icon name="calendar" size={15} /> Last execution
@@ -1642,15 +1818,15 @@ function AppContent() {
             </div>
             <div className="drawer-actions">
               {role === "Scenario Engineer" && (
-                <button className="btn btn-light" onClick={() => void cloneSelectedScenario(selectedScenario)}>
-                  <Icon name="plus" size={15} /> Clone scenario
+                <button className="btn btn-light" disabled={actions.isPending("clone")} onClick={() => void actions.run("clone", () => cloneSelectedScenario(selectedScenario))}>
+                  {actions.isPending("clone") ? <i className="button-spinner" /> : <Icon name="plus" size={15} />} {actions.isPending("clone") ? "Please wait…" : "Clone scenario"}
                 </button>
               )}
               <button
                 className="btn btn-light"
                 onClick={() => downloadScenarioFile(selectedScenario)}
               >
-                <Icon name="download" size={15} /> Download mock .xosc
+                <Icon name="download" size={15} /> Download configuration .json
               </button>
               <button
                 className="btn btn-primary"
@@ -2398,6 +2574,7 @@ function Prioritization({
   failures: FailureCluster[];
   notify: (s: string) => void;
 }) {
+  const actions = useAsyncAction();
   const [strategy, setStrategy] = useState("Proposed · failure history");
   const [ranked, setRanked] = useState(false);
   const [campaignId, setCampaignId] = useState("");
@@ -2416,11 +2593,12 @@ function Prioritization({
     : scenarios.filter((scenario) => scenario.status === "Active" || scenario.status === "Approved");
   const cost = (scenario: Scenario) => 4 + scenario.actors * 0.48;
   const stableHash = (value: string) => Array.from(value).reduce((sum, char) => Math.imul(sum ^ char.charCodeAt(0), 16777619), 2166136261) >>> 0;
-  const run = () => {
+  const run = async () => {
     if (candidateScenarios.length === 0) {
       notify("Select a campaign with scenarios before requesting prioritization.");
       return;
     }
+    setRanked(false);
     const faultSignal = (scenario: Scenario) => Math.min(1, ((100 - scenario.passRate) / 100) * Math.log2(scenario.runCount + 1) / 5);
     const maxCost = Math.max(...candidateScenarios.map(cost), 1);
     const totalWeight = Math.max(1, weights.risk + weights.history + weights.cost);
@@ -2489,7 +2667,12 @@ function Prioritization({
     setMetrics(result);
     const savedRanking = { strategy, weights, order: nextOrder.map((scenario) => scenario.id), ...result, calculatedAt: new Date().toISOString() };
     if (campaign) {
-      void api.saveCampaignRanking(campaign.id, savedRanking).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not save the ranking to the backend."));
+      try {
+        await api.saveCampaignRanking(campaign.id, savedRanking);
+      } catch (error) {
+        notify(error instanceof Error ? error.message : "Could not save the ranking to the backend.");
+        return;
+      }
     }
     setRanked(true);
     notify(`Scenario ranking generated for ${campaign?.name ?? "the active scenario set"} with ${strategy.toLowerCase()}.`);
@@ -2559,9 +2742,9 @@ function Prioritization({
             <button className="btn btn-light" disabled={!ranked} onClick={exportEvaluation}>
               <Icon name="download" size={14} /> Export evaluation
             </button>
-            <button className="btn btn-primary" onClick={run}>
-              <Icon name="spark" size={15} />
-              {ranked ? "Re-run" : "Run prioritization"}
+            <button className="btn btn-primary" disabled={actions.pending} onClick={() => void actions.run("ranking", run)}>
+              {actions.pending ? <i className="button-spinner" /> : <Icon name="spark" size={15} />}
+              {actions.pending ? "Please wait…" : ranked ? "Re-run" : "Run prioritization"}
             </button>
           </div>
         </div>
@@ -2790,9 +2973,10 @@ function Failures({
   failures: FailureCluster[];
   runs: ScenarioRun[];
   notify: (s: string) => void;
-  onConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
-  onReexecute: (failure: FailureCluster) => void;
+  onConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => Promise<void>;
+  onReexecute: (failure: FailureCluster) => Promise<void>;
 }) {
+  const actions = useAsyncAction();
   const [open, setOpen] = useState<FailureCluster | null>(null);
   const [reviewFilter, setReviewFilter] = useState("All statuses");
   const [timeRange, setTimeRange] = useState("This week");
@@ -3054,16 +3238,17 @@ function Failures({
         <Modal
           title={open.label}
           subtitle={open.id + " · " + open.affectedRuns + " related executions"}
-          onClose={() => setOpen(null)}
-          onSubmit={(e) => {
+          onClose={() => { if (!actions.pending) setOpen(null); }}
+          pending={actions.pending}
+          onSubmit={async (e) => {
             e.preventDefault();
             const form = new FormData(e.currentTarget);
-            onConfirm(open, {
+            await actions.run("confirm", () => onConfirm(open, {
               label: String(form.get("label") ?? open.label).trim(),
               rootCause: String(form.get("rootCause") ?? open.rootCause).trim(),
               reviewerNote: String(form.get("reviewerNote") ?? "").trim(),
               reviewedBy: "Test Reviewer",
-            });
+            }));
             setOpen(null);
           }}
           submitLabel="Confirm root cause"
@@ -3116,8 +3301,8 @@ function Failures({
                 {similarFailures.map((failure) => <small key={failure.id}>{failure.id} · {failure.label} · {Math.round(failure.similarity * 100)}% similarity</small>)}
               </div>
             )}
-            <button className="btn btn-light" type="button" onClick={() => { onReexecute(open); setOpen(null); }}>
-              Request scenario re-execution
+            <button className="btn btn-light" type="button" disabled={actions.pending} onClick={() => void actions.run("reexecute", async () => { await onReexecute(open); setOpen(null); })}>
+              {actions.isPending("reexecute") && <i className="button-spinner" />} {actions.isPending("reexecute") ? "Please wait…" : "Request scenario re-execution"}
             </button>
           </div>
         </Modal>
@@ -3141,12 +3326,13 @@ function Nodes({
   config: CarlaIntegrationConfig;
   notify: (s: string) => void;
   onSaveConfig: (config: CarlaIntegrationConfig) => boolean | Promise<boolean>;
-  onTestConfig: () => void;
-  onActivateConfig: () => void;
-  onTestWorker: (worker: WorkerNode) => void;
-  onWorkerAvailability: (worker: WorkerNode, online: boolean) => void;
-  onAddWorker: (worker: WorkerNode) => void;
+  onTestConfig: () => Promise<void>;
+  onActivateConfig: () => Promise<void>;
+  onTestWorker: (worker: WorkerNode) => Promise<void>;
+  onWorkerAvailability: (worker: WorkerNode, online: boolean) => Promise<void>;
+  onAddWorker: (worker: WorkerNode) => Promise<boolean>;
 }) {
+  const actions = useAsyncAction();
   const [registering, setRegistering] = useState(false);
   const [draftConfig, setDraftConfig] = useState(config);
   useEffect(() => setDraftConfig(config), [config]);
@@ -3177,20 +3363,20 @@ function Nodes({
           </div>
           <Badge value={config.active ? "Active" : config.connectionStatus} />
         </div>
-        <div className="carla-config-grid">
+        <fieldset className="carla-config-grid" disabled={actions.pending}>
           <label>Host / IP<input value={draftConfig.host} onChange={(event) => updateConfig({ host: event.target.value })} placeholder="127.0.0.1" /></label>
           <label>RPC port<input type="number" min="1" max="65535" value={draftConfig.rpcPort} onChange={(event) => updateConfig({ rpcPort: Number(event.target.value) })} /></label>
           <label>Streaming port<input type="number" min="1" max="65535" value={draftConfig.streamingPort} onChange={(event) => updateConfig({ streamingPort: Number(event.target.value) })} /></label>
           <label>CARLA version<input value={draftConfig.carlaVersion} onChange={(event) => updateConfig({ carlaVersion: event.target.value })} /></label>
           <label className="carla-path-field">ScenarioRunner installation path<input value={draftConfig.scenarioRunnerPath} onChange={(event) => updateConfig({ scenarioRunnerPath: event.target.value })} placeholder="C:\\Users\\admin\\Downloads\\CARLA_0.9.16\\ScenarioRunner" /></label>
           <label>Quality level<select value="Low" disabled><option value="Low">Low</option></select></label>
-        </div>
+        </fieldset>
         <div className="carla-config-footer">
           <span>Saved {config.updatedAt} · {config.validated ? "Settings validated" : "Settings need validation"}</span>
           <div className="actions">
-            <button className="btn btn-light" onClick={saveConfig}><Icon name="check" size={14} /> Save settings</button>
-            <button className="btn btn-light" disabled={!config.validated || configDirty} onClick={onTestConfig}><Icon name="activity" size={14} /> Test installation</button>
-            <button className="btn btn-primary" disabled={configDirty || !(config.connectionStatus === "Ready" || config.connectionStatus === "Connected") || config.active} onClick={onActivateConfig}><Icon name="play" size={14} /> Activate worker</button>
+            <button className="btn btn-light" disabled={actions.pending} onClick={() => void actions.run("save", saveConfig)}>{actions.isPending("save") ? <i className="button-spinner" /> : <Icon name="check" size={14} />} {actions.isPending("save") ? "Saving…" : "Save settings"}</button>
+            <button className="btn btn-light" disabled={actions.pending || !config.validated || configDirty} onClick={() => void actions.run("test", onTestConfig)}>{actions.isPending("test") ? <i className="button-spinner" /> : <Icon name="activity" size={14} />} {actions.isPending("test") ? "Please wait…" : "Test installation"}</button>
+            <button className="btn btn-primary" disabled={actions.pending || configDirty || !(config.connectionStatus === "Ready" || config.connectionStatus === "Connected") || config.active} onClick={() => void actions.run("activate", onActivateConfig)}>{actions.isPending("activate") ? <i className="button-spinner" /> : <Icon name="play" size={14} />} {actions.isPending("activate") ? "Please wait…" : "Activate worker"}</button>
           </div>
         </div>
         <small className="carla-config-note">The .NET worker starts CARLA only when a run is claimed. Quality is locked to Low.</small>
@@ -3294,10 +3480,10 @@ function Nodes({
                   ))}
                 </span>
                 <div className="node-actions">
-                  <button className="text-button" onClick={() => onTestWorker(w)}>
-                    Test mock connection <Icon name="arrow-right" size={12} />
+                  <button className="text-button" disabled={actions.pending} onClick={() => void actions.run(w.id, () => onTestWorker(w))}>
+                    {actions.isPending(w.id) ? <><i className="button-spinner" /> Please wait…</> : <>Test mock connection <Icon name="arrow-right" size={12} /></>}
                   </button>
-                  <button className="text-button" disabled={w.activeRuns > 0} onClick={() => onWorkerAvailability(w, w.status === "Offline")}>
+                  <button className="text-button" disabled={actions.pending || w.activeRuns > 0} onClick={() => void actions.run(w.id, () => onWorkerAvailability(w, w.status === "Offline"))}>
                     {w.status === "Offline" ? "Bring online" : "Take offline"}
                   </button>
                 </div>
@@ -3321,8 +3507,9 @@ function Nodes({
           title="Register a simulation node"
           subtitle="Add a CARLA worker to the local demo cluster."
           submitLabel="Register node"
-          onClose={() => setRegistering(false)}
-          onSubmit={(event) => {
+          onClose={() => { if (!actions.pending) setRegistering(false); }}
+          pending={actions.pending}
+          onSubmit={async (event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             const port = Number(form.get("port"));
@@ -3347,9 +3534,8 @@ function Nodes({
               activeRuns: 0,
               lastHeartbeat: "Just now",
             };
-            onAddWorker(worker);
-            setRegistering(false);
-            notify(`${worker.name} added to the mock simulation cluster.`);
+            const saved = await actions.run("register", () => onAddWorker(worker));
+            if (saved) setRegistering(false);
           }}
         >
           <label>
@@ -3409,6 +3595,7 @@ function Oracles({
   profile: { version: number; active: boolean; validated: boolean; updatedAt: string };
   onSave: (r: OracleRule[]) => void | Promise<void>;
 }) {
+  const actions = useAsyncAction();
   const [draft, setDraft] = useState(rules);
   useEffect(() => setDraft(rules), [rules]);
   const update = (id: string, patch: Partial<OracleRule>) =>
@@ -3430,6 +3617,10 @@ function Oracles({
           </p>
         </div>
         <Badge value={`Configuration v${profile.version}`} />
+      </div>
+      <div className="info-callout">
+        <Icon name="shield" size={17} />
+        <p>CARLA actor scenes evaluate Collision, Speed limit and Vehicle freezing. Other checks require an imported OpenSCENARIO source with executable safety criteria.</p>
       </div>
       <div className="oracle-layout">
         <section className="card oracle-list">
@@ -3494,9 +3685,9 @@ function Oracles({
               <Icon name="clock" size={14} />
               Applies to new campaign runs.
             </span>
-            <button className="btn btn-primary" onClick={() => onSave(draft)}>
-              <Icon name="check" size={15} />
-              Save configuration
+            <button className="btn btn-primary" disabled={actions.pending} onClick={() => void actions.run("save", async () => { await onSave(draft); })}>
+              {actions.pending ? <i className="button-spinner" /> : <Icon name="check" size={15} />}
+              {actions.pending ? "Saving…" : "Save configuration"}
             </button>
           </div>
         </section>
@@ -3559,39 +3750,55 @@ function Modal({
   onSubmit,
   children,
   submitLabel,
+  wide = false,
+  pending = false,
+  pendingText = "Working…",
 }: {
   title: string;
   subtitle: string;
   onClose: () => void;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (e: FormEvent<HTMLFormElement>) => void | Promise<void>;
   children: ReactNode;
   submitLabel?: string;
+  wide?: boolean;
+  pending?: boolean;
+  pendingText?: string;
 }) {
+  const [submitting, setSubmitting] = useState(false);
+  const submissionLock = useRef(false);
+  const busy = pending || submitting;
   return (
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (!busy && e.target === e.currentTarget) onClose();
       }}
     >
-      <form className="modal" onSubmit={onSubmit}>
+      <form className={`modal${wide ? " modal-wide" : ""}`} onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy || submissionLock.current) return;
+        submissionLock.current = true;
+        setSubmitting(true);
+        try { await onSubmit(event); }
+        finally { submissionLock.current = false; setSubmitting(false); }
+      }} aria-busy={busy}>
         <div className="modal-head">
           <div>
             <h2>{title}</h2>
             <p>{subtitle}</p>
           </div>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={busy} aria-label="Close dialog">
             <Icon name="close" size={18} />
           </button>
         </div>
         {children}
         <div className="modal-actions">
-          <button className="btn btn-light" type="button" onClick={onClose}>
+          <button className="btn btn-light" type="button" onClick={onClose} disabled={busy}>
             Cancel
           </button>
-          <button className="btn btn-primary" type="submit">
-            <Icon name="check" size={15} />
-            {submitLabel ??
+          <button className="btn btn-primary" type="submit" disabled={busy}>
+            {busy ? <i className="button-spinner" /> : <Icon name="check" size={15} />}
+            {busy ? pendingText : submitLabel ??
               (title.startsWith("Create a scenario")
                 ? "Save scenario"
                 : "Create campaign")}
@@ -3979,25 +4186,16 @@ function ruleIcon(id: string): IconName {
 }
 
 function downloadScenarioFile(scenario: Scenario) {
-  const xml = `<?xml version="1.0"?>\n<OpenSCENARIO>\n  <FileHeader revMajor="1" revMinor="1" description="${xmlEscape(scenario.description)}" author="AutoScenarioX" />\n  <ParameterDeclarations />\n  <CatalogLocations />\n  <RoadNetwork>\n    <LogicFile filepath="${xmlEscape(scenario.map)}" />\n  </RoadNetwork>\n  <Storyboard name="${xmlEscape(scenario.name)}">\n    <Environment name="${xmlEscape(scenario.weather)}" />\n    <Entities count="${scenario.actors}" />\n    <ScenarioTags>${scenario.tags.map(xmlEscape).join(", ")}</ScenarioTags>\n  </Storyboard>\n</OpenSCENARIO>\n`;
-  const url = URL.createObjectURL(new Blob([xml], { type: "application/xml" }));
+  const configuration = {
+    format: "AutoScenarioX CARLA actor scene",
+    version: 1,
+    source: "CARLA 0.9.16 vehicle catalogue",
+    scenario,
+  };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(configuration, null, 2)], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${scenario.id.toLowerCase()}.xosc`;
+  link.download = `${scenario.id.toLowerCase()}-configuration.json`;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function xmlEscape(value: string) {
-  const entities: Record<string, string> = {
-    "<": "&lt;",
-    ">": "&gt;",
-    "&": "&amp;",
-    '"': "&quot;",
-    "'": "&apos;",
-  };
-  return value.replace(
-    /[<>&"']/g,
-    (character) => entities[character] ?? character,
-  );
 }

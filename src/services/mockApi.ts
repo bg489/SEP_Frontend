@@ -129,7 +129,7 @@ export const mockApi: AutoScenarioApi = {
       id: makeId("SCN", items),
       status: "Draft",
       version: "v1.0",
-      actors: 2,
+      actors: 1 + input.trafficVehicleCount + input.pedestrianCount + input.obstacleCount,
       runCount: 0,
       passRate: 0,
       lastRun: "Never",
