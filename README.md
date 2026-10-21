@@ -10,9 +10,9 @@ The app starts in **mock mode** for UI previews. Set `VITE_DATA_MODE=api` to use
 
 | Role | Screens and workflows |
 | --- | --- |
-| **Scenario Engineer** | Overview, scenario library and editor, scenario import, side-by-side comparison, scenario clusters, profile |
+| **Scenario Engineer** | Overview, scenario library and editor, scenario import and automatic configuration validation, side-by-side comparison, scenario clusters, profile |
 | **Test Engineer** | Overview, campaign creation and management, prioritization, execution queue and run details, failure insights, campaign reports, profile |
-| **Test Reviewer** | Overview, scenario approval queue, failure evidence and root-cause review, run details, campaign reports, profile |
+| **Test Reviewer** | Overview, failure evidence and root-cause review, run details, campaign reports, profile |
 | **Administrator** | Overview, user and role management, simulation nodes, test-oracle rules, analytics settings, audit log, profile |
 
 The sign-in screen includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. In mock mode, the role selector previews each role's navigation. In API mode, the role comes from the backend and the preview selector is hidden.
@@ -82,7 +82,7 @@ Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, 
 | `GET` | `/api/dashboard/overview` | Dashboard metrics and activity |
 | `GET`, `POST` | `/api/scenarios` | Search/list and create scenarios (`search`, `status`) |
 | `POST` | `/api/scenarios/import`, `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/clone` | Import, edit into a new version, or clone |
-| `GET`, `PUT`, `PATCH` | `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/status`, `/api/scenarios/{id}/execution-metrics` | Version history, review state, execution metrics |
+| `GET`, `PUT`, `PATCH` | `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/status`, `/api/scenarios/{id}/execution-metrics` | Version history, system-validated readiness state, execution metrics |
 | `GET`, `POST`, `PATCH` | `/api/campaigns`, `/api/campaigns/{id}` | Campaign list, create, and update |
 | `GET`, `PUT` | `/api/campaigns/{id}/ranking` | Persist prioritization order and APFD/APFDc evaluation |
 | `GET`, `POST` | `/api/runs`, `/api/campaigns/{id}/runs` | Read and queue backend run records |
