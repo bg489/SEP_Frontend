@@ -550,11 +550,6 @@ function AppContent() {
         ? `Execution blocked: ${inactive.map((scenario) => scenario.id).join(", ")} must be Active first.`
         : "Execution blocked: campaign has no scenarios.");
     }
-    const availableWorkers = workers.filter((worker) => worker.status !== "Offline" && worker.activeRuns < worker.capacity);
-    if (!availableWorkers.length) return notify("Execution blocked: no healthy worker has available capacity.");
-    const workerSlots = availableWorkers.flatMap((worker) =>
-      Array.from({ length: worker.capacity - worker.activeRuns }, () => worker.id),
-    );
     const ranking = isMockMode ? getRanking<{ order: string[] }>(campaignId) : undefined;
     const rankedIds = ranking?.order ?? [];
     const orderedScenarios = [...campaignScenarios].sort((a, b) => {
@@ -585,6 +580,11 @@ function AppContent() {
       }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not queue campaign runs."));
       return;
     }
+    const availableWorkers = workers.filter((worker) => worker.status !== "Offline" && worker.activeRuns < worker.capacity);
+    if (!availableWorkers.length) return notify("Execution blocked: no healthy worker has available capacity.");
+    const workerSlots = availableWorkers.flatMap((worker) =>
+      Array.from({ length: worker.capacity - worker.activeRuns }, () => worker.id),
+    );
     const startedAt = new Date().toLocaleString();
     const createdAt = Date.now();
     const executionItems = orderedScenarios.flatMap((scenario) =>
