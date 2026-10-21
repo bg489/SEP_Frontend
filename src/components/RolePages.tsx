@@ -40,11 +40,12 @@ interface RolePagesProps {
   onNotify: (message: string) => void;
   onScenarioStatus: (id: string, status: ScenarioStatus) => Promise<boolean>;
   onScenarioUpdate: (id: string, changes: Partial<Scenario>) => Promise<boolean>;
-  onImport: (scenario: Scenario) => Promise<Scenario>;
+  onImport: (scenario: Scenario, sourceContent: string) => Promise<Scenario>;
   onFailureConfirm: (failure: FailureCluster, changes?: Partial<FailureCluster>) => void;
   onScenarioReexecute: (failure: FailureCluster) => void;
   onCampaignStart: (id: string) => void;
   onCampaignCancel: (id: string) => void;
+  onDownloadArtifact: (runId: string, fileName: string) => void;
   onUserUpdate: (user: DemoUser) => void;
   onLogout: () => void;
   initialScenarioId?: string;
@@ -588,7 +589,7 @@ function ImportScenarios({
       sourceFileName: file.name,
     };
     try {
-      const saved = await onImport(scenario);
+      const saved = await onImport(scenario, contents);
       setFile(null);
       onNotify(`${saved.id} was imported as a draft from ${file.name}.`);
     } catch (error) {
@@ -605,8 +606,8 @@ function ImportScenarios({
           <small className="section-kicker">SCENARIO LIBRARY · IMPORT</small>
           <h3>Bring an OpenSCENARIO file into your library</h3>
           <p>
-            Upload a .xosc or .osc file. The mock flow creates a draft record so
-            it can be reviewed before campaign use.
+            Upload a .xosc or .osc file. The API stores the validated source
+            with the draft so a CARLA worker can run that exact version.
           </p>
         </div>
         <span className="badge approved">DRAFT FIRST</span>
@@ -627,7 +628,7 @@ function ImportScenarios({
         <b>{file ? file.name : "Drop a scenario file here"}</b>
         <small>
           {file
-            ? `${(file.size / 1024).toFixed(1)} KB · Ready for mock validation`
+            ? `${(file.size / 1024).toFixed(1)} KB · Ready for XML validation`
             : "or choose a file from your computer · .xosc, .osc · up to 10 MB"}
         </small>
         <span className="btn btn-light">Choose file</span>
@@ -667,7 +668,7 @@ function ImportScenarios({
                 <b>{label}</b>
                 <small>{text}</small>
               </span>
-              <small>{index === 0 && file ? "READY" : "MOCK"}</small>
+              <small>{index === 0 && file ? "READY" : isMockMode ? "MOCK" : "API"}</small>
             </div>
           ))}
         </div>
@@ -675,14 +676,16 @@ function ImportScenarios({
           <Icon name="shield" size={18} />
           <h3>Safe by default</h3>
           <p>
-            Uploaded content stays in this browser demo. The connected backend
-            should validate XML, enforce file limits and apply access rules.
+            In API mode, XML is validated and stored against the scenario
+            version. A configured worker runs that saved artifact.
           </p>
           <button
             className="link-button"
             onClick={() =>
               onNotify(
-                "The .NET API will provide schema validation and duplicate detection.",
+                isMockMode
+                  ? "Mock mode keeps the imported file in this browser only."
+                  : "The .NET API validates XML structure, enforces upload limits and stores the source artifact.",
               )
             }
           >
@@ -1094,7 +1097,7 @@ function ExecutionQueue({
         </div>
         <div className="queue-foot">
           <span>
-            <i /> Queue service simulated locally
+            <i /> {isMockMode ? "Queue service simulated locally" : "PostgreSQL queue · local CARLA worker · Low quality"}
           </span>
           <button
             className="link-button"
@@ -1115,6 +1118,7 @@ function RunDetails({
   workers,
   user,
   selectedCampaignId,
+  onDownloadArtifact,
   onNavigate,
 }: RolePagesProps) {
   const campaign =
@@ -1146,7 +1150,7 @@ function RunDetails({
           <small>RUN DETAILS · {campaignRuns.at(-1)?.id ?? "AWAITING FIRST EXECUTION"}</small>
           <h2>{campaign?.name ?? "No active campaign"}</h2>
           <p>
-            Local mock execution · {campaignRuns.length} run records · scenario versions retained at dispatch
+            {isMockMode ? "Local mock execution" : "CARLA / ScenarioRunner execution"} · {campaignRuns.length} run records · scenario versions retained at dispatch
           </p>
         </div>
         <Badge value={campaign?.status ?? "Queued"} />
@@ -1214,7 +1218,12 @@ function RunDetails({
                     {run.id} · {run.scenarioId} · {run.scenarioVersion} · repeat {run.repetition ?? 1} · {run.workerId ?? "Unassigned"}
                   </small>
                   {run.evidence.map((item, evidenceIndex) => <small className="run-evidence-line" key={`${item.rule}-${evidenceIndex}`}>{item.timestamp} · {item.rule}: {item.measured} / {item.threshold}</small>)}
-                  <small className="run-evidence-line">Artifacts: {run.artifacts.join(", ") || "None"}</small>
+                  <small className="run-evidence-line">Artifacts: {run.artifacts.length ? run.artifacts.join(", ") : "None"}</small>
+                  {!isMockMode && run.artifacts.map((fileName) => (
+                    <button className="link-button" key={fileName} onClick={() => onDownloadArtifact(run.id, fileName)}>
+                      Download {fileName} <Icon name="download" size={12} />
+                    </button>
+                  ))}
                 </div>
                 <span className="run-duration">
                   {run.durationSeconds ? `${Math.floor(run.durationSeconds / 60)}m ${run.durationSeconds % 60}s` : `${run.progress}%`}

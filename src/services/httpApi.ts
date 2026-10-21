@@ -76,6 +76,9 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       body: JSON.stringify(config),
     });
   }
+  testCarlaIntegration() {
+    return this.request<CarlaIntegrationConfig>("/api/integration/carla/test", { method: "POST" });
+  }
   listScenarios(filters: ScenarioFilters = {}) {
     const params = new URLSearchParams();
     if (filters.query) params.set("search", filters.query);
@@ -91,10 +94,10 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
       body: JSON.stringify(input),
     });
   }
-  persistImportedScenario(scenario: Scenario) {
+  persistImportedScenario(scenario: Scenario, sourceContent: string) {
     return this.request<Scenario>("/api/scenarios/import", {
       method: "POST",
-      body: JSON.stringify(scenario),
+      body: JSON.stringify({ scenario, sourceFileName: scenario.sourceFileName, sourceContent }),
     });
   }
   updateScenario(id: string, changes: Partial<Scenario>) {
@@ -147,6 +150,20 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
   }
   listRuns() {
     return this.request<ScenarioRun[]>("/api/runs");
+  }
+  async downloadRunArtifact(runId: string, fileName: string): Promise<void> {
+    const accessToken = getAccessToken();
+    const response = await fetch(`${this.baseUrl}/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(fileName)}`, {
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+    });
+    if (!response.ok) throw new Error(await response.text() || `Artifact download failed (${response.status}).`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
   queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string) {
     return this.request<ScenarioRun[]>("/api/campaigns/" + encodeURIComponent(campaignId) + "/runs", {

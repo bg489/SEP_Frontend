@@ -84,6 +84,9 @@ export const mockApi: AutoScenarioApi = {
     saveCarlaConfig(config);
     return config;
   },
+  async testCarlaIntegration(): Promise<CarlaIntegrationConfig> {
+    throw new Error("A real CARLA readiness check requires API mode and the .NET backend.");
+  },
   async getAnalyticsPreferences(): Promise<AnalyticsPreferences> {
     return getAnalyticsPreferences();
   },
@@ -150,9 +153,10 @@ export const mockApi: AutoScenarioApi = {
     });
     return created;
   },
-  async persistImportedScenario(scenario: Scenario): Promise<Scenario> {
+  async persistImportedScenario(scenario: Scenario, sourceContent: string): Promise<Scenario> {
     const items = readStored(storageKeys.scenarios, mockScenarios);
     const created = { ...scenario, id: makeId("SCN", items), version: "v1.0" };
+    try { localStorage.setItem(`autoscenariox.mock.scenario-source:${created.id}:${created.version}`, sourceContent); } catch { /* Keep the mock usable if storage is unavailable. */ }
     writeStored(storageKeys.scenarios, [created, ...items]);
     recordScenarioVersion(created, `Imported ${scenario.sourceFileName ?? "OpenSCENARIO file"}`);
     appendAuditEvent({ actor: "Current user", action: "Import scenario", target: created.id, result: "Success" });
@@ -266,6 +270,9 @@ export const mockApi: AutoScenarioApi = {
   },
   async listRuns(): Promise<ScenarioRun[]> {
     return listRuns();
+  },
+  async downloadRunArtifact(): Promise<void> {
+    throw new Error("Run artifact downloads are available in API mode.");
   },
   async queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string): Promise<ScenarioRun[]> {
     const campaign = (await mockApi.listCampaigns()).find((item) => item.id === campaignId);

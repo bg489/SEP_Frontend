@@ -107,7 +107,7 @@ export interface CarlaIntegrationConfig {
   qualityLevel: "Low";
   validated: boolean;
   active: boolean;
-  connectionStatus: "Not tested" | "Connected (mock)" | "Failed (mock)";
+  connectionStatus: "Not tested" | "Ready" | "Connected" | "Failed";
   updatedAt: string;
 }
 
@@ -247,12 +247,13 @@ export interface AutoScenarioApi {
   getOverview(): Promise<OverviewData>;
   getCarlaIntegration(): Promise<CarlaIntegrationConfig>;
   saveCarlaIntegration(config: CarlaIntegrationConfig): Promise<CarlaIntegrationConfig>;
+  testCarlaIntegration(): Promise<CarlaIntegrationConfig>;
   getAnalyticsPreferences(): Promise<AnalyticsPreferences>;
   saveAnalyticsPreferences(preferences: AnalyticsPreferences): Promise<AnalyticsPreferences>;
   listAuditEvents(): Promise<AuditEvent[]>;
   listScenarios(filters?: ScenarioFilters): Promise<Scenario[]>;
   createScenario(input: CreateScenarioInput): Promise<Scenario>;
-  persistImportedScenario(scenario: Scenario): Promise<Scenario>;
+  persistImportedScenario(scenario: Scenario, sourceContent: string): Promise<Scenario>;
   updateScenario(id: string, changes: Partial<Scenario>): Promise<Scenario>;
   cloneScenario(id: string): Promise<Scenario>;
   updateScenarioStatus(id: string, status: ScenarioStatus, note?: string): Promise<Scenario>;
@@ -264,6 +265,7 @@ export interface AutoScenarioApi {
   saveCampaignRanking(id: string, ranking: Record<string, unknown>): Promise<void>;
   updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">): Promise<Scenario>;
   listRuns(): Promise<ScenarioRun[]>;
+  downloadRunArtifact(runId: string, fileName: string): Promise<void>;
   queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string): Promise<ScenarioRun[]>;
   cancelCampaignRuns(campaignId: string): Promise<ScenarioRun[]>;
   addFailureCluster(failure: FailureCluster): Promise<FailureCluster>;

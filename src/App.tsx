@@ -371,7 +371,7 @@ function AppContent() {
       if (completed.length === campaignRuns.length) {
         status = completed.every((run) => run.state === "Cancelled")
           ? "Cancelled"
-          : completed.some((run) => run.state === "Timed Out")
+          : completed.some((run) => run.state === "Failed" || run.state === "Timed Out")
             ? "Failed"
             : "Completed";
       }
@@ -399,6 +399,34 @@ function AppContent() {
       passRate: Math.round(nextCampaigns.reduce((sum, campaign) => sum + campaign.passRate, 0) / Math.max(1, nextCampaigns.length) * 10) / 10,
     }));
   }, [runs]);
+
+  useEffect(() => {
+    if (!ready || isMockMode) return;
+    let mounted = true;
+    let inFlight = false;
+    const refreshExecution = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const [runResult, campaignResult, overviewResult] = await Promise.allSettled([
+          api.listRuns(),
+          api.listCampaigns(),
+          api.getOverview(),
+        ]);
+        if (!mounted) return;
+        if (runResult.status === "fulfilled") setRuns(runResult.value);
+        if (campaignResult.status === "fulfilled") setCampaigns(campaignResult.value);
+        if (overviewResult.status === "fulfilled") setOverview(overviewResult.value);
+      } finally {
+        inFlight = false;
+      }
+    };
+    const timer = window.setInterval(() => void refreshExecution(), 4000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [ready]);
 
   useEffect(() => {
     if (!toast) return;
@@ -542,7 +570,7 @@ function AppContent() {
         setCampaigns((current) => current.map((item) => item.id === campaignId ? { ...item, status: "Queued", progress: 0 } : item));
         setSelectedCampaignId(campaignId);
         recordAuditEvent({ actor: user?.name ?? "Current user", action: "Queue campaign execution", target: campaignId, result: "Success" });
-        notify(`${campaign.name} queued ${queuedRuns.length} run(s) in PostgreSQL. A connected CARLA worker is required to execute them.`);
+        notify(`${campaign.name} queued ${queuedRuns.length} run(s) in PostgreSQL. The active .NET worker will execute them with CARLA at Low quality.`);
       }).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not queue campaign runs."));
       return;
     }
@@ -825,22 +853,22 @@ function AppContent() {
     return true;
   };
   const testCarlaIntegration = async () => {
-    if (!carlaConfig.validated) return notify("Save valid CARLA settings before testing the mock connection.");
-    const updated = { ...carlaConfig, connectionStatus: "Connected (mock)" as const, updatedAt: new Date().toLocaleString() };
+    if (!carlaConfig.validated) return notify("Save valid CARLA settings before testing the installation.");
+    let updated: CarlaIntegrationConfig;
     try {
-      const saved = await api.saveCarlaIntegration(updated);
-      setCarlaConfig(saved);
-      persistCarlaConfig(saved);
+      updated = await api.testCarlaIntegration();
+      setCarlaConfig(updated);
+      persistCarlaConfig(updated);
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Could not save the mock connection status.");
+      notify(error instanceof Error ? error.message : "CARLA/ScenarioRunner readiness check failed.");
       return;
     }
-    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Tested CARLA connection (mock only; no process started)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
-    notify("Mock connection succeeded. No CARLA process was started.");
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Tested CARLA/ScenarioRunner readiness", target: `${updated.host}:${updated.rpcPort}`, result: updated.connectionStatus === "Failed" ? "Rejected" : "Success" });
+    notify(updated.connectionStatus === "Failed" ? "CARLA/ScenarioRunner readiness check failed." : updated.connectionStatus === "Connected" ? "CARLA is responding on its RPC port." : "CARLA and ScenarioRunner are ready. CARLA will start at Low quality when a run is claimed.");
   };
   const activateCarlaIntegration = async () => {
-    if (!carlaConfig.validated || carlaConfig.connectionStatus !== "Connected (mock)") {
-      notify("Save the settings and pass the mock connection check before activation.");
+    if (!carlaConfig.validated || !["Ready", "Connected"].includes(carlaConfig.connectionStatus)) {
+      notify("Save the settings and pass the CARLA/ScenarioRunner readiness check before activation.");
       return;
     }
     const updated = { ...carlaConfig, active: true, qualityLevel: "Low" as const, updatedAt: new Date().toLocaleString() };
@@ -852,8 +880,8 @@ function AppContent() {
       notify(error instanceof Error ? error.message : "Could not activate CARLA settings.");
       return;
     }
-    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Activated CARLA integration in mock mode (Low quality)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
-    notify("CARLA integration is active in mock mode at Low quality.");
+    recordAuditEvent({ actor: user?.name ?? "Current user", action: "Activated CARLA worker (Low quality)", target: `${updated.host}:${updated.rpcPort}`, result: "Success" });
+    notify("CARLA worker is active. New campaign runs will execute with CARLA at Low quality.");
   };
   const testWorkerConnection = async (worker: WorkerNode) => {
     const reachable = worker.status !== "Offline";
@@ -1302,8 +1330,8 @@ function AppContent() {
                   return false;
                 }
               }}
-              onImport={async (scenario) => {
-                const saved = await api.persistImportedScenario(scenario);
+              onImport={async (scenario, sourceContent) => {
+                const saved = await api.persistImportedScenario(scenario, sourceContent);
                 setScenarios((items) => [saved, ...items]);
                 setOverview((value) => ({ ...value, totalScenarios: value.totalScenarios + 1 }));
                 return saved;
@@ -1312,6 +1340,11 @@ function AppContent() {
               onScenarioReexecute={reexecuteFailure}
               onCampaignStart={startCampaign}
               onCampaignCancel={cancelCampaign}
+              onDownloadArtifact={(runId, fileName) => {
+                void api.downloadRunArtifact(runId, fileName).catch((error: unknown) =>
+                  notify(error instanceof Error ? error.message : "Could not download the run artifact."),
+                );
+              }}
               onUserUpdate={updateUser}
               onLogout={signOut}
               initialScenarioId={editorScenarioId}
@@ -1330,9 +1363,9 @@ function AppContent() {
               CARLA integration{" "}
               <b>
                 <i />{" "}
-                {workers.some((w) => w.status !== "Offline")
-                  ? "Mock ready"
-                  : "Needs attention"}
+                {isMockMode
+                  ? workers.some((w) => w.status !== "Offline") ? "Mock ready" : "Needs attention"
+                  : carlaConfig.active ? "Worker active" : "Needs attention"}
               </b>
             </span>
           </footer>
@@ -3110,7 +3143,8 @@ function Nodes({
   const [registering, setRegistering] = useState(false);
   const [draftConfig, setDraftConfig] = useState(config);
   useEffect(() => setDraftConfig(config), [config]);
-  const configDirty = JSON.stringify({ ...draftConfig, updatedAt: config.updatedAt }) !== JSON.stringify(config);
+  const configDirty = (["host", "rpcPort", "streamingPort", "carlaVersion", "scenarioRunnerPath"] as const)
+    .some((key) => draftConfig[key] !== config[key]);
   const updateConfig = (changes: Partial<CarlaIntegrationConfig>) =>
     setDraftConfig((current) => ({
       ...current,
@@ -3132,27 +3166,27 @@ function Nodes({
           <div>
             <small className="section-kicker">CARLA INTEGRATION · LOW QUALITY ONLY</small>
             <h3>Connection profile</h3>
-            <p>Configure the future worker connection. This screen uses a mock health check and does not launch CARLA.</p>
+            <p>Configure the local CARLA and ScenarioRunner worker. Executions are pinned to Low quality.</p>
           </div>
-          <Badge value={config.active ? "Active (mock)" : config.connectionStatus} />
+          <Badge value={config.active ? "Active" : config.connectionStatus} />
         </div>
         <div className="carla-config-grid">
           <label>Host / IP<input value={draftConfig.host} onChange={(event) => updateConfig({ host: event.target.value })} placeholder="127.0.0.1" /></label>
           <label>RPC port<input type="number" min="1" max="65535" value={draftConfig.rpcPort} onChange={(event) => updateConfig({ rpcPort: Number(event.target.value) })} /></label>
           <label>Streaming port<input type="number" min="1" max="65535" value={draftConfig.streamingPort} onChange={(event) => updateConfig({ streamingPort: Number(event.target.value) })} /></label>
           <label>CARLA version<input value={draftConfig.carlaVersion} onChange={(event) => updateConfig({ carlaVersion: event.target.value })} /></label>
-          <label className="carla-path-field">CARLA / ScenarioRunner installation path<input value={draftConfig.scenarioRunnerPath} onChange={(event) => updateConfig({ scenarioRunnerPath: event.target.value })} placeholder="C:\\CARLA_0.9.16" /></label>
+          <label className="carla-path-field">ScenarioRunner installation path<input value={draftConfig.scenarioRunnerPath} onChange={(event) => updateConfig({ scenarioRunnerPath: event.target.value })} placeholder="C:\\Users\\admin\\Downloads\\CARLA_0.9.16\\ScenarioRunner" /></label>
           <label>Quality level<select value="Low" disabled><option value="Low">Low</option></select></label>
         </div>
         <div className="carla-config-footer">
           <span>Saved {config.updatedAt} · {config.validated ? "Settings validated" : "Settings need validation"}</span>
           <div className="actions">
             <button className="btn btn-light" onClick={saveConfig}><Icon name="check" size={14} /> Save settings</button>
-            <button className="btn btn-light" disabled={!config.validated || configDirty} onClick={onTestConfig}><Icon name="activity" size={14} /> Test mock connection</button>
-            <button className="btn btn-primary" disabled={configDirty || config.connectionStatus !== "Connected (mock)" || config.active} onClick={onActivateConfig}><Icon name="play" size={14} /> Activate mock profile</button>
+            <button className="btn btn-light" disabled={!config.validated || configDirty} onClick={onTestConfig}><Icon name="activity" size={14} /> Test installation</button>
+            <button className="btn btn-primary" disabled={configDirty || !(config.connectionStatus === "Ready" || config.connectionStatus === "Connected") || config.active} onClick={onActivateConfig}><Icon name="play" size={14} /> Activate worker</button>
           </div>
         </div>
-        <small className="carla-config-note">No CARLA executable is started by this frontend flow. Runtime quality is locked to Low.</small>
+        <small className="carla-config-note">The .NET worker starts CARLA only when a run is claimed. Quality is locked to Low.</small>
       </section>
       <div className="metric-grid">
         <Metric

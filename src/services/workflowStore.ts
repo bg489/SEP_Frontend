@@ -24,7 +24,7 @@ const defaultCarlaConfig: CarlaIntegrationConfig = {
   rpcPort: 2000,
   streamingPort: 2001,
   carlaVersion: "0.9.16",
-  scenarioRunnerPath: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16",
+  scenarioRunnerPath: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16\\ScenarioRunner",
   qualityLevel: "Low",
   validated: false,
   active: false,
