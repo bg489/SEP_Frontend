@@ -18,6 +18,7 @@ import type {
   WorkerNode,
 } from "../types";
 import { getAccessToken } from "./authToken";
+import { beginApiActivity } from "./apiActivity";
 
 export class HttpAutoScenarioApi implements AutoScenarioApi {
   private readonly baseUrl = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
@@ -26,39 +27,42 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
   );
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
-    const accessToken = getAccessToken();
-    const response = await fetch(this.baseUrl + path, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        ...init?.headers,
-      },
-    });
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      let message = body;
-      try {
-        const payload = JSON.parse(body) as {
-          message?: unknown;
-          title?: unknown;
-          detail?: unknown;
-        };
-        if (typeof payload.message === "string") message = payload.message;
-        else if (typeof payload.detail === "string") message = payload.detail;
-        else if (typeof payload.title === "string") message = payload.title;
-      } catch {
-        // Keep plain-text API errors readable.
+    const finishActivity = beginApiActivity();
+    try {
+      const accessToken = getAccessToken();
+      const response = await fetch(this.baseUrl + path, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...init?.headers,
+        },
+      });
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        let message = body;
+        try {
+          const payload = JSON.parse(body) as {
+            message?: unknown;
+            title?: unknown;
+            detail?: unknown;
+          };
+          if (typeof payload.message === "string") message = payload.message;
+          else if (typeof payload.detail === "string") message = payload.detail;
+          else if (typeof payload.title === "string") message = payload.title;
+        } catch {
+          // Keep plain-text API errors readable.
+        }
+        if (response.status >= 500 && (!message || message === body || message === "An error occurred while processing your request.")) {
+          message = `The server could not complete this request (HTTP ${response.status}). Check the backend console for details.`;
+        }
+        throw new Error(message || "Request failed with status " + response.status);
       }
-      if (response.status >= 500 && (!message || message === body || message === "An error occurred while processing your request.")) {
-        message = `The server could not complete this request (HTTP ${response.status}). Check the backend console for details.`;
-      }
-      throw new Error(
-        message || "Request failed with status " + response.status,
-      );
+      if (response.status === 204) return undefined as T;
+      return await response.json() as T;
+    } finally {
+      finishActivity();
     }
-    if (response.status === 204) return undefined as T;
-    return response.json() as Promise<T>;
   }
 
   getOverview() {
@@ -161,18 +165,23 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
     return this.request<ScenarioRun[]>("/api/runs");
   }
   async downloadRunArtifact(runId: string, fileName: string): Promise<void> {
-    const accessToken = getAccessToken();
-    const response = await fetch(`${this.baseUrl}/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(fileName)}`, {
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-    });
-    if (!response.ok) throw new Error(await response.text() || `Artifact download failed (${response.status}).`);
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = fileName;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const finishActivity = beginApiActivity();
+    try {
+      const accessToken = getAccessToken();
+      const response = await fetch(`${this.baseUrl}/api/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(fileName)}`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      });
+      if (!response.ok) throw new Error(await response.text() || `Artifact download failed (${response.status}).`);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      finishActivity();
+    }
   }
   queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string) {
     return this.request<ScenarioRun[]>("/api/campaigns/" + encodeURIComponent(campaignId) + "/runs", {

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Icon } from "./Icon";
 import { LanguageSwitcher } from "../i18n";
 import type { LoginInput, RegisterInput, RegistrationRole } from "../services/authApi";
@@ -29,9 +29,16 @@ export function AuthScreen({
   onRequestPasswordReset,
 }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("login");
+  const submitted = useRef(false);
+
+  useEffect(() => {
+    if (!busy) submitted.current = false;
+  }, [busy, error, notice]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy || submitted.current) return;
+    submitted.current = true;
     const data = new FormData(event.currentTarget);
     const email = String(data.get("email") ?? "")
       .trim()
@@ -138,7 +145,7 @@ export function AuthScreen({
 
       <section className="auth-panel-wrap">
         <LanguageSwitcher className="language-switch-auth" />
-        <form className="auth-panel" onSubmit={submit}>
+        <form className="auth-panel" onSubmit={submit} aria-busy={busy}>
           <div className="auth-mobile-brand brand">
             <div className="brand-mark">
               <i />
@@ -183,6 +190,7 @@ export function AuthScreen({
                 <Icon name="users" size={16} />
                 <input
                   name="name"
+                  disabled={busy}
                   required
                   placeholder="Your name"
                   autoComplete="name"
@@ -196,6 +204,7 @@ export function AuthScreen({
               <Icon name="link" size={16} />
               <input
                 name="email"
+                disabled={busy}
                 type="email"
                 required
                 placeholder="you@company.com"
@@ -210,6 +219,7 @@ export function AuthScreen({
                 <Icon name="shield" size={16} />
                 <input
                   name="password"
+                  disabled={busy}
                   type="password"
                   required
                   minLength={8}
@@ -236,7 +246,7 @@ export function AuthScreen({
           {mode === "register" && (
             <label className="auth-label">
               Role
-              <select name="role" defaultValue="Scenario Engineer" required>
+              <select name="role" defaultValue="Scenario Engineer" required disabled={busy}>
                 {registrationRoles.map((registrationRole) => (
                   <option key={registrationRole} value={registrationRole}>
                     {registrationRole}
@@ -264,6 +274,7 @@ export function AuthScreen({
             </div>
           )}
           <button className="btn btn-primary auth-submit" type="submit" disabled={busy}>
+            {busy && <i className="button-spinner" aria-hidden="true" />}
             {busy
               ? "Please wait…"
               : mode === "login"
@@ -271,7 +282,7 @@ export function AuthScreen({
                 : mode === "register"
                   ? "Create account"
                   : "Send reset link"}
-            <Icon name="arrow-right" size={16} />
+            {!busy && <Icon name="arrow-right" size={16} />}
           </button>
           <div className="auth-switch">
             {mode === "login" ? (

@@ -1,6 +1,7 @@
 import type { DemoUser, UserRole } from "../types";
 import { authApiBaseUrl } from "./authConfig";
 import { getAccessToken } from "./authToken";
+import { beginApiActivity } from "./apiActivity";
 
 export interface AuthSession {
   user: DemoUser;
@@ -52,38 +53,43 @@ function sessionFromApi(response: ApiSession): AuthSession {
 }
 
 async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
-  let response: Response;
+  const finishActivity = beginApiActivity();
   try {
-    response = await fetch(authApiBaseUrl + path, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init.headers,
-      },
-    });
-  } catch {
-    throw new Error(
-      `Cannot connect to the authentication API at ${authApiBaseUrl}. Start the .NET backend and try again.`,
-    );
-  }
+    const token = getAccessToken();
+    let response: Response;
+    try {
+      response = await fetch(authApiBaseUrl + path, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...init.headers,
+        },
+      });
+    } catch {
+      throw new Error(
+        `Cannot connect to the authentication API at ${authApiBaseUrl}. Start the .NET backend and try again.`,
+      );
+    }
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as
-      | { message?: string; detail?: string; title?: string; errors?: Record<string, string[]> }
-      | null;
-    const validationMessage = body?.errors
-      ? Object.values(body.errors).flat().join(" ")
-      : undefined;
-    throw new Error(
-      body?.message ?? validationMessage ?? body?.detail ?? body?.title ??
-        `Request failed with status ${response.status}`,
-    );
-  }
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as
+        | { message?: string; detail?: string; title?: string; errors?: Record<string, string[]> }
+        | null;
+      const validationMessage = body?.errors
+        ? Object.values(body.errors).flat().join(" ")
+        : undefined;
+      throw new Error(
+        body?.message ?? validationMessage ?? body?.detail ?? body?.title ??
+          `Request failed with status ${response.status}`,
+      );
+    }
 
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } finally {
+    finishActivity();
+  }
 }
 
 export const authApi = {
