@@ -275,4 +275,6 @@ export interface AutoScenarioApi {
   saveWorkers(workers: WorkerNode[]): Promise<WorkerNode[]>;
   listOracleRules(): Promise<OracleRule[]>;
   saveOracleRules(rules: OracleRule[]): Promise<OracleRule[]>;
+  getOracleProfileState(): Promise<OracleProfileState>;
+  saveOracleProfileState(profile: OracleProfileState): Promise<OracleProfileState>;
 }

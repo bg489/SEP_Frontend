@@ -7,6 +7,7 @@ import type {
   CreateCampaignInput,
   CreateScenarioInput,
   OracleRule,
+  OracleProfileState,
   OverviewData,
   Scenario,
   ScenarioFilters,
@@ -207,6 +208,15 @@ export class HttpAutoScenarioApi implements AutoScenarioApi {
     return this.request<OracleRule[]>("/api/oracles/rules", {
       method: "PUT",
       body: JSON.stringify(rules),
+    });
+  }
+  getOracleProfileState() {
+    return this.request<OracleProfileState>("/api/oracles/profile");
+  }
+  saveOracleProfileState(profile: OracleProfileState) {
+    return this.request<OracleProfileState>("/api/oracles/profile", {
+      method: "PUT",
+      body: JSON.stringify(profile),
     });
   }
 }

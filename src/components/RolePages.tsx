@@ -766,14 +766,18 @@ function ImportScenarios({
 }
 
 function ScenarioCompare({ scenarios }: RolePagesProps) {
-  const [preferences, setPreferences] = useState(getAnalyticsPreferences);
+  const [preferences, setPreferences] = useState(() => isMockMode ? getAnalyticsPreferences() : {
+    similarityWarning: 0.78, similarityBlock: 0.93,
+    featureWeights: { map: 1, category: 1, weather: 1, severity: 1, actors: 1 },
+    retentionDays: 180, reportDays: "30", includeDrafts: false, group: "severity", weeklyEmail: true,
+  });
   useEffect(() => {
     if (isMockMode) return;
     let active = true;
     void api.getAnalyticsPreferences().then((value) => {
       if (!active) return;
       setPreferences(value);
-      saveAnalyticsPreferences(value);
+      if (isMockMode) saveAnalyticsPreferences(value);
     }).catch(() => undefined);
     return () => { active = false; };
   }, []);
@@ -1544,7 +1548,7 @@ function CampaignReport({
     ? `${Math.floor(completedRuns.reduce((sum, run) => sum + (run.durationSeconds ?? 0), 0) / 60)}m`
     : "No run data";
   const [ranking, setRanking] = useState<{ apfd: string; apfdc: string; baselineApfd: string; baselineApfdc: string; strategy: string } | undefined>(
-    () => campaign ? getRanking<{ apfd: string; apfdc: string; baselineApfd: string; baselineApfdc: string; strategy: string }>(campaign.id) : undefined,
+    () => campaign && isMockMode ? getRanking<{ apfd: string; apfdc: string; baselineApfd: string; baselineApfdc: string; strategy: string }>(campaign.id) : undefined,
   );
   useEffect(() => {
     if (!campaign) return;
@@ -2060,7 +2064,12 @@ function UserManagement({ onNotify }: RolePagesProps) {
 
 function AnalyticsSettings({ onNotify }: RolePagesProps) {
   const [settings, setSettings] = useState<AnalyticsPreferences>(() => {
-    const stored = getAnalyticsPreferences();
+    const stored: AnalyticsPreferences = isMockMode ? getAnalyticsPreferences() : {
+      similarityWarning: 0.78, similarityBlock: 0.93,
+      featureWeights: { map: 1, category: 1, weather: 1, severity: 1, actors: 1 },
+      retentionDays: 180, reportDays: "30", includeDrafts: false, group: "severity", weeklyEmail: true,
+    };
+    if (!isMockMode) return stored;
     try {
       const legacy = JSON.parse(localStorage.getItem("asx-analytics") ?? "null") as {
         days?: string; includeDrafts?: boolean; group?: string; weeklyEmail?: boolean;
@@ -2082,7 +2091,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
     void api.getAnalyticsPreferences().then((value) => {
       if (!active) return;
       setSettings(value);
-      saveAnalyticsPreferences(value);
+      if (isMockMode) saveAnalyticsPreferences(value);
     }).catch((error: unknown) => {
       if (active) onNotify(error instanceof Error ? error.message : "Could not load analytics settings.");
     });
@@ -2118,14 +2127,16 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
       onNotify(error instanceof Error ? error.message : "Could not save analytics settings.");
       return;
     }
-    saveAnalyticsPreferences(saved);
-    localStorage.setItem("asx-analytics", JSON.stringify({
-      days: settings.reportDays,
-      includeDrafts: settings.includeDrafts,
-      group: settings.group,
-      weeklyEmail: settings.weeklyEmail,
-    }));
-    appendAuditEvent({ actor: "Current administrator", action: "Updated analytics and similarity settings", target: "Workspace analytics", result: "Success" });
+    if (isMockMode) {
+      saveAnalyticsPreferences(saved);
+      localStorage.setItem("asx-analytics", JSON.stringify({
+        days: settings.reportDays,
+        includeDrafts: settings.includeDrafts,
+        group: settings.group,
+        weeklyEmail: settings.weeklyEmail,
+      }));
+      appendAuditEvent({ actor: "Current administrator", action: "Updated analytics and similarity settings", target: "Workspace analytics", result: "Success" });
+    }
     onNotify(isMockMode ? "Analytics settings saved in this browser." : "Analytics settings saved to the backend.");
   }
   return (
@@ -2254,7 +2265,7 @@ function AnalyticsSettings({ onNotify }: RolePagesProps) {
 
 function AuditLog({ onNotify }: RolePagesProps) {
   void onNotify;
-  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>(listAuditEvents);
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>(() => isMockMode ? listAuditEvents() : []);
   useEffect(() => {
     if (isMockMode) return;
     let active = true;

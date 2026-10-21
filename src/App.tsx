@@ -18,9 +18,6 @@ import {
   getOracleProfileState,
   getRanking,
   listRuns as loadRuns,
-  saveRanking,
-  saveCarlaConfig as persistCarlaConfig,
-  saveOracleProfileState,
   saveRuns as persistRuns,
 } from "./services/workflowStore";
 import { downloadCsv } from "./utils/download";
@@ -264,15 +261,19 @@ function AppContent() {
   const auth = useSelector((state: RootState) => state.auth);
   const user = auth.user;
   const [page, setPage] = useState<Page>("overview");
-  const [overview, setOverview] = useState<OverviewData>(mockOverview);
-  const [scenarios, setScenarios] = useState<Scenario[]>(mockScenarios);
-  const [campaigns, setCampaigns] = useState<Campaign[]>(mockCampaigns);
-  const [failures, setFailures] = useState<FailureCluster[]>(mockFailures);
-  const [runs, setRuns] = useState<ScenarioRun[]>(loadRuns);
-  const [workers, setWorkers] = useState<WorkerNode[]>(mockWorkers);
-  const [carlaConfig, setCarlaConfig] = useState<CarlaIntegrationConfig>(readCarlaConfig);
-  const [oracleProfile, setOracleProfile] = useState(getOracleProfileState);
-  const [rules, setRules] = useState<OracleRule[]>(mockOracleRules);
+  const [overview, setOverview] = useState<OverviewData>(isMockMode ? mockOverview : { totalScenarios: 0, activeCampaigns: 0, passRate: 0, failureClusters: 0, weeklyRuns: [], weeklyLabels: [], recentActivity: [] });
+  const [scenarios, setScenarios] = useState<Scenario[]>(isMockMode ? mockScenarios : []);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(isMockMode ? mockCampaigns : []);
+  const [failures, setFailures] = useState<FailureCluster[]>(isMockMode ? mockFailures : []);
+  const [runs, setRuns] = useState<ScenarioRun[]>(() => isMockMode ? loadRuns() : []);
+  const [workers, setWorkers] = useState<WorkerNode[]>(isMockMode ? mockWorkers : []);
+  const [carlaConfig, setCarlaConfig] = useState<CarlaIntegrationConfig>(() => isMockMode ? readCarlaConfig() : {
+    host: "127.0.0.1", rpcPort: 2000, streamingPort: 2001, carlaVersion: "0.9.16",
+    scenarioRunnerPath: "", qualityLevel: "Low", validated: false, active: false,
+    connectionStatus: "Not tested", updatedAt: "Not configured",
+  });
+  const [oracleProfile, setOracleProfile] = useState(() => isMockMode ? getOracleProfileState() : { version: 1, active: false, validated: false, updatedAt: "Not configured" });
+  const [rules, setRules] = useState<OracleRule[]>(isMockMode ? mockOracleRules : []);
   const [search, setSearch] = useState("");
   const [dialog, setDialog] = useState<"scenario" | "campaign" | null>(null);
   const [toast, setToast] = useState("");
@@ -293,6 +294,15 @@ function AppContent() {
   useEffect(() => {
     dispatch(bootstrapAuthRequested());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (isMockMode) return;
+    let active = true;
+    void api.getOracleProfileState().then((profile) => {
+      if (active) setOracleProfile(profile);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   const navigate = (target: Page) => {
     if (!rolePages[role].includes(target)) {
@@ -476,7 +486,7 @@ function AppContent() {
 
   const notify = (message: string) => setToast(message);
   const recordAuditEvent = (event: Parameters<typeof appendAuditEvent>[0]) => {
-    appendAuditEvent(event);
+    if (isMockMode) appendAuditEvent(event);
   };
   const refreshWorkspace = async () => {
     const results = await Promise.allSettled([
@@ -498,7 +508,8 @@ function AppContent() {
     if (rulesResult.status === "fulfilled") setRules(rulesResult.value);
     if (runsResult.status === "fulfilled") setRuns(runsResult.value);
     if (carlaResult.status === "fulfilled") setCarlaConfig(carlaResult.value);
-    setOracleProfile(getOracleProfileState());
+    if (isMockMode) setOracleProfile(getOracleProfileState());
+    else void api.getOracleProfileState().then(setOracleProfile).catch(() => undefined);
     notify(results.some((result) => result.status === "rejected")
       ? "Some workspace sources could not be refreshed."
       : "Workspace data refreshed from its current data source.");
@@ -522,7 +533,7 @@ function AppContent() {
   const updateRunRecords = (update: (current: ScenarioRun[]) => ScenarioRun[]) => {
     setRuns((current) => {
       const next = update(current);
-      persistRuns(next);
+      if (isMockMode) persistRuns(next);
       return next;
     });
   };
@@ -544,7 +555,7 @@ function AppContent() {
     const workerSlots = availableWorkers.flatMap((worker) =>
       Array.from({ length: worker.capacity - worker.activeRuns }, () => worker.id),
     );
-    const ranking = getRanking<{ order: string[] }>(campaignId);
+    const ranking = isMockMode ? getRanking<{ order: string[] }>(campaignId) : undefined;
     const rankedIds = ranking?.order ?? [];
     const orderedScenarios = [...campaignScenarios].sort((a, b) => {
       const ai = rankedIds.indexOf(a.id);
@@ -820,9 +831,9 @@ function AppContent() {
         validated: true,
         updatedAt: new Date().toLocaleString(),
       };
+      const savedProfile = await api.saveOracleProfileState(profile);
       setRules(saved);
-      setOracleProfile(profile);
-      saveOracleProfileState(profile);
+      setOracleProfile(savedProfile);
       recordAuditEvent({ actor: user?.name ?? "Current user", action: `Validated and activated oracle profile v${profile.version}`, target: "Default safety profile", result: "Success" });
       notify(`Oracle profile v${profile.version} validated and activated.`);
     } catch {
@@ -847,7 +858,6 @@ function AppContent() {
       return false;
     }
     setCarlaConfig(saved);
-    persistCarlaConfig(saved);
     recordAuditEvent({ actor: user?.name ?? "Current user", action: "Saved CARLA integration settings (Low quality)", target: `${saved.host}:${saved.rpcPort}`, result: "Success" });
     notify("CARLA settings saved. The connection has not been tested yet.");
     return true;
@@ -858,7 +868,6 @@ function AppContent() {
     try {
       updated = await api.testCarlaIntegration();
       setCarlaConfig(updated);
-      persistCarlaConfig(updated);
     } catch (error) {
       notify(error instanceof Error ? error.message : "CARLA/ScenarioRunner readiness check failed.");
       return;
@@ -875,7 +884,6 @@ function AppContent() {
     try {
       const saved = await api.saveCarlaIntegration(updated);
       setCarlaConfig(saved);
-      persistCarlaConfig(saved);
     } catch (error) {
       notify(error instanceof Error ? error.message : "Could not activate CARLA settings.");
       return;
@@ -2480,8 +2488,7 @@ function Prioritization({
     };
     setMetrics(result);
     const savedRanking = { strategy, weights, order: nextOrder.map((scenario) => scenario.id), ...result, calculatedAt: new Date().toISOString() };
-    saveRanking(campaign?.id ?? "unassigned", savedRanking);
-    if (campaign && !isMockMode) {
+    if (campaign) {
       void api.saveCampaignRanking(campaign.id, savedRanking).catch((error: unknown) => notify(error instanceof Error ? error.message : "Could not save the ranking to the backend."));
     }
     setRanked(true);

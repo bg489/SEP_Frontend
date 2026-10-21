@@ -4,7 +4,7 @@
 
 This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser. Authentication requests are managed with Redux Saga.
 
-The app starts in **mock mode** for UI previews. Set `VITE_DATA_MODE=api` to use the .NET REST API and PostgreSQL for scenarios, campaigns, execution queue records, failures, prioritization results, configuration, and audit history. Authentication always uses the .NET API. The browser never connects directly to PostgreSQL or Supabase.
+The app uses the .NET REST API and PostgreSQL by default for all five workflows. Every workflow request is dispatched through Redux Saga before it reaches the HTTP adapter. Set `VITE_DATA_MODE=mock` only when previewing the UI without backend workflow data. Authentication always uses the .NET API. The browser never connects directly to PostgreSQL or Supabase.
 
 ## Features by role
 
@@ -28,6 +28,7 @@ The sign-in screen includes registration and forgot-password views. Use the **EN
 ### Install and start
 
 ```powershell
+Copy-Item .env.example .env.local
 npm install
 npm run dev
 ```
@@ -49,14 +50,14 @@ Sign-in and registration always use the .NET authentication API. A user must exi
 
 ## Mock data and API integration
 
-The app uses mock scenario-management data by default, while authentication always uses the .NET backend. Copy `.env.example` to `.env.local` to set the API URL:
+The app uses the .NET backend by default. Copy `.env.example` to `.env.local` to set the API URL:
 
 ```dotenv
-VITE_DATA_MODE=mock
+VITE_DATA_MODE=api
 VITE_API_BASE_URL=http://localhost:5080
 ```
 
-Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` only switches scenario-management data; it never changes authentication. Set `VITE_DATA_MODE=api` to load workflow data from PostgreSQL. The backend applies its EF migration at startup. If an API call fails in API mode, that section shows an error instead of silently presenting seeded demo records as live data.
+Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` selects the workflow data source; it never changes authentication. Set it to `mock` to preview seeded records saved in browser storage. API mode reports failed requests instead of silently presenting those records as live data. The backend applies its EF migrations at startup and stores saved workflow data in `app_workflow` tables in PostgreSQL.
 
 ### Run backend authentication
 
@@ -67,12 +68,13 @@ Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, 
 ### Frontend service boundary
 
 - `src/data/mockData.ts` provides sample scenarios, campaigns, failures, workers, dashboard metrics, and oracle rules.
-- `src/services/mockApi.ts` implements the demo API. Mock edits are saved in browser `localStorage`.
-- `src/services/httpApi.ts` implements the .NET REST adapter for available workflow endpoints.
-- `src/services/api.ts` selects the mock or HTTP implementation using `VITE_DATA_MODE`.
+- `src/services/mockApi.ts` implements the demo adapter. Mock edits are saved in browser `localStorage`.
+- `src/services/httpApi.ts` implements the .NET REST adapter for workflow endpoints.
+- `src/services/api.ts` is the workflow API facade; UI requests are dispatched through `src/features/workflow/workflowSaga.ts`.
+- `src/services/workflowDataApi.ts` selects the mock or HTTP adapter using `VITE_DATA_MODE`.
 - `src/services/authApi.ts` sends login, registration, password-reset, and session requests to the .NET authentication API.
 - `src/features/auth/authSaga.ts` handles login, registration, session restore, password-reset requests, and logout.
-- `src/app/store.ts` creates the Redux store and runs the authentication saga.
+- `src/app/store.ts` creates the Redux store and runs authentication and workflow sagas.
 - `src/types.ts` defines the API and screen data contracts.
 
 ### .NET API endpoints used by the frontend
@@ -91,13 +93,14 @@ Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, 
 | `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm or correct a root cause |
 | `GET`, `PUT` | `/api/simulation-nodes` | Read or configure simulation node records |
 | `GET`, `PUT` | `/api/oracles/rules` | Read and save oracle rules |
+| `GET`, `PUT` | `/api/oracles/profile` | Read and save oracle profile version and activation state |
 | `GET`, `PUT`, `POST` | `/api/integration/carla`, `/api/integration/carla/test` | Save/check real CARLA and ScenarioRunner readiness; quality is fixed to Low |
 | `GET` | `/api/runs/{id}/artifacts/{fileName}` | Download the worker run log |
 | `POST` | `/api/worker-callbacks/runs/{id}` | Receive authenticated external worker callbacks |
 | `GET`, `PUT` | `/api/analytics/preferences` | Persist similarity and reporting settings |
 | `GET` | `/api/audit-log` | Read administrator audit history |
 
-API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. In API mode, imported OpenSCENARIO XML is stored with its scenario version. After the Administrator configures and activates the local .NET CARLA worker, campaigns execute through the matching CARLA 0.9.16/ScenarioRunner installation. The worker reports run states and results to PostgreSQL; the UI polls active runs and lets users download the saved ScenarioRunner log. CARLA is always started at Low quality. See `../Backend/README.md` for installation and worker callback setup. Report files are generated in the browser from persisted run and ranking data.
+API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. In API mode, imported OpenSCENARIO XML is stored with its scenario version. After the Administrator configures and activates the local .NET CARLA worker, campaigns execute through the matching CARLA 0.9.16/ScenarioRunner installation. The worker reports run states and results to PostgreSQL; the UI polls active runs and lets users download the saved ScenarioRunner log. CARLA is always started at Low quality. See `../Backend/README.md` for the database tables, installation, and worker callback setup. Report files are generated in the browser from persisted run and ranking data.
 
 ### Supabase and secrets
 
@@ -109,7 +112,8 @@ The frontend is intended to call the .NET API. Keep Supabase database access and
 src/
   components/   Authentication and role-specific screens
   data/         Initial mock data
-  services/     Mock API, HTTP API, and API selector
+  services/     Saga API facade, HTTP adapter, and mock adapter
+  features/     Authentication and workflow sagas
   App.tsx       App shell, role navigation, shared flows
   types.ts      Shared data and API contracts
   index.css     Application styling

@@ -35,6 +35,8 @@ import {
   saveAnalyticsPreferences,
   saveRanking,
   saveRuns,
+  getOracleProfileState,
+  saveOracleProfileState,
   recordScenarioVersion,
   scenarioVersionHistory,
 } from "./workflowStore";
@@ -360,5 +362,12 @@ export const mockApi: AutoScenarioApi = {
   async saveOracleRules(rules: OracleRule[]) {
     writeStored(storageKeys.oracles, rules);
     return rules;
+  },
+  async getOracleProfileState() {
+    return getOracleProfileState();
+  },
+  async saveOracleProfileState(profile) {
+    saveOracleProfileState(profile);
+    return profile;
   },
 };
