@@ -1,152 +1,118 @@
-# SEP_Frontend
+# AutoScenarioX Frontend
 
-**AutoScenarioX — Scenario Management and Explainable Failure Analytics**
+React + TypeScript, Redux Toolkit và Redux Saga; giao diện tiếng Việt/tiếng Anh với màu chủ đạo `#FF6363`, `#FCFFA7`.
 
-This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser. Authentication requests are managed with Redux Saga.
+Frontend này gọi **backend của nhóm** tại:
 
-The app uses the .NET REST API and PostgreSQL by default for all five workflows. Every workflow request is dispatched through Redux Saga before it reaches the HTTP adapter. Set `VITE_DATA_MODE=mock` only when previewing the UI without backend workflow data. Authentication always uses the .NET API. The browser never connects directly to PostgreSQL or Supabase.
+```text
+C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend
+```
 
-## Features by role
+Không chạy backend cũ ở `Project\Backend`. Các thay đổi trong nhánh này chỉ thuộc repository Frontend; backend của nhóm giữ nguyên.
 
-| Role | Screens and workflows |
+## Chức năng và nguồn dữ liệu
+
+| Chức năng | Nguồn dữ liệu / hành vi |
 | --- | --- |
-| **Scenario Engineer** | Overview, scenario library and editor, scenario import and automatic configuration validation, side-by-side comparison, scenario clusters, profile |
-| **Test Engineer** | Overview, campaign creation and management, prioritization, execution queue and run details, failure insights, campaign reports, profile |
-| **Test Reviewer** | Overview, failure evidence and root-cause review, run details, campaign reports, profile |
-| **Administrator** | Overview, user and role management, simulation nodes, test-oracle rules, analytics settings, audit log, profile |
+| Login, refresh token, current user | API `/api/v1/auth`; Supabase Auth qua .NET 8 khi cấu hình Supabase |
+| Scenario repository | API thật: tìm kiếm/phân trang, metadata, archive/restore/clone |
+| Authoring | Draft JSON theo schema; form map, route/spawn/transform, ego/NPC, pedestrian/obstacle, weather, event/trigger, parameter và execution |
+| Validate/publish | Báo cáo validation, revision/If-Match; publish phiên bản READY, giữ version bất biến |
+| Version/diff/import/export/variant | API thật; JSON/YAML; diff giữa các version của cùng scenario |
+| Campaign | API thật; chọn **scenarioVersionId READY** với search/filter; SUT Behavior Agent hoặc Autopilot |
+| Prioritization | API thật; lưu thứ tự vào campaign. APFD/APFDc là **ước lượng từ đặc trưng**, không phải kết quả đo của campaign đã chạy |
+| Execution | API thật: start/rerun, poll runs, xem Oracle evaluation/violation, tải JSON và video nếu worker đã ghi được |
+| Oracle config | Đọc cấu hình thật trong workspace execution; form sửa Oracle cũ là mock |
+| Worker settings/status, user administration, register/reset password, profile editing | **Mock/demo** vì backend chưa có API; không tạo tài khoản Supabase hoặc lưu mật khẩu |
+| Scenario clusters, failure clustering/review, APFD report, analytics settings, audit | **Mock trên trình duyệt**, có nhãn rõ ràng |
 
-The sign-in screen includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. The signed-in role always comes from the backend; mock workflow data does not enable role-preview sign-ins.
+Không tự chuyển lỗi HTTP/network của chức năng thật thành mock thành công. Mọi thao tác API từ UI đi qua Redux Saga, gồm download. Loading và khóa thao tác xuất hiện khi request đang chạy.
 
-## Scenario authoring and campaigns
+## Chạy trên máy
 
-The create form and Scenario Engineer editor configure the map, weather, ego vehicle, traffic vehicle and count, pedestrian and obstacle blueprints and counts, simulation duration, speed offset, and test intent notes. The vehicle picker includes **41 models in 6 categories** (car, truck, van, bus, motorcycle, and bicycle), with model search and category filters, from the [official CARLA vehicle catalogue](https://carla.readthedocs.io/en/latest/catalogue_vehicles/). Blueprint availability is checked against the installed simulator during execution.
+Yêu cầu Node.js tương thích Vite, npm; .NET **8 SDK** và cấu hình database theo repository backend của nhóm.
 
-The campaign picker lists scenarios that are **Ready for testing** (`Active` or `Approved`). Search by name, ID, map, description, or tag, and filter by map, scenario type, and severity. Selected scenarios remain selected when filters change; the picker displays the selected and visible counts.
-
-API requests show activity in the top bar. Actions such as saving, validation, import, campaign execution, artifact download, review, and worker configuration show loading states and prevent duplicate submissions while their requests finish.
-
-### Execution modes and current limits
-
-| Mode | Runtime behavior |
-| --- | --- |
-| **CARLA actor scene** | Creates the configured ego vehicle, traffic vehicles, pedestrians, and props, applies the map, weather, counts, duration, and driving settings, and follows a seeded road path. Route, trigger, and action free-text fields document test intent; they do not define executable trajectories. |
-| **OpenSCENARIO source** | Runs the original `.xosc` / `.osc` file saved with that scenario version through ScenarioRunner. The actor form does not rewrite the imported file. Use this mode for exact spawn positions, custom trajectories, triggers, and maneuvers. |
-
-Native actor scenes currently support collision, speed / speeding, and freezing / stagnation checks. Other enabled oracle rules are rejected before a native run is queued; use an imported OpenSCENARIO file with executable safety criteria for those checks. CARLA runs at **Low quality**. A successful native result requires the configured actors to spawn, the simulation to run, and the supported safety checks to pass; launching CARLA alone is insufficient.
-
-## Run locally
-
-### Requirements
-
-- Node.js 20.19 or newer
-- npm
-- .NET 10 SDK and PostgreSQL 18 to run the backend
-
-### Install and start
+Terminal backend:
 
 ```powershell
-Copy-Item .env.example .env.local
-npm install
+cd "C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend"
+dotnet run --project AutoScenarioX.Api --launch-profile http
+```
+
+Backend đọc connection string từ .NET user-secrets `autoscenariox-api-dev`, key `ConnectionStrings:Supabase`. Không đưa secret vào frontend/Git. Database của nhóm dùng schema `asx` và SQL migrations trong repository backend; không chạy lại seed/reset trên database dùng chung.
+
+Terminal frontend:
+
+```powershell
+cd "C:\Users\admin\Desktop\Hoc Bai\SEP\Project\Frontend"
+# Chỉ copy khi chưa có file local.
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
+npm ci
 npm run dev
 ```
 
-Open the local address printed by Vite (usually `http://localhost:5173`).
+Mở URL Vite in trong terminal, thường `http://localhost:5173`. Vite proxy `/api` tới `http://localhost:5080`; Swagger ở `http://localhost:5080/swagger`.
 
-Useful project scripts:
+### Xác thực
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the local Vite development server |
-| `npm run build` | Type-check and create a production build |
-| `npm run lint` | Run Oxlint |
-| `npm run preview` | Serve the production build locally |
+`.env.example` mặc định `VITE_AUTH_MODE=Supabase`. Backend phải có `Auth:Mode=Supabase`, `Auth:ProjectUrl`, `Auth:AnonKey` theo hướng dẫn của nhóm. Tài khoản thật đăng nhập qua API; role lấy từ backend. Register và forgot-password trong UI hiện chỉ là demo có nhãn, không tạo session/tài khoản thật.
 
-## Authentication
-
-Sign-in and registration always use the .NET authentication API. A user must exist in the PostgreSQL `autoscenariox` database (or register through the API) and provide the correct password. There are no demo credentials, local mock accounts, or role-preview sign-ins. If the API is unavailable or rejects the credentials, the frontend stays on the sign-in screen and displays the error.
-
-## Mock data and API integration
-
-The app uses the .NET backend by default. Copy `.env.example` to `.env.local` to set the API URL:
+Backend trên máy hiện cấu hình Dev; `.env.local` hiện ghép tương ứng:
 
 ```dotenv
 VITE_DATA_MODE=api
-VITE_API_BASE_URL=http://localhost:5080
+VITE_API_BASE_URL=
+VITE_AUTH_MODE=Dev
 ```
 
-Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` selects the workflow data source; it never changes authentication. Set it to `mock` to preview seeded records saved in browser storage. API mode reports failed requests instead of silently presenting those records as live data. The backend applies its EF migrations at startup and stores saved workflow data in `app_workflow` tables in PostgreSQL.
+Chọn **Open development workspace** để dùng danh tính Dev do backend cấu hình. Dev **không kiểm tra email/mật khẩu**; UI hiện cảnh báo rõ. Chuyển cả frontend và backend sang Supabase khi dùng xác thực thật. Frontend không sửa role trong database hoặc dùng role preview để vượt quyền.
 
-### Run backend authentication
+`VITE_DATA_MODE=mock` chỉ xem trước workflow, không bật phiên đăng nhập giả. `.env.local` được Git ignore.
 
-The separate backend project is in `../Backend`. It targets PostgreSQL 18 database `autoscenariox` and keeps its Identity tables in schema `app_auth`. Follow [the backend setup guide](../Backend/README.md) to configure .NET User Secrets, run the API, and optionally provision the first administrator. The API runs at `http://localhost:5080`.
+## CARLA với backend hiện có
 
-Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/forgot-password`, and `POST /api/auth/reset-password`. During registration, users may select Scenario Engineer, Test Engineer, or Test Reviewer; Administrator can only be assigned by an administrator. Administrator-only role management is provided by `GET /api/admin/users` and `PUT /api/admin/users/{id}/role`. Password-reset email delivery still needs a mail provider in production.
+CARLA cài tại `C:\Users\admin\Downloads\CARLA_0.9.16`; luôn dùng Low quality. Backend hiện **không có API quản lý process worker**, nên màn hình Worker chỉ lưu cấu hình mẫu trên trình duyệt; nó không xác nhận kết nối hoặc mở CARLA.
 
-### Frontend service boundary
+Để chạy thật, cần khởi động worker hiện có của repository backend theo hướng dẫn của nhóm. Frontend chỉ tạo/start campaign, theo dõi run và hiển thị kết quả backend trả về. Source/launcher của backend không được sửa trong nhánh này; lỗi Python/runtime thuộc backend sẽ được hiển thị, không thay bằng PASS giả.
 
-- `src/data/mockData.ts` provides sample scenarios, campaigns, failures, workers, dashboard metrics, and oracle rules.
-- `src/services/mockApi.ts` implements the demo adapter. Mock edits are saved in browser `localStorage`.
-- `src/services/httpApi.ts` implements the .NET REST adapter for workflow endpoints.
-- `src/services/api.ts` is the workflow API facade; UI requests are dispatched through `src/features/workflow/workflowSaga.ts`.
-- `src/services/workflowDataApi.ts` selects the mock or HTTP adapter using `VITE_DATA_MODE`.
-- `src/services/authApi.ts` sends login, registration, password-reset, and session requests to the .NET authentication API.
-- `src/features/auth/authSaga.ts` handles login, registration, session restore, password-reset requests, and logout.
-- `src/app/store.ts` creates the Redux store and runs authentication and workflow sagas.
-- `src/types.ts` defines the API and screen data contracts.
-
-### .NET API endpoints used by the frontend
-
-| Method | Endpoint | Used for |
-| --- | --- | --- |
-| `GET` | `/api/dashboard/overview` | Dashboard metrics and activity |
-| `GET`, `POST` | `/api/scenarios` | Search/list and create scenarios (`search`, `status`) |
-| `POST` | `/api/scenarios/import`, `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/clone` | Import, edit into a new version, or clone |
-| `GET`, `PUT`, `PATCH` | `/api/scenarios/{id}/versions`, `/api/scenarios/{id}/status`, `/api/scenarios/{id}/execution-metrics` | Version history, system-validated readiness state, execution metrics |
-| `GET`, `POST`, `PATCH` | `/api/campaigns`, `/api/campaigns/{id}` | Campaign list, create, and update |
-| `GET`, `PUT` | `/api/campaigns/{id}/ranking` | Persist prioritization order and APFD/APFDc evaluation |
-| `GET`, `POST` | `/api/runs`, `/api/campaigns/{id}/runs` | Read and queue backend run records |
-| `POST` | `/api/campaigns/{id}/runs/cancel` | Cancel queued and active campaign runs |
-| `GET`, `POST` | `/api/analytics/failure-clusters` | Failure groups and oracle evidence |
-| `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm or correct a root cause |
-| `GET`, `PUT` | `/api/simulation-nodes` | Read or configure simulation node records |
-| `GET`, `PUT` | `/api/oracles/rules` | Read and save oracle rules |
-| `GET`, `PUT` | `/api/oracles/profile` | Read and save oracle profile version and activation state |
-| `GET`, `PUT`, `POST` | `/api/integration/carla`, `/api/integration/carla/test` | Save/check real CARLA and ScenarioRunner readiness; quality is fixed to Low |
-| `GET` | `/api/runs/{id}/artifacts/{fileName}` | Download saved run logs, execution options, and simulation results |
-| `POST` | `/api/worker-callbacks/runs/{id}` | Receive authenticated external worker callbacks |
-| `GET`, `PUT` | `/api/analytics/preferences` | Persist similarity and reporting settings |
-| `GET` | `/api/audit-log` | Read administrator audit history |
-
-API responses follow the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. In API mode, scenario definitions and imported OpenSCENARIO XML are stored with their versions. After the Administrator configures and activates the local .NET CARLA worker, campaigns run against CARLA 0.9.16 using the mode above. The worker reports run states and results to PostgreSQL; the UI polls active runs and lets users download saved execution logs and evidence. See `../Backend/README.md` for database tables, installation, and worker callbacks. Report files are generated in the browser from persisted run and ranking data.
-
-### Supabase and secrets
-
-The frontend is intended to call the .NET API. Keep Supabase database access and service-role credentials on the backend; never put a service key in a `VITE_*` variable. If Supabase Auth is later used in the browser, only expose its public anon key and keep authorization checks in .NET as required.
-
-## Project structure
+Luồng dữ liệu hiện có:
 
 ```text
-src/
-  components/   Authentication and role-specific screens
-  data/         Initial mock data and official CARLA vehicle catalogue
-  hooks/        Shared API action loading and duplicate-submit protection
-  services/     Saga API facade, HTTP adapter, and mock adapter
-  features/     Authentication and workflow sagas
-  App.tsx       App shell, role navigation, shared flows
-  types.ts      Shared data and API contracts
-  index.css     Application styling
+UI → Redux Saga → teamClient → .NET API → Supabase PostgreSQL
+                                   ↑
+                    Python worker ↔ CARLA 0.9.16
 ```
 
-## Git workflow
+Scenario phải được save/validate/publish READY trước khi chọn vào campaign. Start campaign chỉ tạo hàng đợi; cần worker thực sự claim/chạy/upload telemetry để có kết quả. Rerun hiện **xóa run cũ của campaign** và UI yêu cầu xác nhận. Backend chưa có cancel campaign.
 
-This frontend folder is a Git repository with an `origin` remote. Create a feature branch for work intended to merge into `main`, then push that branch and open a pull request:
+Backend nhóm dùng canonical JSON/YAML và Python API worker. Nó không dùng endpoint OpenSCENARIO/ScenarioRunner của backend cũ. Không diễn giải các ghi chú tự do thành route/event có thể thực thi.
+
+Tham khảo chính thức: [Synchrony](https://carla.readthedocs.io/en/0.9.16/adv_synchrony_timestep/), [Traffic Manager](https://carla.readthedocs.io/en/0.9.16/adv_traffic_manager/), [Rendering/Low](https://carla.readthedocs.io/en/0.9.16/adv_rendering_options/). Low vẫn render; no-rendering làm camera/GPU sensor trả dữ liệu rỗng.
+
+## Cấu trúc tích hợp
+
+- `src/services/backendCapabilities.ts`: module thật/mock.
+- `src/services/teamClient.ts`: auth token/refresh, ProblemDetails, loading/download.
+- `src/services/teamScenarios.ts`: repository, draft, version, handoff.
+- `src/services/teamOperations.ts`: campaign/run/Oracle DTO.
+- `src/components/TeamScenarioWorkspace.tsx`, `TeamOperationsWorkspace.tsx`: màn hình theo contract backend nhóm.
+
+Để deploy ở origin khác, đặt `VITE_API_BASE_URL` và CORS theo backend. `TEAM_API_TARGET` thay đích proxy của Vite khi phát triển. Không đặt Supabase service-role key, DB password hoặc connection string trong biến `VITE_*`.
+
+## Git
+
+Làm việc trên nhánh tính năng, commit theo chức năng; không push trực tiếp main. Yêu cầu hiện tại chỉ commit, chưa push.
 
 ```powershell
-git switch -c feature/short-description
+git branch --show-current
 git status
-git add <files-to-include>
-git commit -m "feat: describe the change"
-git push -u origin feature/short-description
+git log --oneline -8
+# Khi đã kiểm tra và muốn push nhánh hiện tại:
+git push -u origin HEAD
 ```
 
-Review `git status` before committing. Do not push directly to `main`. The backend is a sibling repository; commit and push its changes separately. To verify the frontend remote, run `git remote -v`.
+### Giới hạn worker đã đối chiếu trong source backend
+
+Worker hiện gọi recorder với `record_video`, `lite`, `max_sim_s`, nhưng hàm recorder chưa nhận các đối số này; worker cũng mong tuple trong khi recorder hiện trả đường dẫn string. Vì vậy việc start campaign qua API chưa đồng nghĩa có thể chạy CARLA thành công.
+
+Recorder hiện chỉ hỗ trợ `pedestrian_crossing`, `lead_vehicle_brake`; chưa thực thi `vehicle_cut_in`, `traffic_light_override`, SUT Autopilot và kiểm tra red-light. Worker chỉ gửi header Dev, chưa hỗ trợ Bearer Supabase. Các lỗi/giới hạn này thuộc backend hiện có và không được sửa trong công việc frontend này. Không dùng `--simulate` để xác nhận chạy CARLA thật.
