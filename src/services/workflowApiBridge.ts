@@ -34,10 +34,10 @@ export function requestWorkflowApi<T>(method: keyof AutoScenarioApi, args: unkno
   });
 }
 
-export function settleWorkflowApiRequest(requestId: string, result?: unknown, error?: string): void {
+export function settleWorkflowApiRequest(requestId: string, result?: unknown, error?: Error): void {
   const deferred = pending.get(requestId);
   if (!deferred) return;
   pending.delete(requestId);
-  if (error) deferred.reject(new Error(error));
+  if (error) deferred.reject(error);
   else deferred.resolve(result);
 }

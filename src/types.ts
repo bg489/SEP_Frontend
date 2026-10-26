@@ -1,7 +1,7 @@
 export type ScenarioStatus = "Active" | "Approved" | "In review" | "Draft" | "Archived";
 export type CampaignStatus =
   "Running" | "Queued" | "Completed" | "Draft" | "Needs review" | "Failed" | "Cancelled";
-export type RunVerdict = "PASS" | "FAIL" | "TIMEOUT";
+export type RunVerdict = "PASS" | "FAIL" | "TIMEOUT" | "ERROR";
 export type UserRole =
   "Scenario Engineer" | "Test Engineer" | "Test Reviewer" | "Administrator";
 
@@ -265,6 +265,8 @@ export interface ScenarioFilters {
 }
 
 export interface AutoScenarioApi {
+  backendRequest<T>(path: string, init?: RequestInit): Promise<T>;
+  backendDownload(path: string, fileName: string): Promise<void>;
   getOverview(): Promise<OverviewData>;
   getCarlaIntegration(): Promise<CarlaIntegrationConfig>;
   saveCarlaIntegration(config: CarlaIntegrationConfig): Promise<CarlaIntegrationConfig>;

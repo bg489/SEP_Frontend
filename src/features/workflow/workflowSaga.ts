@@ -22,7 +22,7 @@ function* processWorkflowRequest(action: PayloadAction<WorkflowApiRequest>) {
     settleWorkflowApiRequest(
       requestId,
       undefined,
-      error instanceof Error ? error.message : "Workflow API request failed.",
+      error instanceof Error ? error : new Error("Workflow API request failed."),
     );
   }
 }
