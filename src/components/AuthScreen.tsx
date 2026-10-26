@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Icon } from "./Icon";
-import { LanguageSwitcher, useLocale } from "../i18n";
+import { LanguageSwitcher } from "../i18n";
+import { useLocale } from "../localeContext";
 import type { LoginInput, RegisterInput, RegistrationRole } from "../services/authApi";
 import { isTeamDevAuth } from "../services/authConfig";
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useLocale } from "../i18n";
+import { useLocale } from "../localeContext";
 import { carlaVehicles } from "../data/carlaVehicles";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import type {

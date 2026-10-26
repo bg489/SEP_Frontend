@@ -1,22 +1,15 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { vietnameseTranslations } from "./translations";
-
-export type Locale = "en" | "vi";
+import { LocaleContext, useLocale, type Locale } from "./localeContext";
 
 type TranslationState = { source: string; lastApplied: string };
 type AttributeStates = Map<string, TranslationState>;
 
-const LocaleContext = createContext<{
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-} | null>(null);
 const textStates = new WeakMap<Text, TranslationState>();
 const attributeStates = new WeakMap<Element, AttributeStates>();
 const translatedAttributes = ["placeholder", "title", "aria-label", "alt"] as const;
@@ -296,12 +289,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
-}
-
-export function useLocale() {
-  const context = useContext(LocaleContext);
-  if (!context) throw new Error("useLocale must be used inside LanguageProvider");
-  return context;
 }
 
 export function LanguageSwitcher({ className = "" }: { className?: string }) {

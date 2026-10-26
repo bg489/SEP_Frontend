@@ -1,4 +1,10 @@
 const entries: [string, string][] = [
+  ["Worker setup", "Cấu hình worker"],
+  ["Run results", "Kết quả thực thi"],
+  ["Status unavailable via API", "API chưa cung cấp trạng thái"],
+  ["Status not exposed by backend", "Backend chưa cung cấp trạng thái"],
+  ["Development authentication", "Xác thực phát triển"],
+  ["Campaign saved to the backend.", "Đã lưu campaign vào backend."],
   ["Overview", "Tổng quan"],
   ["Workspace", "Không gian làm việc"],
   ["Account", "Tài khoản"],
