@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Icon } from "./Icon";
-import { LanguageSwitcher } from "../i18n";
+import { LanguageSwitcher, useLocale } from "../i18n";
 import type { LoginInput, RegisterInput, RegistrationRole } from "../services/authApi";
+import { isTeamDevAuth } from "../services/authConfig";
 
 type AuthMode = "login" | "register" | "forgot";
 
@@ -30,6 +31,9 @@ export function AuthScreen({
 }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("login");
   const submitted = useRef(false);
+  const { locale } = useLocale();
+  const text = (en: string, vi: string) => locale === "vi" ? vi : en;
+  const developmentLogin = mode === "login" && isTeamDevAuth;
 
   useEffect(() => {
     if (!busy) submitted.current = false;
@@ -39,6 +43,10 @@ export function AuthScreen({
     event.preventDefault();
     if (busy || submitted.current) return;
     submitted.current = true;
+    if (developmentLogin) {
+      onLogin({ email: "", password: "" });
+      return;
+    }
     const data = new FormData(event.currentTarget);
     const email = String(data.get("email") ?? "")
       .trim()
@@ -100,7 +108,7 @@ export function AuthScreen({
         <div className="auth-preview-card">
           <div className="auth-preview-top">
             <span>
-              <i /> LIVE CAMPAIGN
+              <i /> DEMO CAMPAIGN
             </span>
             <b>68%</b>
           </div>
@@ -169,17 +177,19 @@ export function AuthScreen({
             </div>
             <h2>
               {mode === "login"
-                ? "Sign in to your workspace"
+                ? developmentLogin ? text("Development workspace", "Không gian phát triển") : "Sign in to your workspace"
                 : mode === "register"
-                  ? "Create your account"
-                  : "Reset your password"}
+                  ? text("Registration preview", "Xem trước đăng ký")
+                  : text("Password recovery preview", "Xem trước khôi phục mật khẩu")}
             </h2>
             <p>
               {mode === "login"
-                ? "Sign in with an account registered in the AutoScenarioX database."
+                ? developmentLogin
+                  ? text("Use the development account configured on the team backend. This mode does not verify a password.", "Sử dụng tài khoản phát triển được cấu hình ở backend nhóm. Chế độ này không kiểm tra mật khẩu.")
+                  : text("Sign in with a Supabase account that has access to AutoScenarioX.", "Đăng nhập bằng tài khoản Supabase được cấp quyền vào AutoScenarioX.")
                 : mode === "register"
-                  ? "Create an account with your work email and choose your role. Administrator access is assigned separately."
-                  : "Enter your email and we’ll prepare a reset request."}
+                  ? text("Demo only. Registration is not available in the team backend yet. This form creates no account and stores no password.", "Chỉ mô phỏng. Backend nhóm chưa hỗ trợ đăng ký. Biểu mẫu không tạo tài khoản và không lưu mật khẩu.")
+                  : text("Demo only. The team backend has no password recovery endpoint. No reset email will be sent.", "Chỉ mô phỏng. Backend nhóm chưa có API khôi phục mật khẩu. Hệ thống sẽ không gửi email đặt lại.")}
             </p>
           </div>
 
@@ -198,7 +208,7 @@ export function AuthScreen({
               </div>
             </label>
           )}
-          <label className="auth-label">
+          {!developmentLogin && <label className="auth-label">
             Work email
             <div className="auth-input">
               <Icon name="link" size={16} />
@@ -211,8 +221,8 @@ export function AuthScreen({
                 autoComplete="email"
               />
             </div>
-          </label>
-          {mode !== "forgot" && (
+          </label>}
+          {mode !== "forgot" && !developmentLogin && (
             <label className="auth-label">
               Password
               <div className="auth-input">
@@ -222,8 +232,8 @@ export function AuthScreen({
                   disabled={busy}
                   type="password"
                   required
-                  minLength={8}
-                  placeholder="8+ characters with upper/lowercase, number and symbol"
+                  minLength={mode === "register" ? 8 : 1}
+                  placeholder={mode === "register" ? "8+ characters" : "Your password"}
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
@@ -255,6 +265,10 @@ export function AuthScreen({
               </select>
             </label>
           )}
+          {developmentLogin && <div className="auth-role-note" role="status">
+            <Icon name="warning" size={15} />
+            {text("Development authentication is enabled explicitly. The backend decides the account and role; use Supabase mode for real sign-in.", "Đang bật xác thực phát triển theo cấu hình. Backend quyết định tài khoản và role; dùng chế độ Supabase khi cần đăng nhập thật.")}
+          </div>}
           {mode === "register" && (
             <div className="auth-role-note">
               <Icon name="shield" size={15} />
@@ -278,10 +292,10 @@ export function AuthScreen({
             {busy
               ? "Please wait…"
               : mode === "login"
-                ? "Sign in"
+                ? developmentLogin ? text("Open development workspace", "Mở không gian phát triển") : "Sign in"
                 : mode === "register"
-                  ? "Create account"
-                  : "Send reset link"}
+                  ? text("Check demo form", "Kiểm tra biểu mẫu mô phỏng")
+                  : text("Preview recovery request", "Xem trước yêu cầu khôi phục")}
             {!busy && <Icon name="arrow-right" size={16} />}
           </button>
           <div className="auth-switch">
@@ -295,7 +309,7 @@ export function AuthScreen({
                     setMode("register");
                   }}
                 >
-                  Create an account
+                  {text("Preview registration", "Xem trước đăng ký")}
                 </button>
               </>
             ) : (
@@ -314,7 +328,7 @@ export function AuthScreen({
             )}
           </div>
           <div className="auth-footnote">
-            <i /> Secure sign-in · Role-based access
+            <i /> {developmentLogin ? text("Development access · Backend account", "Truy cập phát triển · Tài khoản backend") : "Secure sign-in · Role-based access"}
           </div>
         </form>
       </section>

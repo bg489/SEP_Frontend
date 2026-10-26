@@ -62,8 +62,16 @@ const authSlice = createSlice({
     },
     authFailed(state, action: PayloadAction<string>) {
       state.status = "anonymous";
+      state.user = null;
       state.busy = false;
       state.error = action.payload;
+    },
+    authDemoCompleted(state, action: PayloadAction<string>) {
+      state.status = "anonymous";
+      state.user = null;
+      state.busy = false;
+      state.error = null;
+      state.message = action.payload;
     },
     passwordResetSucceeded(state, action: PayloadAction<string>) {
       state.busy = false;
@@ -110,6 +118,7 @@ const authSlice = createSlice({
 
 export const {
   authAnonymous,
+  authDemoCompleted,
   authFailed,
   authSucceeded,
   adminRoleChangeRequested,
