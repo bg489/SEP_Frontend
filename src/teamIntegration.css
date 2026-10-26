@@ -1,0 +1,3 @@
+.capability-banner{display:flex;flex-direction:column;gap:6px;padding:15px 19px;border:1px solid #e1e7ef;border-left:4px solid #ff6363;background:#fff;border-radius:12px;margin-bottom:20px;font-size:12px;line-height:1.65;color:#52627c}
+.capability-banner strong{color:#19273e;font-size:13px}.capability-banner.mock{background:#fffde8;border-color:#ece6b8;border-left-color:#e8bd38}.capability-banner.mixed{background:#fffdf0}
+.capability-banner span{max-width:1100px}.toast-message{white-space:pre-line}

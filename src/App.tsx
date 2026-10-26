@@ -11,6 +11,13 @@ import { Icon, type IconName } from "./components/Icon";
 import { AuthScreen } from "./components/AuthScreen";
 import { RolePages, RoleWelcome } from "./components/RolePages";
 import { LanguageProvider, LanguageSwitcher } from "./i18n";
+import { useLocale } from "./localeContext";
+import { TeamScenarioWorkspace } from "./components/TeamScenarioWorkspace";
+import { TeamOperationsWorkspace } from "./components/TeamOperationsWorkspace";
+import { TeamOverview } from "./components/TeamOverview";
+import { TeamScenarioService } from "./services/teamScenarios";
+import { moduleSource, teamOperationPages, teamScenarioPages, usesTeamBackend } from "./services/backendCapabilities";
+import { isTeamDevAuth } from "./services/authConfig";
 import { api, isMockMode } from "./services/api";
 import {
   appendAuditEvent,
@@ -26,6 +33,7 @@ import { subscribeToApiActivity } from "./services/apiActivity";
 import { carlaObstacleOptions, carlaPedestrians } from "./data/carlaVehicles";
 import { VehicleSelect } from "./components/VehicleSelect";
 import { useAsyncAction } from "./hooks/useAsyncAction";
+import "./teamIntegration.css";
 import type { AppDispatch, RootState } from "./app/store";
 import {
   bootstrapAuthRequested,
@@ -60,6 +68,8 @@ import type {
 } from "./types";
 
 type Page = AppPage;
+const sagaTeamClient = { request: api.backendRequest, download: api.backendDownload };
+const teamScenarios = new TeamScenarioService(sagaTeamClient);
 const rolePages: Record<UserRole, Page[]> = {
   "Scenario Engineer": [
     "overview",
@@ -76,6 +86,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "priority",
     "execution",
     "run-detail",
+    "nodes",
     "failures",
     "report",
     "profile",
@@ -90,6 +101,8 @@ const rolePages: Record<UserRole, Page[]> = {
   ],
   Administrator: [
     "overview",
+    "scenarios", "scenario-editor", "import", "compare", "clusters",
+    "campaigns", "priority", "execution", "run-detail", "failures", "report",
     "users",
     "nodes",
     "oracles",
@@ -150,6 +163,7 @@ const navByRole: Record<
       icon: "play",
       group: "TESTING",
     },
+    { id: "nodes", label: "Worker setup", icon: "nodes", group: "TESTING" },
     {
       id: "failures",
       label: "Failure insights",
@@ -167,6 +181,7 @@ const navByRole: Record<
   "Test Reviewer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
     { id: "review", label: "Review queue", icon: "shield", group: "REVIEW" },
+    { id: "run-detail", label: "Run results", icon: "play", group: "REVIEW" },
     {
       id: "failures",
       label: "Failure evidence",
@@ -183,6 +198,10 @@ const navByRole: Record<
   ],
   Administrator: [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
+    { id: "scenarios", label: "Scenario library", icon: "scenarios", group: "DESIGN" },
+    { id: "campaigns", label: "Campaigns", icon: "campaigns", group: "TESTING" },
+    { id: "priority", label: "Prioritization", icon: "priority", group: "TESTING" },
+    { id: "execution", label: "Execution queue", icon: "play", group: "TESTING" },
     { id: "users", label: "User management", icon: "users", group: "ACCESS" },
     { id: "nodes", label: "Simulation nodes", icon: "nodes", group: "SYSTEM" },
     { id: "oracles", label: "Test oracles", icon: "oracles", group: "SYSTEM" },
@@ -261,9 +280,12 @@ export default function App() {
 }
 
 function AppContent() {
+  const { locale } = useLocale();
+  const vi = locale === "vi";
   const dispatch = useDispatch<AppDispatch>();
   const auth = useSelector((state: RootState) => state.auth);
   const user = auth.user;
+  const [profilePreview, setProfilePreview] = useState<DemoUser | null>(null);
   const [page, setPage] = useState<Page>("overview");
   const [overview, setOverview] = useState<OverviewData>(isMockMode ? mockOverview : { totalScenarios: 0, activeCampaigns: 0, passRate: 0, failureClusters: 0, weeklyRuns: [], weeklyLabels: [], recentActivity: [] });
   const [scenarios, setScenarios] = useState<Scenario[]>(isMockMode ? mockScenarios : []);
@@ -279,8 +301,17 @@ function AppContent() {
   const [oracleProfile, setOracleProfile] = useState(() => isMockMode ? getOracleProfileState() : { version: 1, active: false, validated: false, updatedAt: "Not configured" });
   const [rules, setRules] = useState<OracleRule[]>(isMockMode ? mockOracleRules : []);
   const [search, setSearch] = useState("");
-  const [dialog, setDialog] = useState<"scenario" | "campaign" | null>(null);
+  const [dialog, setDialogState] = useState<"scenario" | "campaign" | null>(null);
+  const setDialog = (next: "scenario" | "campaign" | null) => {
+    if (usesTeamBackend && next) {
+      if (next === "scenario") { setEditorScenarioId(undefined); setPage("scenario-editor"); }
+      else setPage("campaigns");
+      return;
+    }
+    setDialogState(next);
+  };
   const [toast, setToast] = useState("");
+  const notify = (message: string) => setToast(message);
   const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(
     null,
   );
@@ -305,19 +336,26 @@ function AppContent() {
   const cancelledRunIds = useRef(new Set<string>());
   const role = user?.role ?? "Test Engineer";
   useEffect(() => {
+    if (!user) { setProfilePreview(null); return; }
+    try {
+      const saved = JSON.parse(localStorage.getItem(`autoscenariox.mock.profile.${user.email}`) ?? "null") as DemoUser | null;
+      setProfilePreview(saved && typeof saved.name === "string" && typeof saved.email === "string" ? { ...saved, role: user.role } : null);
+    } catch { setProfilePreview(null); }
+  }, [user]);
+  useEffect(() => {
     dispatch(bootstrapAuthRequested());
   }, [dispatch]);
 
   useEffect(() => subscribeToApiActivity(setApiRequestCount), []);
 
   useEffect(() => {
-    if (isMockMode) return;
+    if (isMockMode || auth.status !== "authenticated") return;
     let active = true;
     void api.getOracleProfileState().then((profile) => {
       if (active) setOracleProfile(profile);
     }).catch(() => undefined);
     return () => { active = false; };
-  }, []);
+  }, [auth.status]);
 
   const navigate = (target: Page) => {
     if (!rolePages[role].includes(target)) {
@@ -328,7 +366,12 @@ function AppContent() {
     setSelectedScenario(null);
   };
   const updateUser = (next: DemoUser) => {
-    if (isAuthApiEnabled) return;
+    if (isAuthApiEnabled) {
+      const demo = { ...next, role: user?.role ?? next.role };
+      localStorage.setItem(`autoscenariox.mock.profile.${user?.email}`, JSON.stringify(demo));
+      setProfilePreview(demo);
+      return;
+    }
     localStorage.setItem("asx-session", JSON.stringify(next));
   };
   const signOut = () => {
@@ -337,6 +380,7 @@ function AppContent() {
   };
 
   useEffect(() => {
+    if (auth.status !== "authenticated") { setReady(false); return; }
     let mounted = true;
     Promise.allSettled([
       api.getOverview(),
@@ -379,10 +423,10 @@ function AppContent() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [auth.status, user?.email, user?.role]);
 
   useEffect(() => {
-    if (!runs.length) return;
+    if (usesTeamBackend || !runs.length) return;
     const terminalStates = new Set(["Passed", "Failed", "Cancelled", "Timed Out"]);
     const updates: Campaign[] = [];
     const nextCampaigns = campaigns.map((campaign) => {
@@ -426,7 +470,7 @@ function AppContent() {
   }, [runs]);
 
   useEffect(() => {
-    if (!ready || isMockMode) return;
+    if (!ready || isMockMode || auth.status !== "authenticated" || page !== "overview") return;
     let mounted = true;
     let inFlight = false;
     const refreshExecution = async () => {
@@ -451,7 +495,7 @@ function AppContent() {
       mounted = false;
       window.clearInterval(timer);
     };
-  }, [ready]);
+  }, [ready, auth.status, page]);
 
   useEffect(() => {
     if (!toast) return;
@@ -460,7 +504,7 @@ function AppContent() {
   }, [toast]);
 
   useEffect(() => {
-    if (!ready || page !== "scenarios") return;
+    if (usesTeamBackend || !ready || page !== "scenarios") return;
     let active = true;
     const timer = window.setTimeout(() => {
       api
@@ -499,7 +543,6 @@ function AppContent() {
     [scenarios, search, statusFilter],
   );
 
-  const notify = (message: string) => setToast(message);
   const recordAuditEvent = (event: Parameters<typeof appendAuditEvent>[0]) => {
     if (isMockMode) appendAuditEvent(event);
   };
@@ -530,6 +573,7 @@ function AppContent() {
       : "Workspace data refreshed from its current data source.");
   };
   const openScenario = (scenario: Scenario) => {
+    if (usesTeamBackend) { setEditorScenarioId(scenario.id); navigate("scenario-editor"); return; }
     setSelectedScenario(scenario);
     setScenarioVersions([]);
     void api.listScenarioVersions(scenario.id).then(setScenarioVersions).catch(() => setScenarioVersions([]));
@@ -745,6 +789,9 @@ function AppContent() {
     notify("Campaign cancellation requested; queued mock runs were stopped.");
   };
   const reexecuteFailure = async (failure: FailureCluster) => {
+    if (usesTeamBackend) return notify(vi
+      ? "Đây là dữ liệu mẫu. Hãy tạo campaign bằng phiên bản READY trong mục Campaigns để chạy CARLA thật."
+      : "This is mock evidence. Create a campaign with READY versions in Campaigns to run CARLA.");
     const scenario = scenarios.find((item) => item.name === failure.scenarioName);
     if (!scenario) return notify("The source scenario for this failure is no longer available.");
     if (scenario.status !== "Active" && scenario.status !== "Approved") return notify(`${scenario.id} must be Active before re-execution.`);
@@ -998,7 +1045,7 @@ function AppContent() {
       (campaignScenarioCategory === "All types" || scenario.category === campaignScenarioCategory) &&
       (campaignScenarioSeverity === "All severities" || scenario.severity === campaignScenarioSeverity);
   });
-  const action =
+  const action = usesTeamBackend && [...teamScenarioPages, ...teamOperationPages].includes(page) ? null :
     page === "scenarios" ? (
       <div className="actions">
         <button className="btn btn-light" onClick={() => navigate("import")}>
@@ -1014,7 +1061,7 @@ function AppContent() {
     ) : (page === "campaigns" || page === "overview") &&
       role === "Test Engineer" ? (
       <button className="btn btn-primary" onClick={openCampaignDialog}>
-        <Icon name="plus" size={16} /> New campaign
+        <Icon name="plus" size={16} /> {usesTeamBackend ? "Open campaigns" : "New campaign"}
       </button>
     ) : page === "oracles" && role === "Administrator" ? (
       <button className="btn btn-light" disabled={actions.isPending("rules")} onClick={() => void actions.run("rules", () => saveRules(rules))}>
@@ -1096,7 +1143,7 @@ function AppContent() {
                   >
                     <Icon name={n.icon} size={17} />
                     <span>{n.label}</span>
-                    {n.id === "failures" && <em>12</em>}
+                    {n.id === "failures" && <em>{usesTeamBackend ? "Mock" : failures.length}</em>}
                   </button>
                 ))}
             </div>
@@ -1111,18 +1158,11 @@ function AppContent() {
             <span>
               <b>Simulation cluster</b>
               <small>
-                <i /> {workers.filter((w) => w.status !== "Offline").length} of{" "}
-                {workers.length} workers online
+                <i /> {usesTeamBackend ? "Status unavailable via API" : `${workers.filter((w) => w.status !== "Offline").length} of ${workers.length} workers online`}
               </small>
             </span>
             <button
-              onClick={() =>
-                role === "Administrator"
-                  ? navigate("nodes")
-                  : notify(
-                      "Simulation node administration is available to Administrators.",
-                    )
-              }
+              onClick={() => navigate("nodes")}
             >
               <Icon name="arrow-right" size={14} />
             </button>
@@ -1272,10 +1312,29 @@ function AppContent() {
               <i /> Loading workspace data
             </div>
           )}
+          <div className={`capability-banner ${moduleSource(page)}`} role="note">
+            <strong>{moduleSource(page) === "mock" ? (vi ? "Dữ liệu mẫu" : "Mock data") : moduleSource(page) === "mixed" ? (vi ? "Nguồn dữ liệu theo chức năng" : "Data source by feature") : (vi ? "Backend nhóm · API thật" : "Team backend · Live API")}</strong>
+            <span>{moduleSource(page) === "mock"
+              ? (vi ? "Backend mới chưa có API cho chức năng này. Thao tác chỉ dùng dữ liệu mẫu trên trình duyệt." : "The new backend has no API for this module. Actions use browser mock data.")
+              : moduleSource(page) === "mixed"
+                ? page === "oracles"
+                  ? (vi ? "Cấu hình Oracle phía trên lấy từ backend. Form chỉnh sửa mẫu phía dưới chỉ lưu trong trình duyệt, không thay đổi ngưỡng đánh giá thật." : "The Oracle configurations above come from the backend. The demo editor below saves only in this browser and does not change actual evaluation thresholds.")
+                  : (vi ? "Scenario, campaign và kết quả chạy lấy từ API. Phân cụm lỗi, báo cáo APFD, quản trị tài khoản và tùy chỉnh hồ sơ dùng dữ liệu mẫu." : "Scenarios, campaigns and run results use the API. Failure clustering, APFD reports, user administration and profile changes use mock data.")
+                : (vi ? "Dữ liệu được đọc và ghi qua Redux Saga tới backend AutoScenarioX mới." : "Data is read and written through Redux Saga to the new AutoScenarioX backend.")}</span>
+          </div>
+          {isTeamDevAuth && <div className="capability-banner mock" role="note"><strong>Development authentication</strong><span>{vi ? "Chế độ Dev dùng danh tính cấu hình trong backend; không kiểm tra mật khẩu. Đặt Auth:Mode=Supabase và VITE_AUTH_MODE=Supabase để đăng nhập thật." : "Dev uses the identity configured in the backend without password verification. Set Auth:Mode=Supabase and VITE_AUTH_MODE=Supabase for real sign-in."}</span></div>}
+          {usesTeamBackend && ["execution", "run-detail", "nodes"].includes(page) && <div className="capability-banner mock" role="note"><strong>{vi ? "Giới hạn của worker backend hiện tại" : "Current backend worker limitation"}</strong><span>{vi ? "Worker hiện truyền các đối số record_video/lite/max_sim_s mà recorder chưa nhận, nên chạy CARLA thật sẽ gặp lỗi hạ tầng. Frontend vẫn tạo và theo dõi hàng đợi qua API; cần nhóm backend sửa worker để thực thi thành công. Backend được giữ nguyên theo yêu cầu của bạn." : "The existing worker passes record_video/lite/max_sim_s arguments that its recorder does not accept, so real CARLA execution fails as an infrastructure error. The frontend can create and monitor the API queue; the backend team needs to repair the worker for successful execution. Backend code remains unchanged."}</span></div>}
+          {usesTeamBackend && teamScenarioPages.includes(page) && <TeamScenarioWorkspace
+            service={teamScenarios} page={page} initialScenarioId={editorScenarioId} onChanged={refreshWorkspace} onNotify={notify} />}
+          {usesTeamBackend && teamOperationPages.includes(page) && <TeamOperationsWorkspace
+            client={sagaTeamClient} page={page} role={role} onNavigate={navigate} onChanged={refreshWorkspace} onNotify={notify} />}
+          {usesTeamBackend && page === "oracles" && <section><div className="capability-banner mock"><strong>{vi ? "Form chỉnh sửa Oracle · Mock" : "Oracle editor · Mock"}</strong><span>{vi ? "Backend hiện chưa có API chỉnh sửa Oracle. Form này không thay đổi cấu hình thật phía trên." : "The backend has no Oracle editing API. This form does not change the actual configurations above."}</span></div><Oracles rules={rules} profile={oracleProfile} onSave={saveRules} /></section>}
+          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages].includes(page)) && <>
           {page === "overview" && (
             <RoleWelcome role={role} onNavigate={navigate} />
           )}
-          {page === "overview" && (
+          {page === "overview" && usesTeamBackend && <TeamOverview overview={overview} scenarios={scenarios} campaigns={campaigns} role={role} onNavigate={navigate} onScenario={openScenario} />}
+          {page === "overview" && !usesTeamBackend && (
             <Overview
               role={role}
               overview={overview}
@@ -1366,9 +1425,9 @@ function AppContent() {
           ].includes(page) && (
             <RolePages
               page={page}
-              user={user}
-              scenarios={scenarios}
-              campaigns={campaigns}
+              user={page === "profile" && profilePreview ? profilePreview : user}
+              scenarios={usesTeamBackend ? mockScenarios : scenarios}
+              campaigns={usesTeamBackend ? mockCampaigns : campaigns}
               failures={failures}
               runs={runs}
               workers={workers}
@@ -1423,6 +1482,7 @@ function AppContent() {
               }}
             />
           )}
+          </>}
           <footer className="page-footer">
             <span>
               AutoScenarioX <i>·</i> Scenario testing workspace
@@ -1433,7 +1493,7 @@ function AppContent() {
                 <i />{" "}
                 {isMockMode
                   ? workers.some((w) => w.status !== "Offline") ? "Mock ready" : "Needs attention"
-                  : carlaConfig.active ? "Worker active" : "Needs attention"}
+                  : "Status not exposed by backend"}
               </b>
             </span>
           </footer>
