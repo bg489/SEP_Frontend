@@ -17,8 +17,10 @@ import { TeamOperationsWorkspace } from "./components/TeamOperationsWorkspace";
 import { TeamOverview } from "./components/TeamOverview";
 import { BackendDataWorkspace } from "./components/BackendDataWorkspace";
 import { WorkerProtocolPanel } from "./components/WorkerProtocolPanel";
+import { TeamFailureAnalysisWorkspace } from "./components/TeamFailureAnalysisWorkspace";
+import { TeamCoveragePanel } from "./components/TeamCoveragePanel";
 import { TeamScenarioService } from "./services/teamScenarios";
-import { moduleSource, teamOperationPages, teamScenarioPages, teamUtilityPages, usesTeamBackend } from "./services/backendCapabilities";
+import { moduleSource, teamAnalysisPages, teamOperationPages, teamScenarioPages, teamUtilityPages, usesTeamBackend } from "./services/backendCapabilities";
 import { isTeamDevAuth } from "./services/authConfig";
 import { DevRoleSelect } from "./components/DevRoleSelect";
 import { getDevRole } from "./services/devRole";
@@ -83,7 +85,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "import",
     "compare",
     "clusters",
-    "backend-data",
+    "backend-data", "coverage", "failures", "review", "report",
     "run-detail", "oracles",
     "profile",
   ],
@@ -94,7 +96,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "execution",
     "run-detail",
     "nodes",
-    "backend-data", "worker-protocol", "oracles",
+    "backend-data", "coverage", "worker-protocol", "oracles", "review",
     "failures",
     "report",
     "profile",
@@ -105,7 +107,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "failures",
     "report",
     "run-detail",
-    "backend-data", "oracles",
+    "backend-data", "coverage", "oracles",
     "profile",
   ],
   Administrator: [
@@ -113,7 +115,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "scenarios", "scenario-editor", "import", "compare", "clusters",
     "campaigns", "priority", "execution", "run-detail", "failures", "report",
     "users",
-    "backend-data", "worker-protocol",
+    "backend-data", "coverage", "worker-protocol", "review",
     "nodes",
     "oracles",
     "analytics",
@@ -128,6 +130,7 @@ const navByRole: Record<
   "Scenario Engineer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
     { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
+    { id: "coverage", label: "Scenario coverage", icon: "map", group: "WORKSPACE" },
     {
       id: "scenarios",
       label: "Scenario library",
@@ -154,11 +157,17 @@ const navByRole: Record<
     },
     { id: "run-detail", label: "Run results", icon: "play", group: "EXPLORE" },
     { id: "oracles", label: "Test oracles", icon: "oracles", group: "EXPLORE" },
+    ...(usesTeamBackend ? [
+      { id: "failures" as const, label: "Failure insights", icon: "failures" as const, group: "ANALYZE" },
+      { id: "review" as const, label: "Review queue", icon: "shield" as const, group: "ANALYZE" },
+      { id: "report" as const, label: "Campaign reports", icon: "activity" as const, group: "ANALYZE" },
+    ] : []),
     { id: "profile", label: "My profile", icon: "users", group: "ACCOUNT" },
   ],
   "Test Engineer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
     { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
+    { id: "coverage", label: "Scenario coverage", icon: "map", group: "WORKSPACE" },
     {
       id: "campaigns",
       label: "Campaigns",
@@ -192,11 +201,13 @@ const navByRole: Record<
       icon: "activity",
       group: "ANALYZE",
     },
+    ...(usesTeamBackend ? [{ id: "review" as const, label: "Review queue", icon: "shield" as const, group: "ANALYZE" }] : []),
     { id: "profile", label: "My profile", icon: "users", group: "ACCOUNT" },
   ],
   "Test Reviewer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
     { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
+    { id: "coverage", label: "Scenario coverage", icon: "map", group: "WORKSPACE" },
     { id: "oracles", label: "Test oracles", icon: "oracles", group: "REVIEW" },
     { id: "review", label: "Review queue", icon: "shield", group: "REVIEW" },
     { id: "run-detail", label: "Run results", icon: "play", group: "REVIEW" },
@@ -217,10 +228,14 @@ const navByRole: Record<
   Administrator: [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
     { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
+    { id: "coverage", label: "Scenario coverage", icon: "map", group: "WORKSPACE" },
     { id: "scenarios", label: "Scenario library", icon: "scenarios", group: "DESIGN" },
     { id: "campaigns", label: "Campaigns", icon: "campaigns", group: "TESTING" },
     { id: "priority", label: "Prioritization", icon: "priority", group: "TESTING" },
     { id: "execution", label: "Execution queue", icon: "play", group: "TESTING" },
+    { id: "failures", label: "Failure insights", icon: "failures", group: "ANALYZE" },
+    { id: "review", label: "Review queue", icon: "shield", group: "ANALYZE" },
+    { id: "report", label: "Campaign reports", icon: "activity", group: "ANALYZE" },
     { id: "users", label: "User management", icon: "users", group: "ACCESS" },
     { id: "nodes", label: "Simulation nodes", icon: "nodes", group: "SYSTEM" },
     { id: "worker-protocol", label: "Worker API tools", icon: "nodes", group: "SYSTEM" },
@@ -256,6 +271,7 @@ const titles: Record<Page, string> = {
   audit: "Audit log",
   profile: "My profile",
   "backend-data": "Backend data explorer",
+  coverage: "Scenario coverage",
   "worker-protocol": "Worker API tools",
 };
 const dashboardLinks: Record<
@@ -1070,7 +1086,7 @@ function AppContent() {
       (campaignScenarioCategory === "All types" || scenario.category === campaignScenarioCategory) &&
       (campaignScenarioSeverity === "All severities" || scenario.severity === campaignScenarioSeverity);
   });
-  const action = usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamUtilityPages].includes(page) ? null :
+  const action = usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamAnalysisPages, ...teamUtilityPages].includes(page) ? null :
     page === "scenarios" ? (
       <div className="actions">
         <button className="btn btn-light" onClick={() => navigate("import")}>
@@ -1168,7 +1184,7 @@ function AppContent() {
                   >
                     <Icon name={n.icon} size={17} />
                     <span>{n.label}</span>
-                    {n.id === "failures" && <em>{usesTeamBackend ? "Mock" : failures.length}</em>}
+                    {n.id === "failures" && !usesTeamBackend && <em>{failures.length}</em>}
                   </button>
                 ))}
             </div>
@@ -1352,7 +1368,7 @@ function AppContent() {
               : moduleSource(page, role) === "mixed"
                 ? page === "oracles"
                   ? (vi ? "Cấu hình Oracle phía trên lấy từ backend. Form chỉnh sửa mẫu phía dưới chỉ lưu trong trình duyệt, không thay đổi ngưỡng đánh giá thật." : "The Oracle configurations above come from the backend. The demo editor below saves only in this browser and does not change actual evaluation thresholds.")
-                  : (vi ? "Scenario, campaign và kết quả chạy lấy từ API. Phân cụm lỗi, báo cáo APFD, quản trị tài khoản và tùy chỉnh hồ sơ dùng dữ liệu mẫu." : "Scenarios, campaigns and run results use the API. Failure clustering, APFD reports, user administration and profile changes use mock data.")
+                   : (vi ? "Kịch bản, coverage, chiến dịch, kết quả chạy và phân tích lỗi lấy từ API. Quản trị tài khoản, phân cụm kịch bản và tùy chỉnh hồ sơ vẫn dùng dữ liệu mẫu ở các màn hình có nhãn Mock." : "Scenarios, coverage, campaigns, run results and failure analysis use the API. User administration, scenario clustering and profile changes remain local demos on screens labeled Mock.")
                 : (vi ? "Dữ liệu được đọc và ghi qua Redux Saga tới backend AutoScenarioX mới." : "Data is read and written through Redux Saga to the new AutoScenarioX backend.")}</span>
           </div>
           {isTeamDevAuth && <div className="capability-banner mock" role="note"><strong>Development authentication</strong><span>{vi ? "Dùng bộ chọn Vai trò Dev trên thanh trên cùng để đổi quyền kiểm thử. Tài khoản Dev không kiểm tra mật khẩu; việc chọn role không thay đổi database. Dùng Supabase khi cần đăng nhập thật." : "Use the Dev role selector in the top bar to switch test permissions. The Dev account does not verify a password, and selecting a role does not change the database. Use Supabase for real sign-in."}</span></div>}
@@ -1363,8 +1379,10 @@ function AppContent() {
             client={sagaTeamClient} page={page} role={role} onNavigate={navigate} onChanged={refreshWorkspace} onNotify={notify} />}
           {usesTeamBackend && page === "backend-data" && <BackendDataWorkspace client={sagaTeamClient} role={role} onRefreshSession={async () => { await api.backendRefreshSession(); dispatch(bootstrapAuthRequested()); }} />}
           {usesTeamBackend && page === "worker-protocol" && <WorkerProtocolPanel client={sagaTeamClient} role={role} onNotify={notify} />}
+          {usesTeamBackend && page === "coverage" && <TeamCoveragePanel client={sagaTeamClient} />}
+          {usesTeamBackend && teamAnalysisPages.includes(page) && <TeamFailureAnalysisWorkspace key={`${role}:${page}`} client={sagaTeamClient} role={role} initialView={page === "report" ? "effectiveness" : page === "review" ? "review" : "analysis"} onChanged={refreshWorkspace} onNotify={notify} />}
           {usesTeamBackend && page === "oracles" && role === "Administrator" && <section><div className="capability-banner mock"><strong>{vi ? "Form chỉnh sửa Oracle · Mock" : "Oracle editor · Mock"}</strong><span>{vi ? "Backend hiện chưa có API chỉnh sửa Oracle. Form này không thay đổi cấu hình thật phía trên." : "The backend has no Oracle editing API. This form does not change the actual configurations above."}</span></div><Oracles rules={rules} profile={oracleProfile} onSave={saveRules} /></section>}
-          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamUtilityPages].includes(page)) && <>
+          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamAnalysisPages, ...teamUtilityPages].includes(page)) && <>
           {page === "overview" && (
             <RoleWelcome role={role} onNavigate={navigate} />
           )}
@@ -1990,6 +2008,7 @@ function pageDescription(page: Page) {
     audit: "Trace important changes across the simulation workspace.",
     profile: "Manage your workspace identity and notification preferences.",
     "backend-data": "Browse READY versions, execution packages, reference data, identity and database health.",
+    coverage: "Inspect READY scenario coverage across maps, weather, categories and event types.",
     "worker-protocol": "Inspect worker callbacks and submit existing telemetry or video through the API.",
   };
   return descriptions[page];
