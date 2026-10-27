@@ -23,7 +23,7 @@ export interface TeamVersion {
 }
 export interface TeamScenarioDetail {
   id: string; code: string; name: string; description: string | null; category: string;
-  status: string; originType: string; hasDraft: boolean; createdAt: string;
+  status: string; originType: string; hasDraft: boolean; tags?: string[]; createdAt: string;
   updatedAt: string; latestVersion: TeamVersion | null; latestContent: TeamObject | null;
 }
 export interface TeamVersionDetail {
@@ -78,8 +78,21 @@ export interface TeamDiff {
 }
 export interface TeamVariantBatch {
   id: string; baseVersionId: string; parameterGrid: Record<string, TeamJson>;
+  strategy?: "cartesian" | "pairwise"; cartesianCount?: number;
   requestedCount: number; generatedCount: number; note: string | null;
   createdBy: string; createdAt: string;
+}
+export interface TeamTag { name: string; scenarioCount: number; activeScenarioCount: number }
+export interface TeamScenarioTags { scenarioId: string; tags: string[] }
+export interface TeamScenarioHistoryEvent {
+  id: number; at: string; action: string; entityType: string; entityId: string;
+  actor: { id: string; displayName: string; email: string | null };
+  versionNumber: number | null; relatedScenario: { id: string; code: string; name: string } | null;
+  details: TeamJson;
+}
+export interface TeamScenarioTemplate {
+  key: string; title: string; summary: string; category: string; mapName: string;
+  eventTypes: string[]; reference: string | null;
 }
 export interface TeamVariantResult {
   batch: TeamVariantBatch;

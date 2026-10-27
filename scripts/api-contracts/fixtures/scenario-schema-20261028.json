@@ -1,0 +1,611 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://autoscenariox.local/schemas/scenario/1.0/scenario.schema.json",
+  "title": "AutoScenarioX Scenario",
+  "description": "Canonical scenario definition v1.0. Đây là NỘI DUNG của một ScenarioVersion. Các trường vòng đời (scenario_id, version_id, version_number, status, content_hash, created_by, created_at) do database quản lý, KHÔNG nằm trong tài liệu này.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "metadata", "source", "map", "route", "weather", "ego_vehicle", "execution"],
+  "properties": {
+    "schema_version": {
+      "description": "Phiên bản schema, dùng để migrate khi schema thay đổi.",
+      "const": "1.0"
+    },
+    "metadata": { "$ref": "#/$defs/metadata" },
+    "source": { "$ref": "#/$defs/source" },
+    "map": { "$ref": "#/$defs/map" },
+    "route": { "$ref": "#/$defs/route" },
+    "weather": { "$ref": "#/$defs/weather" },
+    "ego_vehicle": { "$ref": "#/$defs/egoVehicle" },
+    "traffic": { "$ref": "#/$defs/traffic" },
+    "actors": {
+      "description": "Các simulation actor được đặt cố định và có thể được điều khiển bởi event (khác với traffic nền sinh ngẫu nhiên).",
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/actor" },
+      "default": []
+    },
+    "events": {
+      "description": "Các tình huống kịch bản (linh hồn của scenario).",
+      "type": "array",
+      "maxItems": 20,
+      "items": { "$ref": "#/$defs/event" },
+      "default": []
+    },
+    "parameters": {
+      "description": "Tham số có thể biến thiên. Trường số ở nơi khác có thể tham chiếu bằng {\"$param\": \"ten_tham_so\"}. Dùng cho sinh biến thể (Flow 4) và feature extraction (Flow 5).",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/parameterDef" },
+      "maxProperties": 30,
+      "default": {}
+    },
+    "execution": { "$ref": "#/$defs/execution" },
+    "extensions": {
+      "description": "Vùng mở cho tính năng tương lai / dữ liệu của adapter. Không được dùng cho dữ liệu mà runner bắt buộc phải hiểu.",
+      "type": "object"
+    }
+  },
+
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,31}$"
+    },
+
+    "paramRef": {
+      "description": "Tham chiếu tới một tham số trong khối parameters.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$param"],
+      "properties": {
+        "$param": { "$ref": "#/$defs/identifier" }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "category"],
+      "properties": {
+        "name": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "category": {
+          "type": "string",
+          "enum": ["pedestrian", "cut_in", "braking", "traffic_light", "following", "intersection", "obstacle", "free_driving", "other"]
+        },
+        "tags": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$" }
+        }
+      }
+    },
+
+    "source": {
+      "description": "Nguồn gốc của version này, phục vụ traceability.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["manual", "import", "clone", "variant"] },
+        "format": { "type": "string", "enum": ["json", "yaml", "carla_route_xml", "openscenario"] },
+        "original_file": { "type": "string", "maxLength": 255 },
+        "original_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "parent_version_id": { "type": "string", "format": "uuid" },
+        "import_warnings": { "type": "array", "items": { "type": "string" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "import" } } },
+          "then": { "required": ["format", "original_hash"] }
+        },
+        {
+          "if": { "properties": { "type": { "enum": ["clone", "variant"] } } },
+          "then": { "required": ["parent_version_id"] }
+        }
+      ]
+    },
+
+    "map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "description": "Tên map CARLA. Schema chỉ kiểm tra định dạng; map có tồn tại hay không do validation tầng 3 kiểm tra với map metadata.",
+          "type": "string",
+          "pattern": "^Town[0-9]{2}(HD)?(_Opt)?$"
+        }
+      }
+    },
+
+    "location": {
+      "description": "Vị trí: hoặc chỉ số spawn point của map, hoặc tọa độ thế giới CARLA (mét).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["spawn_point_index"],
+          "properties": {
+            "spawn_point_index": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "z": { "type": "number", "default": 0.5 },
+            "yaw": { "type": "number", "minimum": -180, "maximum": 180 }
+          }
+        }
+      ]
+    },
+
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "goal"],
+      "properties": {
+        "start": { "$ref": "#/$defs/location" },
+        "waypoints": {
+          "description": "Các điểm trung gian bắt buộc đi qua (tùy chọn).",
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/location" }
+        },
+        "goal": { "$ref": "#/$defs/location" },
+        "speed_limit_kmh": {
+          "description": "Giới hạn tốc độ cho Oracle speeding. Nếu bỏ trống, Oracle dùng biển báo của map.",
+          "type": "number", "minimum": 5, "maximum": 130
+        },
+        "goal_tolerance_m": {
+          "description": "Bán kính coi là đã tới đích (dùng cho Oracle route completion).",
+          "type": "number", "minimum": 1, "maximum": 50, "default": 5
+        }
+      }
+    },
+
+    "weather": {
+      "description": "Preset của carla.WeatherParameters, có thể ghi đè từng tham số. Không khai báo preset thì mặc định ClearNoon.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "type": "string",
+          "enum": [
+            "ClearNoon", "CloudyNoon", "WetNoon", "WetCloudyNoon", "SoftRainNoon", "MidRainyNoon", "HardRainNoon",
+            "ClearSunset", "CloudySunset", "WetSunset", "WetCloudySunset", "SoftRainSunset", "MidRainSunset", "HardRainSunset",
+            "ClearNight", "CloudyNight", "WetNight", "WetCloudyNight", "SoftRainNight", "MidRainyNight", "HardRainNight"
+          ],
+          "default": "ClearNoon"
+        },
+        "cloudiness": { "type": "number", "minimum": 0, "maximum": 100 },
+        "precipitation": { "type": "number", "minimum": 0, "maximum": 100 },
+        "precipitation_deposits": { "type": "number", "minimum": 0, "maximum": 100 },
+        "wind_intensity": { "type": "number", "minimum": 0, "maximum": 100 },
+        "sun_azimuth_angle": { "type": "number", "minimum": 0, "maximum": 360 },
+        "sun_altitude_angle": { "type": "number", "minimum": -90, "maximum": 90 },
+        "fog_density": { "type": "number", "minimum": 0, "maximum": 100 },
+        "fog_distance": { "type": "number", "minimum": 0 },
+        "wetness": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+
+    "egoVehicle": {
+      "description": "Xe được kiểm thử. Vị trí xuất phát lấy từ route.start. Việc chọn agent SUT (Behavior Agent/Autopilot và cấu hình) thuộc về Campaign (Flow 2), để cùng một scenario có thể test nhiều cấu hình SUT.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blueprint": {
+          "type": "string",
+          "pattern": "^vehicle\\.[a-z0-9_]+\\.[a-z0-9_]+$",
+          "default": "vehicle.tesla.model3"
+        },
+        "role_name": { "type": "string", "default": "hero" },
+        "color": { "type": "string", "pattern": "^[0-9]{1,3},[0-9]{1,3},[0-9]{1,3}$" },
+        "initial_speed_kmh": {
+          "oneOf": [
+            { "type": "number", "minimum": 0, "maximum": 130 },
+            { "$ref": "#/$defs/paramRef" }
+          ],
+          "default": 0
+        },
+        "target_speed_kmh": {
+          "description": "Tốc độ thử của ego (VUT test speed kiểu Euro NCAP): runner giới hạn SUT ở tốc độ này thay vì biển báo của map; speed_limit_kmh vẫn là ngưỡng của Oracle. Gắn chung $param với initial_speed_kmh để ego chạy đều từ đầu. Bỏ trống thì SUT chạy theo biển báo (từ 2026-10-20).",
+          "oneOf": [
+            { "type": "number", "minimum": 5, "maximum": 130 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        }
+      }
+    },
+
+    "traffic": {
+      "description": "Giao thông nền do Traffic Manager điều khiển. Seed lấy từ execution.seed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "npc_vehicles": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "count": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0, "maximum": 300 },
+                { "$ref": "#/$defs/paramRef" }
+              ],
+              "default": 0
+            },
+            "blueprint_filter": { "type": "string", "default": "vehicle.*" },
+            "four_wheels_only": { "type": "boolean", "default": true },
+            "speed_difference_percent": {
+              "description": "Traffic Manager global_percentage_speed_difference: dương = chậm hơn giới hạn, âm = nhanh hơn.",
+              "type": "number", "minimum": -100, "maximum": 100, "default": 0
+            },
+            "distance_to_leading_m": { "type": "number", "minimum": 0, "maximum": 20, "default": 2.5 }
+          }
+        },
+        "pedestrians": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "count": {
+              "oneOf": [
+                { "type": "integer", "minimum": 0, "maximum": 300 },
+                { "$ref": "#/$defs/paramRef" }
+              ],
+              "default": 0
+            },
+            "crossing_probability": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 },
+            "running_probability": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 }
+          }
+        }
+      }
+    },
+
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "blueprint", "spawn"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "type": { "type": "string", "enum": ["vehicle", "pedestrian", "bicycle", "static_obstacle"] },
+        "blueprint": { "type": "string" },
+        "spawn": { "$ref": "#/$defs/location" },
+        "initial_speed_kmh": {
+          "oneOf": [
+            { "type": "number", "minimum": 0, "maximum": 130 },
+            { "$ref": "#/$defs/paramRef" }
+          ],
+          "default": 0
+        },
+        "behavior": {
+          "description": "idle: đứng yên đến khi event kích hoạt; scripted: chỉ di chuyển theo event; autopilot: giao cho Traffic Manager.",
+          "type": "string", "enum": ["idle", "scripted", "autopilot"], "default": "idle"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["vehicle", "bicycle"] } } },
+          "then": { "properties": { "blueprint": { "pattern": "^vehicle\\.[a-z0-9_]+\\.[a-z0-9_]+$" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "pedestrian" } } },
+          "then": { "properties": { "blueprint": { "pattern": "^walker\\.pedestrian\\.[0-9]{4}$" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "static_obstacle" } } },
+          "then": {
+            "properties": {
+              "blueprint": { "pattern": "^static\\.prop\\.[a-z0-9_]+$" },
+              "behavior": { "const": "idle" }
+            }
+          }
+        }
+      ]
+    },
+
+    "trigger": {
+      "description": "Điều kiện kích hoạt event.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "actor_ref", "distance_m"],
+          "properties": {
+            "type": { "const": "ego_distance_to_actor" },
+            "actor_ref": { "$ref": "#/$defs/identifier" },
+            "distance_m": {
+              "oneOf": [
+                { "type": "number", "minimum": 0.5, "maximum": 200 },
+                { "$ref": "#/$defs/paramRef" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "location", "distance_m"],
+          "properties": {
+            "type": { "const": "ego_distance_to_location" },
+            "location": { "$ref": "#/$defs/location" },
+            "distance_m": {
+              "oneOf": [
+                { "type": "number", "minimum": 0.5, "maximum": 200 },
+                { "$ref": "#/$defs/paramRef" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "time_s"],
+          "properties": {
+            "type": { "const": "simulation_time" },
+            "time_s": {
+              "oneOf": [
+                { "type": "number", "minimum": 0, "maximum": 3600 },
+                { "$ref": "#/$defs/paramRef" }
+              ]
+            }
+          }
+        },
+        {
+          "description": "Kích hoạt delay_s giây sau khi event event_ref bắt đầu (nối tiếp event, từ 2026-10-17).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "event_ref", "delay_s"],
+          "properties": {
+            "type": { "const": "after_event" },
+            "event_ref": { "$ref": "#/$defs/identifier" },
+            "delay_s": {
+              "oneOf": [
+                { "type": "number", "minimum": 0, "maximum": 600 },
+                { "$ref": "#/$defs/paramRef" }
+              ]
+            }
+          }
+        },
+        {
+          "description": "Kích hoạt khi thời gian tới va chạm giữa ego và actor_ref (khoảng cách / tốc độ tiếp cận) ≤ ttc_s (từ 2026-10-17).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "actor_ref", "ttc_s"],
+          "properties": {
+            "type": { "const": "time_to_collision" },
+            "actor_ref": { "$ref": "#/$defs/identifier" },
+            "ttc_s": {
+              "oneOf": [
+                { "type": "number", "minimum": 0.5, "maximum": 10 },
+                { "$ref": "#/$defs/paramRef" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "trigger"],
+      "properties": {
+        "id": { "$ref": "#/$defs/identifier" },
+        "type": {
+          "type": "string",
+          "enum": ["pedestrian_crossing", "vehicle_cut_in", "lead_vehicle_brake", "traffic_light_override", "vehicle_crossing"]
+        },
+        "description": { "type": "string", "maxLength": 500 },
+        "trigger": { "$ref": "#/$defs/trigger" },
+        "actor_ref": { "$ref": "#/$defs/identifier" },
+        "params": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "pedestrian_crossing" } } },
+          "then": {
+            "required": ["actor_ref", "params"],
+            "properties": { "params": { "$ref": "#/$defs/paramsPedestrianCrossing" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "vehicle_cut_in" } } },
+          "then": {
+            "required": ["actor_ref", "params"],
+            "properties": { "params": { "$ref": "#/$defs/paramsVehicleCutIn" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "lead_vehicle_brake" } } },
+          "then": {
+            "required": ["actor_ref", "params"],
+            "properties": { "params": { "$ref": "#/$defs/paramsLeadVehicleBrake" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "traffic_light_override" } } },
+          "then": {
+            "required": ["params"],
+            "not": { "required": ["actor_ref"] },
+            "properties": { "params": { "$ref": "#/$defs/paramsTrafficLightOverride" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "vehicle_crossing" } } },
+          "then": {
+            "required": ["actor_ref", "params"],
+            "properties": { "params": { "$ref": "#/$defs/paramsVehicleCrossing" } }
+          }
+        }
+      ]
+    },
+
+    "paramsPedestrianCrossing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["speed_ms"],
+      "properties": {
+        "speed_ms": {
+          "oneOf": [
+            { "type": "number", "minimum": 0.3, "maximum": 6 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        },
+        "direction": { "type": "string", "enum": ["left_to_right", "right_to_left"], "default": "left_to_right" },
+        "sync": {
+          "description": "Đồng bộ thời điểm (như OpenSCENARIO SynchronizeAction, cách Euro NCAP canh người đi bộ): sau khi trigger kích hoạt, runner giữ người đi bộ đứng chờ rồi cho đi ở speed_ms đúng lúc để tới point khi ego tới point, lệch offset_s giây (dương = tới sau ego, âm = tới trước). Từ 2026-10-21.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["point"],
+          "properties": {
+            "point": { "$ref": "#/$defs/location" },
+            "offset_s": {
+              "oneOf": [
+                { "type": "number", "minimum": -5, "maximum": 5 },
+                { "$ref": "#/$defs/paramRef" }
+              ],
+              "default": 0
+            }
+          }
+        }
+      }
+    },
+
+    "paramsVehicleCutIn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side", "cut_in_gap_m"],
+      "properties": {
+        "side": { "type": "string", "enum": ["left", "right"] },
+        "cut_in_gap_m": {
+          "description": "Khoảng cách phía trước ego khi xe NPC chen vào.",
+          "oneOf": [
+            { "type": "number", "minimum": 2, "maximum": 50 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        },
+        "lane_change_duration_s": {
+          "oneOf": [
+            { "type": "number", "minimum": 0.5, "maximum": 10 },
+            { "$ref": "#/$defs/paramRef" }
+          ],
+          "default": 2
+        }
+      }
+    },
+
+    "paramsLeadVehicleBrake": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deceleration_ms2"],
+      "properties": {
+        "deceleration_ms2": {
+          "oneOf": [
+            { "type": "number", "minimum": 1, "maximum": 10 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        },
+        "target_speed_kmh": { "type": "number", "minimum": 0, "maximum": 130, "default": 0 },
+        "time_gap_s": {
+          "description": "Trước khi phanh, runner liên tục chỉnh tốc độ actor để giữ khoảng cách tới ego = time_gap_s × tốc độ ego (như OpenSCENARIO LongitudinalDistanceAction timeGap); Euro NCAP CCRb 2026 dùng 1.0 s. Bỏ trống thì actor chạy đều ở initial_speed_kmh (từ 2026-10-21).",
+          "oneOf": [
+            { "type": "number", "minimum": 0.3, "maximum": 5 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        }
+      }
+    },
+
+    "paramsTrafficLightOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "duration_s"],
+      "properties": {
+        "target": { "type": "string", "enum": ["next_on_route"], "default": "next_on_route" },
+        "state": { "type": "string", "enum": ["red", "yellow", "green"] },
+        "duration_s": {
+          "oneOf": [
+            { "type": "number", "minimum": 1, "maximum": 120 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        }
+      }
+    },
+
+    "paramsVehicleCrossing": {
+      "description": "Xe NPC đứng ở đường cắt ngang; khi trigger kích hoạt thì chạy qua nút giao tới destination (CARLA tự tìm đường) với tốc độ speed_kmh.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["destination", "speed_kmh"],
+      "properties": {
+        "destination": { "$ref": "#/$defs/location" },
+        "speed_kmh": {
+          "oneOf": [
+            { "type": "number", "minimum": 5, "maximum": 100 },
+            { "$ref": "#/$defs/paramRef" }
+          ]
+        },
+        "ignore_traffic_lights": {
+          "description": "true: xe chạy qua cả khi đèn đỏ (tình huống xe khác vượt đèn đỏ).",
+          "type": "boolean",
+          "default": false
+        },
+        "sync": {
+          "description": "Đồng bộ thời điểm (như OpenSCENARIO SynchronizeAction): runner liên tục chỉnh tốc độ actor (tối đa speed_kmh) để actor tới point cùng lúc ego tới point, lệch offset_s giây (dương = actor tới sau ego, âm = tới trước).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["point"],
+          "properties": {
+            "point": { "$ref": "#/$defs/location" },
+            "offset_s": {
+              "oneOf": [
+                { "type": "number", "minimum": -5, "maximum": 5 },
+                { "$ref": "#/$defs/paramRef" }
+              ],
+              "default": 0
+            }
+          }
+        }
+      }
+    },
+
+    "parameterDef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value", "min", "max"],
+      "properties": {
+        "type": { "type": "string", "enum": ["number", "integer"] },
+        "value": { "type": "number" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "type": "string", "maxLength": 16 },
+        "description": { "type": "string", "maxLength": 300 }
+      }
+    },
+
+    "execution": {
+      "description": "Cấu hình phục vụ reproducibility. Runner (Flow 2) bắt buộc dùng synchronous mode + fixed_delta_seconds + seed cho cả Traffic Manager.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seed", "timeout_s"],
+      "properties": {
+        "seed": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "timeout_s": { "type": "number", "minimum": 10, "maximum": 3600 },
+        "fixed_delta_seconds": { "type": "number", "minimum": 0.01, "maximum": 0.1, "default": 0.05 },
+        "synchronous_mode": { "const": true, "default": true },
+        "warmup_s": {
+          "description": "Thời gian chờ ổn định (actor rơi xuống đất, TM khởi động) trước khi tính giờ.",
+          "type": "number", "minimum": 0, "maximum": 30, "default": 2
+        }
+      }
+    }
+  }
+}

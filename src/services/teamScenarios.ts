@@ -4,6 +4,7 @@ import type {
   TeamImportResult, TeamMap, TeamObject, TeamPage, TeamReadyVersion, TeamScenario,
   TeamScenarioDetail, TeamScenarioRow, TeamValidation, TeamVariantBatch, TeamVariantResult,
   TeamVersion, TeamVersionDetail,
+  TeamTag, TeamScenarioTags, TeamScenarioHistoryEvent, TeamScenarioTemplate,
 } from "./teamContracts";
 import { teamNumber, teamObject, teamString } from "./teamContracts";
 
@@ -32,7 +33,7 @@ export function teamScenarioFromDetail(detail: TeamScenarioDetail, draft?: TeamD
     hasDraft: detail.hasDraft, draftRevision: draft?.rowVersion, backendStatus: detail.status,
     canonicalContent: content, actors: 1 + teamNumber(npc.count, content) + teamNumber(teamObject(traffic.pedestrians).count, content) + actorList.length,
     runCount: 0, passRate: 0, lastRun: "Never", owner: "Backend workspace",
-    tags: Array.isArray(metadata.tags) ? metadata.tags.filter((item): item is string => typeof item === "string") : [], priorityScore: 0,
+    tags: detail.tags ?? (Array.isArray(metadata.tags) ? metadata.tags.filter((item): item is string => typeof item === "string") : []), priorityScore: 0,
     egoVehicle: teamString(teamObject(content.ego_vehicle).blueprint, "vehicle.tesla.model3"),
     trafficVehicle: teamString(npc.blueprint_filter, "vehicle.*"), trafficVehicleCount: teamNumber(npc.count, content),
     pedestrianCount: teamNumber(teamObject(traffic.pedestrians).count, content),
@@ -63,15 +64,26 @@ export class TeamScenarioService {
   constructor(client: TeamApiClient) { this.client = client; }
   catalog() { return this.client.request<TeamCatalog>("/api/v1/reference/catalog"); }
   maps() { return this.client.request<TeamMap[]>("/api/v1/reference/maps"); }
+  templates() { return this.client.request<TeamScenarioTemplate[]>("/api/v1/reference/scenario-templates"); }
+  tags() { return this.client.request<TeamTag[]>("/api/v1/tags"); }
+  replaceTags(id: string, tags: string[]) {
+    return this.client.request<TeamScenarioTags>(`/api/v1/scenarios/${segment(id)}/tags`, { method: "PUT", body: body({ tags }) });
+  }
+  history(id: string, page = 1, pageSize = 20) {
+    return this.client.request<TeamPage<TeamScenarioHistoryEvent>>(`/api/v1/scenarios/${segment(id)}/history?page=${page}&pageSize=${pageSize}`);
+  }
   schema() { return this.client.request<TeamObject>("/api/v1/reference/scenario-schema"); }
-  search(query: Record<string, string | number | boolean | undefined> = {}) {
+  search(query: Record<string, string | string[] | number | boolean | undefined> = {}) {
     const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "") params.set(key, String(value));
+    for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "") {
+      if (Array.isArray(value)) value.forEach(item => params.append(key, item));
+      else params.set(key, String(value));
+    }
     return this.client.request<TeamPage<TeamScenarioRow>>("/api/v1/scenarios?" + params);
   }
   detail(id: string) { return this.client.request<TeamScenarioDetail>(`/api/v1/scenarios/${segment(id)}`); }
-  createProfile(name: string, description: string, category: string) {
-    return this.client.request<TeamScenarioDetail>("/api/v1/scenarios", { method: "POST", body: body({ name, description, category }) });
+  createProfile(name: string, description: string, category: string, template?: string) {
+    return this.client.request<TeamScenarioDetail>("/api/v1/scenarios", { method: "POST", body: body({ name, description, category, ...(template ? { template } : {}) }) });
   }
   updateProfile(id: string, changes: { name?: string; description?: string; category?: string }) {
     return this.client.request<TeamScenarioDetail>(`/api/v1/scenarios/${segment(id)}`, { method: "PATCH", body: body(changes) });
@@ -118,8 +130,8 @@ export class TeamScenarioService {
   exportVersion(id: string, number: number, format: "json" | "yaml") { return this.client.download(`/api/v1/scenarios/${segment(id)}/versions/${number}/export?format=${format}`, `${id}-v${number}.${format}`); }
   variants(id: string, number: number) { return this.client.request<TeamVariantBatch[]>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches`); }
   variantBatch(id: string, number: number, batchId: string) { return this.client.request<TeamVariantResult>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches/${segment(batchId)}`); }
-  generateVariants(id: string, number: number, parameterGrid: Record<string, number[]>, namePrefix?: string, note?: string) {
-    return this.client.request<TeamVariantResult>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches`, { method: "POST", body: body({ parameterGrid, namePrefix, note }) });
+  generateVariants(id: string, number: number, parameterGrid: Record<string, (number | string)[]>, namePrefix?: string, note?: string, strategy?: "cartesian" | "pairwise") {
+    return this.client.request<TeamVariantResult>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches`, { method: "POST", body: body({ parameterGrid, namePrefix, note, ...(strategy ? { strategy } : {}) }) });
   }
   ready(query: Record<string, string | number | boolean | undefined> = {}) {
     const params = new URLSearchParams({ pageSize: "100", latestOnly: "true" });
