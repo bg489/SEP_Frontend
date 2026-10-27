@@ -1,11 +1,7 @@
 import type { Campaign, ScenarioRun, OracleRule } from "../types";
+import type { TeamApiClient, TeamPage, TeamReadyVersion } from "./teamContracts";
 
-export interface ReadyVersion {
-  scenarioVersionId: string; scenarioId: string; scenarioCode: string; scenarioName: string;
-  category: string; versionNumber: number; isLatestReady: boolean; mapName: string | null;
-  weatherPreset: string | null; actorCount: number; eventCount: number; contentHash: string;
-  egoBlueprint: string | null; speedLimitKmh: number | null;
-}
+export type ReadyVersion = TeamReadyVersion;
 export interface TeamCampaign {
   id: string; code: string; name: string; description: string | null; strategy: string;
   status: string; progress: number; passRate: number; failedRuns: number; estimatedDuration: string;
@@ -18,6 +14,7 @@ export interface TeamCampaign {
 export interface TeamRun {
   id: string; campaignId: string; scenarioVersionId: string; scenarioId: string;
   scenarioCode: string; scenarioName: string; versionNumber: number; status: string;
+  category: string; mapName: string | null; weatherPreset: string | null; sortOrder: number;
   verdict: string | null; contentHash: string | null; seed: number | null;
   startedAt: string | null; finishedAt: string | null; errorMessage: string | null;
 }
@@ -27,9 +24,10 @@ export interface OracleConfig {
   ttcThresholdS: number; routeGoalToleranceM: number; createdAt: string;
 }
 export interface RunResult {
-  runId: string; campaignId: string; campaignName: string; scenarioId: string; scenarioVersionId: string;
-  scenarioName: string; versionNumber: number; status: string; seed: number | null;
+  runId: string; campaignId: string; campaignCode: string | null; campaignName: string; scenarioId: string; scenarioVersionId: string;
+  scenarioCode: string; scenarioName: string; versionNumber: number; status: string; seed: number | null;
   startedAt: string | null; finishedAt: string | null; outcome: string | null;
+  telemetryReceivedAt: string | null;
   durationS: number | null; verdict: string | null; hasVideo: boolean; infraRetryCount: number;
   evaluations: { id: string; oracleConfigId: string; oracleVersion: number; verdict: string;
     errorReason: string | null; evaluatedAt: string;
@@ -40,8 +38,53 @@ export interface RankResult {
   metrics: { apfdEstimate: number; apfdcEstimate: number; faultsFoundEarlyEstimate: number;
     faultsTotalEstimate: number; estimatedSuiteMinutes: number; note: string };
   ordered: { rank: number; scenarioVersionId: string; scenarioId: string; scenarioCode: string;
-    scenarioName: string; severity: string; score: number; rationale: string; estimatedCostMinutes: number }[];
+    scenarioName: string; category: string; mapName: string | null; weatherPreset: string | null;
+    severity: string; failureSignalEstimate: number; score: number; rationale: string; estimatedCostMinutes: number }[];
   featureNames: string[]; distanceMatrix: number[][] | null;
+}
+export interface CampaignCreateInput {
+  name: string; description?: string | null; strategy?: string; scenarioVersionIds: string[];
+  sutType?: string; sutBehavior?: string; sutCarlaVersion?: string;
+}
+export type CampaignUpdateInput = Partial<CampaignCreateInput>;
+export interface ReadyVersionQuery {
+  q?: string; category?: string; map?: string; scenarioId?: string;
+  latestOnly?: boolean; page?: number; pageSize?: number;
+}
+export interface PrioritizationStrategy { id: string; label: string; description: string }
+export interface PrioritizationInput {
+  scenarioVersionIds?: string[]; strategy: string;
+  params?: { diversityWeight?: number; riskWeight?: number; seed?: number; limit?: number };
+}
+
+/** Contract-specific helpers retain the injected Redux Saga transport for every request. */
+export function operationsApi(client: TeamApiClient) {
+  const id = encodeURIComponent;
+  const write = (method: "POST" | "PATCH", body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
+  return {
+    listCampaigns: () => client.request<TeamCampaign[]>("/api/v1/campaigns"),
+    getCampaign: (campaignId: string) => client.request<TeamCampaign>(`/api/v1/campaigns/${id(campaignId)}`),
+    createCampaign: (body: CampaignCreateInput) => client.request<TeamCampaign>("/api/v1/campaigns", write("POST", body)),
+    updateCampaign: (campaignId: string, body: CampaignUpdateInput) => client.request<TeamCampaign>(`/api/v1/campaigns/${id(campaignId)}`, write("PATCH", body)),
+    startCampaign: (campaignId: string) => client.request<TeamCampaign>(`/api/v1/campaigns/${id(campaignId)}/start`, { method: "POST" }),
+    rerunCampaign: (campaignId: string) => client.request<TeamCampaign>(`/api/v1/campaigns/${id(campaignId)}/rerun`, { method: "POST" }),
+    listRuns: (campaignId: string) => client.request<TeamRun[]>(`/api/v1/campaigns/${id(campaignId)}/runs`),
+    availableReady: (query: ReadyVersionQuery = {}) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
+      }
+      return client.request<TeamPage<ReadyVersion>>(`/api/v1/campaigns/available-scenarios${params.size ? `?${params}` : ""}`);
+    },
+    listStrategies: () => client.request<PrioritizationStrategy[]>("/api/v1/prioritization/strategies"),
+    rank: (body: PrioritizationInput) => client.request<RankResult>("/api/v1/prioritization/rank", write("POST", body)),
+    listOracleConfigs: () => client.request<OracleConfig[]>("/api/v1/oracle-configs"),
+    getRunResult: (runId: string) => client.request<RunResult>(`/api/v1/runs/${id(runId)}/result`),
+    downloadRunResult: (runId: string, fileName = `oracle-${runId}.json`) => client.download(`/api/v1/runs/${id(runId)}/result`, fileName),
+    downloadVideo: (runId: string, fileName = `carla-${runId}.mp4`) => client.download(`/api/v1/runs/${id(runId)}/video`, fileName),
+    videoMedia: (runId: string) => client.media ? client.media(`/api/v1/runs/${id(runId)}/video`) : Promise.reject(new Error("Authenticated video preview is unavailable.")),
+    supportsVideoMedia: Boolean(client.media),
+  };
 }
 export interface WorkerIntegration {
   carlaRoot: string; pythonExecutable: string; host: string; rpcPort: number; trafficManagerPort: number;
