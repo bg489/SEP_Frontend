@@ -6,6 +6,7 @@ export type TeamObject = { [key: string]: TeamJson };
 export interface TeamApiClient {
   request<T>(path: string, init?: RequestInit): Promise<T>;
   download(path: string, fileName: string): Promise<void>;
+  media?(path: string): Promise<Blob>;
 }
 export interface TeamPage<T> { items: T[]; page: number; pageSize: number; totalCount: number; totalPages: number }
 export interface TeamScenarioRow {
@@ -29,11 +30,11 @@ export interface TeamVersionDetail {
   summary: TeamVersion; scenarioId: string; schemaVersion: string;
   npcVehicleCount: number | null; pedestrianCount: number | null;
   speedLimitKmh: number | null; egoBlueprint: string | null;
-  parentVersionId: string | null; validationReportId: string; content: TeamObject;
+  parentVersionId: string | null; validationReportId: string; content: TeamObject | null;
 }
 export interface TeamDraft {
   scenarioId: string; rowVersion: number; lastValidationReportId: string | null;
-  baseVersionId: string | null; updatedAt: string; content: TeamObject;
+  baseVersionId: string | null; updatedAt: string; content: TeamObject | null;
 }
 export interface TeamIssue { tier: string; path: string; message: string }
 export interface TeamValidation {

@@ -108,9 +108,10 @@ export class TeamScenarioService {
     return this.client.request<TeamScenarioDetail>(`/api/v1/scenarios/${segment(id)}/clone`, { method: "POST", body: body({ name, description, versionNumber }) });
   }
   imports(id: string) { return this.client.request<TeamImportRecord[]>(`/api/v1/scenarios/${segment(id)}/imports`); }
-  importFile(file: File, name?: string, category?: string) {
+  importFile(file: File, name?: string, category?: string, format?: "json" | "yaml") {
     const data = new FormData(); data.append("File", file);
     if (name) data.append("Name", name); if (category) data.append("Category", category);
+    if (format) data.append("Format", format);
     return this.client.request<TeamImportResult>("/api/v1/scenarios/import", { method: "POST", body: data });
   }
   exportDraft(id: string, format: "json" | "yaml") { return this.client.download(`/api/v1/scenarios/${segment(id)}/draft/export?format=${format}`, `${id}-draft.${format}`); }
@@ -152,7 +153,7 @@ export class TeamScenarioService {
     return this.updateFlatDraft(created, draft, input);
   }
   private async updateFlatDraft(detail: TeamScenarioDetail, draft: TeamDraft, changes: Partial<Scenario>): Promise<Scenario> {
-    const content = structuredClone(draft.content);
+    const content = structuredClone(draft.content ?? {});
     if (changes.obstacleCount !== undefined && changes.obstacleCount !== (Array.isArray(content.actors) ? content.actors.map(teamObject).filter(actor => actor.type === "static_obstacle").length : 0))
       throw new Error("Edit obstacle actor positions in the schema workspace; a count alone cannot define executable obstacles.");
     if (changes.map !== undefined) content.map = { ...teamObject(content.map), name: changes.map };

@@ -11,3 +11,8 @@
 .team-item-row code { overflow-wrap: anywhere; font-size: 11px; color: #53687e; }
 .team-item-row .btn { flex: 0 0 auto; }
 .team-mini-json { font: 12px/1.6 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 8px; background: #f5f7fb; padding: 12px; max-height: 230px; overflow: auto; }
+.team-variant-options { margin: 16px 0; }
+.team-scenario-workspace .modal { max-height: calc(100dvh - 48px); overflow-y: auto; }
+.team-repository-filters { grid-template-columns: minmax(180px, 2fr) repeat(5, minmax(105px, 1fr)); }
+@media (max-width: 1250px) { .team-repository-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .team-repository-filters { grid-template-columns: 1fr; } }
