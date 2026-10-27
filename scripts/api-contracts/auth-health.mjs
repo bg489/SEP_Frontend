@@ -42,7 +42,7 @@ globalThis.fetch = async (path, init = {}) => {
   if (path === "/api/v1/auth/me") return respond(user);
   if (path === "/api/health/db") return healthUnavailable
     ? respond({ title: "Database unavailable", detail: "Fixture connection could not be checked", traceId: "qa-trace" }, 503)
-    : respond({ status: "SCHEMA_INCOMPLETE", asxTables: 21, expectedTables: 18, postgres: "PostgreSQL fixture" });
+    : respond({ status: "SCHEMA_INCOMPLETE", missingTables: ["scenario_tags"], postgres: "PostgreSQL fixture" });
   if (path.endsWith("/video")) return new Response(new Uint8Array([0,0,0,20,102,116,121,112,109,112,52,50]), { headers: { "Content-Type": "video/mp4" } });
   return respond([]);
 };
@@ -73,7 +73,7 @@ try {
   assert.equal(refreshed, 3, "401 triggers one refresh and retries the API request");
 
   const health = await api.backendRequest("/api/health/db");
-  assert.deepEqual(health, { status: "SCHEMA_INCOMPLETE", asxTables: 21, expectedTables: 18, postgres: "PostgreSQL fixture" });
+  assert.deepEqual(health, { status: "SCHEMA_INCOMPLETE", missingTables: ["scenario_tags"], postgres: "PostgreSQL fixture" });
   healthUnavailable = true;
   await assert.rejects(api.backendRequest("/api/health/db"), error => error.status === 503
     && error.traceId === "qa-trace" && error.message.includes("Fixture connection could not be checked"));

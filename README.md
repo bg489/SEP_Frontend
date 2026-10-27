@@ -15,29 +15,33 @@ Không chạy backend cũ ở `Project\Backend`. Các thay đổi trong nhánh n
 | Chức năng | Nguồn dữ liệu / hành vi |
 | --- | --- |
 | Login, refresh token, current user | API `/api/v1/auth`; Supabase Auth qua .NET 8 khi cấu hình Supabase |
-| Scenario repository | API thật: tìm kiếm/phân trang, metadata, archive/restore/clone |
-| Authoring | Draft JSON theo schema; form map, route/spawn/transform, ego/NPC, pedestrian/obstacle, weather, event/trigger, parameter và execution |
+| Scenario repository | API thật: tìm kiếm/phân trang, bộ lọc tag, metadata, archive/restore/clone; thay tags và xem lịch sử thay đổi |
+| Authoring | Template từ backend; bản đồ spawn tương tác; form theo schema hiện hành cho map, route/transform, ego/NPC, pedestrian/obstacle, weather, event/trigger, parameter và execution; giữ JSON đầy đủ |
 | Validate/publish | Báo cáo validation, revision/If-Match; publish phiên bản READY, giữ version bất biến |
-| Version/diff/import/export/variant | API thật; JSON/YAML; diff giữa các version của cùng scenario |
+| Version/diff/import/export/variant | API thật; JSON/YAML; diff giữa các version; chiến lược sinh biến thể và seed theo backend |
+| Scenario coverage | API thật `/api/v1/coverage`; phiên bản READY mới nhất hoặc mọi phiên bản READY, ma trận bản đồ/thời tiết/phân loại/event và truy xuất từng version |
 | Campaign | API thật; chọn **scenarioVersionId READY** với search/filter; SUT Behavior Agent hoặc Autopilot |
 | Prioritization | API thật; lưu thứ tự vào campaign. APFD/APFDc là **ước lượng từ đặc trưng**, không phải kết quả đo của campaign đã chạy |
 | Execution | API thật: start/rerun, poll runs, xem đầy đủ Oracle evaluation/violation, tải JSON; phát MP4 có xác thực và tải video nếu worker đã upload |
-| Backend data | API thật: READY mới nhất/lịch sử, đủ bộ lọc/phân trang, execution package, map/catalog/schema, tài khoản hiện tại và database health |
+| Backend data | API thật: READY mới nhất/lịch sử, execution package, map chi tiết/spawn, template/catalog/schema, coverage, tài khoản và danh sách bảng database còn thiếu |
+| Failure insights / Review queue / Campaign reports | API thật theo campaign: group → verify → similar → explainability → generate → review; trả các run chưa giải thích được về Flow 3; đọc APFD/APFDc và các đường cong từ kết quả backend |
 | Worker API tools | API thật nâng cao: claim/running/requeue-infra, upload NDJSON và MP4 gốc, đọc kết quả/gói thực thi; không khởi động CARLA |
 | Oracle config | Đọc cấu hình thật trong workspace execution; form sửa Oracle cũ là mock |
 | Worker settings/status, user administration, register/reset password, profile editing | **Mock/demo** vì backend chưa có API; không tạo tài khoản Supabase hoặc lưu mật khẩu |
-| Scenario clusters, failure clustering/review, APFD report, analytics settings, audit | **Mock trên trình duyệt**, có nhãn rõ ràng |
+| Scenario clusters, analytics settings, audit toàn hệ thống | **Mock trên trình duyệt**, có nhãn rõ ràng; lịch sử của từng scenario có API thật riêng |
 
 Không tự chuyển lỗi HTTP/network của chức năng thật thành mock thành công. Mọi thao tác API từ UI đi qua Redux Saga, gồm download. Loading và khóa thao tác xuất hiện khi request đang chạy.
 
-Đối chiếu hiện tại: **51/51 HTTP method + route** trong Swagger có luồng frontend và kiểm tra contract. Xem [bảng đầy đủ và phạm vi kiểm tra](docs/backend-api-coverage.md). Đây là toàn bộ API backend hiện có, không có nghĩa những chức năng đồ án chưa có endpoint đã trở thành dữ liệu thật.
+Đối chiếu ngày 28/10/2026: **66/66 HTTP method + route** trong Swagger có luồng frontend và kiểm tra contract. Xem [bảng đầy đủ và phạm vi kiểm tra](docs/backend-api-coverage.md). Đây là phạm vi API backend đang công bố, không đồng nghĩa worker đã hoàn thành mọi yêu cầu của đồ án.
 
 ```powershell
 npm run verify:api
 npm run build
 ```
 
-`verify:api` dùng transport/file giả lập trong bộ nhớ; không ghi database, khởi động CARLA hoặc gọi backend thật. Các kiểm tra bao gồm If-Match, multipart import, query, payload, nguyên trạng file PUT, auth refresh/401, Blob video, state/error và đủ 51 route trong snapshot contract.
+`verify:api` dùng transport/file giả lập trong bộ nhớ; không ghi database, khởi động CARLA hoặc gọi backend thật. Kiểm tra gồm If-Match, multipart, bộ lọc/tag/history/template/variant, coverage và hình học bản đồ, các bước failure analysis, query/payload, file PUT, auth refresh/401, Blob video và đủ 66 operation trong snapshot.
+
+Mọi thao tác ghi dùng cùng transport Redux Saga. Regroup thay phiên phân tích đang có; Return to Flow 3 có thể xóa telemetry/evaluation/video của các run được backend chọn; Rerun có thể thay run cũ. Giao diện giải thích tác động và yêu cầu xác nhận cho các thao tác này. Một kết quả `null` hoặc chưa đủ bước phân tích được hiển thị là chưa có dữ liệu, không thay bằng APFD/APFDc giả.
 
 ## Chạy trên máy
 

@@ -9,7 +9,7 @@ await mkdir(resolve("node_modules/.tmp"), { recursive: true });
 await mkdir(resolve("node_modules/.cache"), { recursive: true });
 const snapshot = JSON.parse((await readFile(resolve("docs/backend-endpoints.json"), "utf8")).replace(/^\uFEFF/, ""));
 const observed = new Set();
-for (const file of ["scenarios", "operations", "worker-protocol", "auth-health"]) {
+for (const file of ["scenarios", "operations", "worker-protocol", "auth-health", "reference-coverage", "failure-analysis"]) {
   const child = spawnSync(process.execPath, [resolve(`scripts/api-contracts/${file}.mjs`)], { encoding: "utf8", env: process.env, maxBuffer: 8 * 1024 * 1024 });
   if (child.error) throw child.error;
   for (const line of (child.stdout ?? "").split(/\r?\n/)) {
