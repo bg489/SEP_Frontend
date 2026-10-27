@@ -15,8 +15,10 @@ import { useLocale } from "./localeContext";
 import { TeamScenarioWorkspace } from "./components/TeamScenarioWorkspace";
 import { TeamOperationsWorkspace } from "./components/TeamOperationsWorkspace";
 import { TeamOverview } from "./components/TeamOverview";
+import { BackendDataWorkspace } from "./components/BackendDataWorkspace";
+import { WorkerProtocolPanel } from "./components/WorkerProtocolPanel";
 import { TeamScenarioService } from "./services/teamScenarios";
-import { moduleSource, teamOperationPages, teamScenarioPages, usesTeamBackend } from "./services/backendCapabilities";
+import { moduleSource, teamOperationPages, teamScenarioPages, teamUtilityPages, usesTeamBackend } from "./services/backendCapabilities";
 import { isTeamDevAuth } from "./services/authConfig";
 import { DevRoleSelect } from "./components/DevRoleSelect";
 import { getDevRole } from "./services/devRole";
@@ -71,7 +73,7 @@ import type {
 } from "./types";
 
 type Page = AppPage;
-const sagaTeamClient = { request: api.backendRequest, download: api.backendDownload };
+const sagaTeamClient = { request: api.backendRequest, download: api.backendDownload, media: api.backendMedia };
 const teamScenarios = new TeamScenarioService(sagaTeamClient);
 const rolePages: Record<UserRole, Page[]> = {
   "Scenario Engineer": [
@@ -81,6 +83,8 @@ const rolePages: Record<UserRole, Page[]> = {
     "import",
     "compare",
     "clusters",
+    "backend-data",
+    "run-detail", "oracles",
     "profile",
   ],
   "Test Engineer": [
@@ -90,6 +94,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "execution",
     "run-detail",
     "nodes",
+    "backend-data", "worker-protocol", "oracles",
     "failures",
     "report",
     "profile",
@@ -100,6 +105,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "failures",
     "report",
     "run-detail",
+    "backend-data", "oracles",
     "profile",
   ],
   Administrator: [
@@ -107,6 +113,7 @@ const rolePages: Record<UserRole, Page[]> = {
     "scenarios", "scenario-editor", "import", "compare", "clusters",
     "campaigns", "priority", "execution", "run-detail", "failures", "report",
     "users",
+    "backend-data", "worker-protocol",
     "nodes",
     "oracles",
     "analytics",
@@ -120,6 +127,7 @@ const navByRole: Record<
 > = {
   "Scenario Engineer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
+    { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
     {
       id: "scenarios",
       label: "Scenario library",
@@ -144,10 +152,13 @@ const navByRole: Record<
       icon: "map",
       group: "EXPLORE",
     },
+    { id: "run-detail", label: "Run results", icon: "play", group: "EXPLORE" },
+    { id: "oracles", label: "Test oracles", icon: "oracles", group: "EXPLORE" },
     { id: "profile", label: "My profile", icon: "users", group: "ACCOUNT" },
   ],
   "Test Engineer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
+    { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
     {
       id: "campaigns",
       label: "Campaigns",
@@ -167,6 +178,8 @@ const navByRole: Record<
       group: "TESTING",
     },
     { id: "nodes", label: "Worker setup", icon: "nodes", group: "TESTING" },
+    { id: "worker-protocol", label: "Worker API tools", icon: "nodes", group: "TESTING" },
+    { id: "oracles", label: "Test oracles", icon: "oracles", group: "TESTING" },
     {
       id: "failures",
       label: "Failure insights",
@@ -183,6 +196,8 @@ const navByRole: Record<
   ],
   "Test Reviewer": [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
+    { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
+    { id: "oracles", label: "Test oracles", icon: "oracles", group: "REVIEW" },
     { id: "review", label: "Review queue", icon: "shield", group: "REVIEW" },
     { id: "run-detail", label: "Run results", icon: "play", group: "REVIEW" },
     {
@@ -201,12 +216,14 @@ const navByRole: Record<
   ],
   Administrator: [
     { id: "overview", label: "Overview", icon: "overview", group: "WORKSPACE" },
+    { id: "backend-data", label: "Backend data", icon: "activity", group: "WORKSPACE" },
     { id: "scenarios", label: "Scenario library", icon: "scenarios", group: "DESIGN" },
     { id: "campaigns", label: "Campaigns", icon: "campaigns", group: "TESTING" },
     { id: "priority", label: "Prioritization", icon: "priority", group: "TESTING" },
     { id: "execution", label: "Execution queue", icon: "play", group: "TESTING" },
     { id: "users", label: "User management", icon: "users", group: "ACCESS" },
     { id: "nodes", label: "Simulation nodes", icon: "nodes", group: "SYSTEM" },
+    { id: "worker-protocol", label: "Worker API tools", icon: "nodes", group: "SYSTEM" },
     { id: "oracles", label: "Test oracles", icon: "oracles", group: "SYSTEM" },
     {
       id: "analytics",
@@ -238,6 +255,8 @@ const titles: Record<Page, string> = {
   analytics: "Analytics settings",
   audit: "Audit log",
   profile: "My profile",
+  "backend-data": "Backend data explorer",
+  "worker-protocol": "Worker API tools",
 };
 const dashboardLinks: Record<
   UserRole,
@@ -361,6 +380,9 @@ function AppContent() {
   }, [auth.status]);
 
   const navigate = (target: Page) => {
+    if (!usesTeamBackend && teamUtilityPages.includes(target)) {
+      notify(vi ? "Chức năng này cần chế độ API của backend nhóm." : "This feature requires team backend API mode."); return;
+    }
     if (!rolePages[role].includes(target)) {
       notify("This screen is not included in the current role preview.");
       return;
@@ -1048,7 +1070,7 @@ function AppContent() {
       (campaignScenarioCategory === "All types" || scenario.category === campaignScenarioCategory) &&
       (campaignScenarioSeverity === "All severities" || scenario.severity === campaignScenarioSeverity);
   });
-  const action = usesTeamBackend && [...teamScenarioPages, ...teamOperationPages].includes(page) ? null :
+  const action = usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamUtilityPages].includes(page) ? null :
     page === "scenarios" ? (
       <div className="actions">
         <button className="btn btn-light" onClick={() => navigate("import")}>
@@ -1135,7 +1157,7 @@ function AppContent() {
             <div className="nav-group" key={group}>
               <label>{group}</label>
               {navByRole[role]
-                .filter((n) => n.group === group)
+                .filter((n) => n.group === group && (usesTeamBackend || !teamUtilityPages.includes(n.id)))
                 .map((n) => (
                   <button
                     className={"nav-item " + (page === n.id ? "active" : "")}
@@ -1323,24 +1345,26 @@ function AppContent() {
               <i /> Loading workspace data
             </div>
           )}
-          <div className={`capability-banner ${moduleSource(page)}`} role="note">
-            <strong>{moduleSource(page) === "mock" ? (vi ? "Dữ liệu mẫu" : "Mock data") : moduleSource(page) === "mixed" ? (vi ? "Nguồn dữ liệu theo chức năng" : "Data source by feature") : (vi ? "Backend nhóm · API thật" : "Team backend · Live API")}</strong>
-            <span>{moduleSource(page) === "mock"
+          <div className={`capability-banner ${moduleSource(page, role)}`} role="note">
+            <strong>{moduleSource(page, role) === "mock" ? (vi ? "Dữ liệu mẫu" : "Mock data") : moduleSource(page, role) === "mixed" ? (vi ? "Nguồn dữ liệu theo chức năng" : "Data source by feature") : (vi ? "Backend nhóm · API thật" : "Team backend · Live API")}</strong>
+            <span>{moduleSource(page, role) === "mock"
               ? (vi ? "Backend mới chưa có API cho chức năng này. Thao tác chỉ dùng dữ liệu mẫu trên trình duyệt." : "The new backend has no API for this module. Actions use browser mock data.")
-              : moduleSource(page) === "mixed"
+              : moduleSource(page, role) === "mixed"
                 ? page === "oracles"
                   ? (vi ? "Cấu hình Oracle phía trên lấy từ backend. Form chỉnh sửa mẫu phía dưới chỉ lưu trong trình duyệt, không thay đổi ngưỡng đánh giá thật." : "The Oracle configurations above come from the backend. The demo editor below saves only in this browser and does not change actual evaluation thresholds.")
                   : (vi ? "Scenario, campaign và kết quả chạy lấy từ API. Phân cụm lỗi, báo cáo APFD, quản trị tài khoản và tùy chỉnh hồ sơ dùng dữ liệu mẫu." : "Scenarios, campaigns and run results use the API. Failure clustering, APFD reports, user administration and profile changes use mock data.")
                 : (vi ? "Dữ liệu được đọc và ghi qua Redux Saga tới backend AutoScenarioX mới." : "Data is read and written through Redux Saga to the new AutoScenarioX backend.")}</span>
           </div>
           {isTeamDevAuth && <div className="capability-banner mock" role="note"><strong>Development authentication</strong><span>{vi ? "Dùng bộ chọn Vai trò Dev trên thanh trên cùng để đổi quyền kiểm thử. Tài khoản Dev không kiểm tra mật khẩu; việc chọn role không thay đổi database. Dùng Supabase khi cần đăng nhập thật." : "Use the Dev role selector in the top bar to switch test permissions. The Dev account does not verify a password, and selecting a role does not change the database. Use Supabase for real sign-in."}</span></div>}
-          {usesTeamBackend && ["execution", "run-detail", "nodes"].includes(page) && <div className="capability-banner mock" role="note"><strong>{vi ? "Giới hạn của worker backend hiện tại" : "Current backend worker limitation"}</strong><span>{vi ? "Worker hiện truyền các đối số record_video/lite/max_sim_s mà recorder chưa nhận, nên chạy CARLA thật sẽ gặp lỗi hạ tầng. Frontend vẫn tạo và theo dõi hàng đợi qua API; cần nhóm backend sửa worker để thực thi thành công. Backend được giữ nguyên theo yêu cầu của bạn." : "The existing worker passes record_video/lite/max_sim_s arguments that its recorder does not accept, so real CARLA execution fails as an infrastructure error. The frontend can create and monitor the API queue; the backend team needs to repair the worker for successful execution. Backend code remains unchanged."}</span></div>}
+          {usesTeamBackend && ["execution", "run-detail", "nodes"].includes(page) && <div className="capability-banner mixed" role="note"><strong>{vi ? "Thực thi qua worker bên ngoài" : "Execution uses an external worker"}</strong><span>{vi ? "Start campaign tạo hàng đợi qua API. Worker Python phải nhận run, thực thi CARLA Low và gửi telemetry; frontend hiển thị kết luận backend trả về. Công cụ Worker API cho phép kiểm tra callback thủ công, không khởi động mô phỏng." : "Start campaign creates the API queue. The Python worker must claim runs, execute CARLA at Low quality and submit telemetry; the frontend displays the verdict returned by the backend. Worker API tools inspect manual callbacks and do not launch a simulation."}</span></div>}
           {usesTeamBackend && teamScenarioPages.includes(page) && <TeamScenarioWorkspace
             service={teamScenarios} page={page} initialScenarioId={editorScenarioId} onChanged={refreshWorkspace} onNotify={notify} />}
           {usesTeamBackend && teamOperationPages.includes(page) && <TeamOperationsWorkspace
             client={sagaTeamClient} page={page} role={role} onNavigate={navigate} onChanged={refreshWorkspace} onNotify={notify} />}
-          {usesTeamBackend && page === "oracles" && <section><div className="capability-banner mock"><strong>{vi ? "Form chỉnh sửa Oracle · Mock" : "Oracle editor · Mock"}</strong><span>{vi ? "Backend hiện chưa có API chỉnh sửa Oracle. Form này không thay đổi cấu hình thật phía trên." : "The backend has no Oracle editing API. This form does not change the actual configurations above."}</span></div><Oracles rules={rules} profile={oracleProfile} onSave={saveRules} /></section>}
-          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages].includes(page)) && <>
+          {usesTeamBackend && page === "backend-data" && <BackendDataWorkspace client={sagaTeamClient} role={role} onRefreshSession={async () => { await api.backendRefreshSession(); dispatch(bootstrapAuthRequested()); }} />}
+          {usesTeamBackend && page === "worker-protocol" && <WorkerProtocolPanel client={sagaTeamClient} role={role} onNotify={notify} />}
+          {usesTeamBackend && page === "oracles" && role === "Administrator" && <section><div className="capability-banner mock"><strong>{vi ? "Form chỉnh sửa Oracle · Mock" : "Oracle editor · Mock"}</strong><span>{vi ? "Backend hiện chưa có API chỉnh sửa Oracle. Form này không thay đổi cấu hình thật phía trên." : "The backend has no Oracle editing API. This form does not change the actual configurations above."}</span></div><Oracles rules={rules} profile={oracleProfile} onSave={saveRules} /></section>}
+          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamUtilityPages].includes(page)) && <>
           {page === "overview" && (
             <RoleWelcome role={role} onNavigate={navigate} />
           )}
@@ -1950,12 +1974,12 @@ function pageDescription(page: Page) {
       "Order scenarios to reveal faults earlier and compare APFD effectiveness.",
     failures:
       "Review oracle evidence, recurring patterns and root-cause explanations.",
-    nodes: "Monitor CARLA workers and available simulation capacity.",
+    nodes: usesTeamBackend ? "Keep a local worker reference profile and inspect manual startup instructions." : "Monitor CARLA workers and available simulation capacity.",
     oracles: "Manage the safety rules used to evaluate each simulation run.",
     "scenario-editor":
       "Configure a scenario and validate it automatically before testing.",
-    import: "Validate and bring OpenSCENARIO files into your reusable library.",
-    compare: "Compare scenario context, risk, coverage and execution results.",
+    import: usesTeamBackend ? "Import canonical JSON or YAML with format and category controls." : "Validate and bring OpenSCENARIO files into your reusable library.",
+    compare: usesTeamBackend ? "Compare immutable versions and inspect execution-relevant changes." : "Compare scenario context, risk, coverage and execution results.",
     clusters: "Explore scenarios grouped by road context and shared tags.",
     execution: "Monitor campaigns waiting for simulation capacity.",
     "run-detail": "Inspect scenario-level outcomes and execution evidence.",
@@ -1965,6 +1989,8 @@ function pageDescription(page: Page) {
     analytics: "Configure default report scope and insight delivery.",
     audit: "Trace important changes across the simulation workspace.",
     profile: "Manage your workspace identity and notification preferences.",
+    "backend-data": "Browse READY versions, execution packages, reference data, identity and database health.",
+    "worker-protocol": "Inspect worker callbacks and submit existing telemetry or video through the API.",
   };
   return descriptions[page];
 }

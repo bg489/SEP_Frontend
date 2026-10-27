@@ -78,6 +78,8 @@ function makeId(prefix: string, items: { id: string }[]): string {
 export const mockApi: AutoScenarioApi = {
   async backendRequest<T>(): Promise<T> { throw new Error("This action needs the team backend. Switch VITE_DATA_MODE to api."); },
   async backendDownload(): Promise<void> { throw new Error("This download needs the team backend."); },
+  async backendMedia(): Promise<Blob> { throw new Error("Run video playback needs the team backend."); },
+  async backendRefreshSession(): Promise<void> { throw new Error("Session refresh needs the team backend."); },
   async getOverview(): Promise<OverviewData> {
     return readStored("autoscenariox.mock.overview", mockOverview);
   },

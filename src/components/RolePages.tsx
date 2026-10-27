@@ -12,6 +12,7 @@ import {
 } from "../services/workflowStore";
 import { isAuthApiEnabled } from "../services/authConfig";
 import { api, isMockMode } from "../services/api";
+import { mockFeaturePages } from "../services/backendCapabilities";
 import type { AppDispatch, RootState } from "../app/store";
 import { carlaObstacleOptions, carlaPedestrians, carlaVehicles } from "../data/carlaVehicles";
 import { VehicleSelect } from "./VehicleSelect";
@@ -113,13 +114,13 @@ export function RoleWelcome({
       },
       {
         title: "Import scenarios",
-        detail: "Validate an OpenSCENARIO file",
+        detail: isMockMode ? "Validate an OpenSCENARIO file" : "Import canonical JSON or YAML",
         page: "import",
         icon: "campaigns",
       },
       {
         title: "Compare versions",
-        detail: "Review risk and coverage changes",
+        detail: isMockMode ? "Review risk and coverage changes" : "Compare immutable scenario content",
         page: "compare",
         icon: "priority",
       },
@@ -133,7 +134,7 @@ export function RoleWelcome({
       },
       {
         title: "Prioritization",
-        detail: "Order tests by risk and history",
+        detail: isMockMode ? "Order tests by risk and history" : "Rank content features and inspect estimates",
         page: "priority",
         icon: "priority",
       },
@@ -173,13 +174,13 @@ export function RoleWelcome({
       },
       {
         title: "Simulation nodes",
-        detail: "Monitor CARLA capacity",
+        detail: isMockMode ? "Monitor CARLA capacity" : "Local worker reference profile",
         page: "nodes",
         icon: "nodes",
       },
       {
         title: "Safety configuration",
-        detail: "Maintain oracle thresholds",
+        detail: isMockMode ? "Maintain oracle thresholds" : "Read versioned backend thresholds",
         page: "oracles",
         icon: "failures",
       },
@@ -208,7 +209,7 @@ export function RoleWelcome({
               <Icon name={card.icon} size={17} />
             </span>
             <span>
-              <b>{card.title}</b>
+              <b>{card.title}{!isMockMode && mockFeaturePages.includes(card.page) ? " · Mock" : ""}</b>
               <small>{card.detail}</small>
             </span>
             <Icon name="arrow-right" size={15} />

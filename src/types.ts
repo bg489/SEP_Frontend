@@ -24,6 +24,8 @@ export type AppPage =
   | "users"
   | "analytics"
   | "audit"
+  | "backend-data"
+  | "worker-protocol"
   | "profile";
 
 export interface DemoUser {
@@ -267,6 +269,8 @@ export interface ScenarioFilters {
 export interface AutoScenarioApi {
   backendRequest<T>(path: string, init?: RequestInit): Promise<T>;
   backendDownload(path: string, fileName: string): Promise<void>;
+  backendMedia(path: string): Promise<Blob>;
+  backendRefreshSession(): Promise<void>;
   getOverview(): Promise<OverviewData>;
   getCarlaIntegration(): Promise<CarlaIntegrationConfig>;
   saveCarlaIntegration(config: CarlaIntegrationConfig): Promise<CarlaIntegrationConfig>;

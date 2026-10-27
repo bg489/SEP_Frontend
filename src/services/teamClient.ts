@@ -20,7 +20,8 @@ export class TeamApiError extends Error {
     const fieldMessages = Object.entries(problem.errors ?? {}).flatMap(([field, errors]) => errors.map((message) => `${field}: ${message}`));
     const issueMessages = (problem.report?.errors ?? []).map((issue) => `${issue.path}: ${issue.message}`);
     const headline = problem.message ?? problem.title ?? problem.detail ?? `Request failed (HTTP ${status}).`;
-    super([headline, ...fieldMessages, ...issueMessages].filter(Boolean).join("\n"));
+    const detail = problem.detail && problem.detail !== headline ? problem.detail : undefined;
+    super([headline, detail, ...fieldMessages, ...issueMessages].filter(Boolean).join("\n"));
     this.name = "TeamApiError";
     this.status = status;
     this.code = problem.code ?? `HTTP_${status}`;
@@ -118,4 +119,10 @@ export async function downloadTeamArtifact(path: string, fileName: string): Prom
   } finally { finish(); }
 }
 
-export const teamClient = { request: requestTeamApi, response: requestTeamResponse, download: downloadTeamArtifact };
+export async function readTeamMedia(path: string): Promise<Blob> {
+  const finish = beginApiActivity();
+  try { return await (await requestTeamResponse(path)).blob(); }
+  finally { finish(); }
+}
+
+export const teamClient = { request: requestTeamApi, response: requestTeamResponse, download: downloadTeamArtifact, media: readTeamMedia };

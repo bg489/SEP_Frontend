@@ -1,6 +1,7 @@
 import type { AutoScenarioApi, CarlaIntegrationConfig, Campaign, OverviewData } from "../types";
 import { mockApi } from "./mockApi";
-import { TeamApiError, downloadTeamArtifact, requestTeamApi, teamClient } from "./teamClient";
+import { TeamApiError, downloadTeamArtifact, readTeamMedia, refreshTeamSession, requestTeamApi, teamClient } from "./teamClient";
+import { isTeamDevAuth } from "./authConfig";
 import { TeamScenarioService, teamScenarioFromReady } from "./teamScenarios";
 import { campaignToUi, runToUi, type TeamCampaign, type TeamRun } from "./teamOperations";
 
@@ -29,6 +30,11 @@ export const teamBackendApi: AutoScenarioApi = {
   ...mockApi,
   backendRequest: requestTeamApi,
   backendDownload: downloadTeamArtifact,
+  backendMedia: readTeamMedia,
+  async backendRefreshSession() {
+    if (isTeamDevAuth) throw new Error("Dev mode has no Supabase token to refresh.");
+    await refreshTeamSession();
+  },
   listScenarios: allUiScenarios,
   createScenario: input => scenarios.createScenario(input),
   persistImportedScenario: (scenario, content) => scenarios.persistImportedScenario(scenario, content),
