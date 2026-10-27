@@ -1,122 +1,139 @@
-# SEP_Frontend
+# AutoScenarioX Frontend
 
-**AutoScenarioX — Scenario Management and Explainable Failure Analytics**
+React + TypeScript, Redux Toolkit và Redux Saga; giao diện tiếng Việt/tiếng Anh với màu chủ đạo `#FF6363`, `#FCFFA7`.
 
-This repository contains the AutoScenarioX frontend: a role-based single-page application for designing driving scenarios, managing test campaigns, reviewing failures, and configuring the simulation workspace. The interface supports English and Vietnamese; English is the default, and the selected language is remembered in the browser. Authentication requests are managed with Redux Saga.
+Frontend này gọi **backend của nhóm** tại:
 
-The app starts in **mock mode**. Its API boundary is designed so the frontend can later use the .NET REST API without coupling screen components to HTTP or Supabase.
+```text
+C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend
+```
 
-## Features by role
+Không chạy backend cũ ở `Project\Backend`. Các thay đổi trong nhánh này chỉ thuộc repository Frontend; backend của nhóm giữ nguyên.
 
-| Role | Screens and workflows |
+## Chức năng và nguồn dữ liệu
+
+| Chức năng | Nguồn dữ liệu / hành vi |
 | --- | --- |
-| **Scenario Engineer** | Overview, scenario library and editor, scenario import, side-by-side comparison, scenario clusters, profile |
-| **Test Engineer** | Overview, campaign creation and management, prioritization, execution queue and run details, failure insights, campaign reports, profile |
-| **Test Reviewer** | Overview, scenario approval queue, failure evidence and root-cause review, run details, campaign reports, profile |
-| **Administrator** | Overview, user and role management, simulation nodes, test-oracle rules, analytics settings, audit log, profile |
+| Login, refresh token, current user | API `/api/v1/auth`; Supabase Auth qua .NET 8 khi cấu hình Supabase |
+| Scenario repository | API thật: tìm kiếm/phân trang, metadata, archive/restore/clone |
+| Authoring | Draft JSON theo schema; form map, route/spawn/transform, ego/NPC, pedestrian/obstacle, weather, event/trigger, parameter và execution |
+| Validate/publish | Báo cáo validation, revision/If-Match; publish phiên bản READY, giữ version bất biến |
+| Version/diff/import/export/variant | API thật; JSON/YAML; diff giữa các version của cùng scenario |
+| Campaign | API thật; chọn **scenarioVersionId READY** với search/filter; SUT Behavior Agent hoặc Autopilot |
+| Prioritization | API thật; lưu thứ tự vào campaign. APFD/APFDc là **ước lượng từ đặc trưng**, không phải kết quả đo của campaign đã chạy |
+| Execution | API thật: start/rerun, poll runs, xem đầy đủ Oracle evaluation/violation, tải JSON; phát MP4 có xác thực và tải video nếu worker đã upload |
+| Backend data | API thật: READY mới nhất/lịch sử, đủ bộ lọc/phân trang, execution package, map/catalog/schema, tài khoản hiện tại và database health |
+| Worker API tools | API thật nâng cao: claim/running/requeue-infra, upload NDJSON và MP4 gốc, đọc kết quả/gói thực thi; không khởi động CARLA |
+| Oracle config | Đọc cấu hình thật trong workspace execution; form sửa Oracle cũ là mock |
+| Worker settings/status, user administration, register/reset password, profile editing | **Mock/demo** vì backend chưa có API; không tạo tài khoản Supabase hoặc lưu mật khẩu |
+| Scenario clusters, failure clustering/review, APFD report, analytics settings, audit | **Mock trên trình duyệt**, có nhãn rõ ràng |
 
-The sign-in screen includes registration and forgot-password views. Use the **EN / VI** switch on the sign-in screen or in the top bar to change the interface language. In mock mode, the role selector previews each role's navigation. In API mode, the role comes from the backend and the preview selector is hidden.
+Không tự chuyển lỗi HTTP/network của chức năng thật thành mock thành công. Mọi thao tác API từ UI đi qua Redux Saga, gồm download. Loading và khóa thao tác xuất hiện khi request đang chạy.
 
-## Run locally
-
-### Requirements
-
-- Node.js 20.19 or newer
-- npm
-- .NET 10 SDK and PostgreSQL 18 to run backend authentication
-
-### Install and start
+Đối chiếu hiện tại: **51/51 HTTP method + route** trong Swagger có luồng frontend và kiểm tra contract. Xem [bảng đầy đủ và phạm vi kiểm tra](docs/backend-api-coverage.md). Đây là toàn bộ API backend hiện có, không có nghĩa những chức năng đồ án chưa có endpoint đã trở thành dữ liệu thật.
 
 ```powershell
-npm install
+npm run verify:api
+npm run build
+```
+
+`verify:api` dùng transport/file giả lập trong bộ nhớ; không ghi database, khởi động CARLA hoặc gọi backend thật. Các kiểm tra bao gồm If-Match, multipart import, query, payload, nguyên trạng file PUT, auth refresh/401, Blob video, state/error và đủ 51 route trong snapshot contract.
+
+## Chạy trên máy
+
+Yêu cầu Node.js tương thích Vite, npm; .NET **8 SDK** và cấu hình database theo repository backend của nhóm.
+
+Terminal backend:
+
+```powershell
+cd "C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend"
+dotnet run --project AutoScenarioX.Api --launch-profile http
+```
+
+Backend đọc connection string từ .NET user-secrets `autoscenariox-api-dev`, key `ConnectionStrings:Supabase`. Không đưa secret vào frontend/Git. Database của nhóm dùng schema `asx` và SQL migrations trong repository backend; không chạy lại seed/reset trên database dùng chung.
+
+Terminal frontend:
+
+```powershell
+cd "C:\Users\admin\Desktop\Hoc Bai\SEP\Project\Frontend"
+# Chỉ copy khi chưa có file local.
+if (!(Test-Path .env.local)) { Copy-Item .env.example .env.local }
+npm ci
 npm run dev
 ```
 
-Open the local address printed by Vite (usually `http://localhost:5173`).
+Mở URL Vite in trong terminal, thường `http://localhost:5173`. Vite proxy `/api` tới `http://localhost:5080`; Swagger ở `http://localhost:5080/swagger`.
 
-Useful project scripts:
+### Xác thực
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the local Vite development server |
-| `npm run build` | Type-check and create a production build |
-| `npm run lint` | Run Oxlint |
-| `npm run preview` | Serve the production build locally |
+`.env.example` mặc định `VITE_AUTH_MODE=Supabase`. Backend phải có `Auth:Mode=Supabase`, `Auth:ProjectUrl`, `Auth:AnonKey` theo hướng dẫn của nhóm. Tài khoản thật đăng nhập qua API; role lấy từ backend. Register và forgot-password trong UI hiện chỉ là demo có nhãn, không tạo session/tài khoản thật.
 
-## Authentication
-
-Sign-in and registration always use the .NET authentication API. A user must exist in the PostgreSQL `autoscenariox` database (or register through the API) and provide the correct password. There are no demo credentials, local mock accounts, or role-preview sign-ins. If the API is unavailable or rejects the credentials, the frontend stays on the sign-in screen and displays the error.
-
-## Mock data and API integration
-
-The app uses mock scenario-management data by default, while authentication always uses the .NET backend. Copy `.env.example` to `.env.local` to set the API URL:
+Backend trên máy hiện cấu hình Dev; `.env.local` hiện ghép tương ứng:
 
 ```dotenv
-VITE_DATA_MODE=mock
-VITE_API_BASE_URL=http://localhost:5080
+VITE_DATA_MODE=api
+VITE_API_BASE_URL=
+VITE_AUTH_MODE=Dev
 ```
 
-Start the backend first, then restart Vite after changing `.env.local`. `VITE_DATA_MODE` only switches scenario-management data; it never changes authentication. Set `VITE_DATA_MODE=api` only when the scenario-management endpoints listed below are available.
+Chọn **Open development workspace** để dùng danh tính Dev do backend cấu hình. Dev **không kiểm tra email/mật khẩu**; UI hiện cảnh báo rõ. Chuyển cả frontend và backend sang Supabase khi dùng xác thực thật. Frontend không sửa role lưu trong database; chế độ Supabase luôn lấy role thật từ backend.
 
-### Run backend authentication
+### Đổi role trong Dev
 
-The separate backend project is in `../Backend`. It targets PostgreSQL 18 database `autoscenariox` and keeps its Identity tables in schema `app_auth`. Follow [the backend setup guide](../Backend/README.md) to configure .NET User Secrets, run the API, and optionally provision the first administrator. The API runs at `http://localhost:5080`.
+- Trước khi vào workspace: chọn **Dev role / Vai trò Dev** trên màn hình đăng nhập, rồi bấm **Open development workspace**.
+- Sau khi vào workspace: đổi **Dev role / Vai trò Dev** trên thanh trên cùng. Giao diện trở về Tổng quan, tải lại dữ liệu và menu theo role vừa chọn qua Redux Saga.
+- Có đủ `SCENARIO_ENGINEER`, `TEST_ENGINEER`, `TEST_REVIEWER`, `ADMIN`. Lựa chọn được nhớ trong session của tab trình duyệt.
 
-Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/forgot-password`, and `POST /api/auth/reset-password`. During registration, users may select Scenario Engineer, Test Engineer, or Test Reviewer; Administrator can only be assigned by an administrator. Administrator-only role management is provided by `GET /api/admin/users` and `PUT /api/admin/users/{id}/role`. Password-reset email delivery still needs a mail provider in production.
+Frontend gửi header `X-Asx-Dev-Role` cho các request Dev, dùng cơ chế đã có của backend. `/auth/me` hiện trả role lưu trong database, nên trong Dev giao diện hiển thị role tạm thời đã chọn để khớp với quyền mà header áp dụng. Việc này không đổi tài khoản hoặc role trong database. Nếu `/me` lỗi, frontend không tạo phiên giả để vào hệ thống.
 
-### Frontend service boundary
+Bộ chọn và header Dev bị tắt khi `VITE_AUTH_MODE=Supabase`; role trong phiên Supabase không bị ghi đè.
 
-- `src/data/mockData.ts` provides sample scenarios, campaigns, failures, workers, dashboard metrics, and oracle rules.
-- `src/services/mockApi.ts` implements the demo API. Scenario and campaign creation, root-cause confirmation, and oracle edits are saved in browser `localStorage`.
-- `src/services/httpApi.ts` implements the .NET REST adapter.
-- `src/services/api.ts` selects the mock or HTTP implementation using `VITE_DATA_MODE`.
-- `src/services/authApi.ts` sends login, registration, password-reset, and session requests to the .NET authentication API.
-- `src/features/auth/authSaga.ts` handles login, registration, session restore, password-reset requests, and logout.
-- `src/app/store.ts` creates the Redux store and runs the authentication saga.
-- `src/types.ts` defines the API and screen data contracts.
+`VITE_DATA_MODE=mock` chỉ xem trước workflow, không bật phiên đăng nhập giả. `.env.local` được Git ignore.
 
-### Expected .NET API endpoints
+## CARLA với backend hiện có
 
-| Method | Endpoint | Used for |
-| --- | --- | --- |
-| `GET` | `/api/dashboard/overview` | Dashboard metrics and activity |
-| `GET`, `POST` | `/api/scenarios` | Search/list scenarios and create a scenario (`search` and `status` query parameters are supported) |
-| `GET`, `POST` | `/api/campaigns` | List and create campaigns |
-| `GET` | `/api/analytics/failure-clusters` | Failure clusters and evidence |
-| `POST` | `/api/analytics/failure-clusters/{id}/confirm` | Confirm a reviewed root cause |
-| `GET` | `/api/simulation-nodes` | Simulation worker status |
-| `GET`, `PUT` | `/api/oracles/rules` | Read and save oracle rules |
+CARLA cài tại `C:\Users\admin\Downloads\CARLA_0.9.16`; luôn dùng Low quality. Backend hiện **không có API quản lý process worker**, nên màn hình Worker chỉ lưu cấu hình mẫu trên trình duyệt; nó không xác nhận kết nối hoặc mở CARLA.
 
-API responses should match the TypeScript contracts in `src/types.ts`. Configure CORS on the .NET API for the frontend origin. If an API request fails, the interface keeps its available demo data and displays a notification.
+Để chạy thật, cần khởi động worker hiện có của repository backend theo hướng dẫn của nhóm. Frontend chỉ tạo/start campaign, theo dõi run và hiển thị kết quả backend trả về. Source/launcher của backend không được sửa trong nhánh này; lỗi Python/runtime thuộc backend sẽ được hiển thị, không thay bằng PASS giả.
 
-Actual CARLA execution, OpenSCENARIO parsing, campaign approval, node registration, and report export still need backend support.
-
-### Supabase and secrets
-
-The frontend is intended to call the .NET API. Keep Supabase database access and service-role credentials on the backend; never put a service key in a `VITE_*` variable. If Supabase Auth is later used in the browser, only expose its public anon key and keep authorization checks in .NET as required.
-
-## Project structure
+Luồng dữ liệu hiện có:
 
 ```text
-src/
-  components/   Authentication and role-specific screens
-  data/         Initial mock data
-  services/     Mock API, HTTP API, and API selector
-  App.tsx       App shell, role navigation, shared flows
-  types.ts      Shared data and API contracts
-  index.css     Application styling
+UI → Redux Saga → teamClient → .NET API → Supabase PostgreSQL
+                                   ↑
+                    Python worker ↔ CARLA 0.9.16
 ```
 
-## Git workflow
+Scenario phải được save/validate/publish READY trước khi chọn vào campaign. Start campaign chỉ tạo hàng đợi; cần worker thực sự claim/chạy/upload telemetry để có kết quả. Rerun hiện **xóa run cũ của campaign** và UI yêu cầu xác nhận. Backend chưa có cancel campaign.
 
-This frontend folder is a Git repository with an `origin` remote. Create a feature branch for work intended to merge into `main`, then push that branch and open a pull request:
+Backend nhóm dùng canonical JSON/YAML và Python API worker. Nó không dùng endpoint OpenSCENARIO/ScenarioRunner của backend cũ. Không diễn giải các ghi chú tự do thành route/event có thể thực thi.
+
+Tham khảo chính thức: [Synchrony](https://carla.readthedocs.io/en/0.9.16/adv_synchrony_timestep/), [Traffic Manager](https://carla.readthedocs.io/en/0.9.16/adv_traffic_manager/), [Rendering/Low](https://carla.readthedocs.io/en/0.9.16/adv_rendering_options/). Low vẫn render; no-rendering làm camera/GPU sensor trả dữ liệu rỗng.
+
+## Cấu trúc tích hợp
+
+- `src/services/backendCapabilities.ts`: module thật/mock.
+- `src/services/teamClient.ts`: auth token/refresh, ProblemDetails, loading/download.
+- `src/services/teamScenarios.ts`: repository, draft, version, handoff.
+- `src/services/teamOperations.ts`: campaign/run/Oracle DTO.
+- `src/components/TeamScenarioWorkspace.tsx`, `TeamOperationsWorkspace.tsx`: màn hình theo contract backend nhóm.
+
+Để deploy ở origin khác, đặt `VITE_API_BASE_URL` và CORS theo backend. `TEAM_API_TARGET` thay đích proxy của Vite khi phát triển. Không đặt Supabase service-role key, DB password hoặc connection string trong biến `VITE_*`.
+
+## Git
+
+Làm việc trên nhánh tính năng, commit theo chức năng; không push trực tiếp main. Yêu cầu hiện tại chỉ commit, chưa push.
 
 ```powershell
-git switch -c feature/short-description
+git branch --show-current
 git status
-git add <files-to-include>
-git commit -m "feat: describe the change"
-git push -u origin feature/short-description
+git log --oneline -8
+# Khi đã kiểm tra và muốn push nhánh hiện tại:
+git push -u origin HEAD
 ```
 
-Review `git status` before committing. Do not push directly to `main`. The backend is a sibling folder and is not inside this frontend Git repository; version-control it in its own repository when your team creates one. To verify the frontend remote, run `git remote -v`.
+### Giới hạn worker đã đối chiếu trong source backend
+
+Frontend dùng API có sẵn và giữ nguyên các sửa đổi launcher/worker do bạn thực hiện. Start campaign chỉ tạo hàng đợi; quá trình CARLA phải được worker bên ngoài thực thi và upload telemetry. Nút `Claim` trong công cụ nâng cao dành cho xử lý thủ công: nó lấy tác vụ khỏi hàng đợi, nên worker thông thường sẽ không nhận lại tác vụ đó. Không cần thao tác này khi chạy campaign theo luồng worker bình thường.
+
+Recorder hiện chỉ hỗ trợ `pedestrian_crossing`, `lead_vehicle_brake`; chưa thực thi `vehicle_cut_in`, `traffic_light_override`, SUT Autopilot và kiểm tra red-light. Worker hiện gửi header Dev, chưa hỗ trợ Bearer Supabase. Các giới hạn runtime này thuộc backend/worker và không được thay đổi trong công việc frontend. Việc API lưu được cấu hình hoặc trả gói runnable chưa chứng minh mô phỏng đã thực thi. Không dùng `--simulate` để xác nhận chạy CARLA thật.

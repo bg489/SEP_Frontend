@@ -1,7 +1,7 @@
-export type ScenarioStatus = "Approved" | "In review" | "Draft" | "Archived";
+export type ScenarioStatus = "Active" | "Approved" | "In review" | "Draft" | "Archived";
 export type CampaignStatus =
-  "Running" | "Queued" | "Completed" | "Draft" | "Needs review";
-export type RunVerdict = "PASS" | "FAIL" | "TIMEOUT";
+  "Running" | "Queued" | "Completed" | "Draft" | "Needs review" | "Failed" | "Cancelled";
+export type RunVerdict = "PASS" | "FAIL" | "TIMEOUT" | "ERROR";
 export type UserRole =
   "Scenario Engineer" | "Test Engineer" | "Test Reviewer" | "Administrator";
 
@@ -24,6 +24,8 @@ export type AppPage =
   | "users"
   | "analytics"
   | "audit"
+  | "backend-data"
+  | "worker-protocol"
   | "profile";
 
 export interface DemoUser {
@@ -49,6 +51,91 @@ export interface Scenario {
   owner: string;
   tags: string[];
   priorityScore: number;
+  routeDescription?: string;
+  egoVehicle?: string;
+  trafficDensity?: "Low" | "Medium" | "High";
+  pedestrianCount?: number;
+  obstacleCount?: number;
+  triggerCondition?: string;
+  actions?: string;
+  sourceFileName?: string;
+  executionMode?: "CARLA actors" | "OpenSCENARIO source";
+  trafficVehicle?: string;
+  trafficVehicleCount?: number;
+  pedestrianBlueprint?: string;
+  obstacleBlueprint?: string;
+  executionDurationSeconds?: number;
+  speedLimitOffsetPercent?: number;
+}
+
+export interface ScenarioVersionRecord {
+  version: string;
+  savedAt: string;
+  note: string;
+  hash: string;
+  status: ScenarioStatus;
+}
+
+export interface ScenarioRun {
+  id: string;
+  campaignId: string;
+  scenarioId: string;
+  scenarioName: string;
+  scenarioVersion: string;
+  state: "Queued" | "Assigned" | "Running" | "Passed" | "Failed" | "Cancelled" | "Timed Out";
+  progress: number;
+  verdict?: RunVerdict;
+  startedAt?: string;
+  durationSeconds?: number;
+  workerId?: string;
+  retryOf?: string;
+  repetition?: number;
+  sutVersion?: string;
+  agent?: "Behavior Agent" | "Autopilot";
+  randomSeed?: number;
+  oracleProfile?: string;
+  artifacts: string[];
+  evidence: FailureEvidence[];
+}
+
+export interface AuditEvent {
+  id: string;
+  time: string;
+  actor: string;
+  action: string;
+  target: string;
+  result: "Success" | "Rejected" | "Info";
+}
+
+export interface CarlaIntegrationConfig {
+  host: string;
+  rpcPort: number;
+  streamingPort: number;
+  carlaVersion: string;
+  scenarioRunnerPath: string;
+  qualityLevel: "Low";
+  validated: boolean;
+  active: boolean;
+  connectionStatus: "Not tested" | "Ready" | "Connected" | "Failed";
+  updatedAt: string;
+}
+
+export interface AnalyticsPreferences {
+  similarityWarning: number;
+  similarityBlock: number;
+  featureWeights: { map: number; category: number; weather: number; severity: number; actors: number };
+  retentionDays: number;
+  reportDays: string;
+  includeDrafts: boolean;
+  group: string;
+  weeklyEmail: boolean;
+}
+
+export interface OracleProfileState {
+  version: number;
+  active: boolean;
+  validated: boolean;
+  updatedAt: string;
 }
 
 export interface Campaign {
@@ -64,6 +151,13 @@ export interface Campaign {
   passRate: number;
   failedRuns: number;
   estimatedDuration: string;
+  sutName?: string;
+  sutVersion?: string;
+  agent?: "Behavior Agent" | "Autopilot";
+  randomSeed?: number;
+  repetitions?: number;
+  timeoutSeconds?: number;
+  oracleProfile?: string;
 }
 
 export interface FailureEvidence {
@@ -86,6 +180,10 @@ export interface FailureCluster {
   scenarioName: string;
   confidence: number;
   evidence: FailureEvidence[];
+  sourceRunId?: string;
+  reviewedBy?: string;
+  reviewerNote?: string;
+  originalLabel?: string;
 }
 
 export interface WorkerNode {
@@ -133,6 +231,20 @@ export interface CreateScenarioInput {
   category: string;
   severity: Scenario["severity"];
   weather: string;
+  routeDescription: string;
+  egoVehicle: string;
+  trafficDensity: "Low" | "Medium" | "High";
+  pedestrianCount: number;
+  obstacleCount: number;
+  triggerCondition: string;
+  actions: string;
+  executionMode: "CARLA actors" | "OpenSCENARIO source";
+  trafficVehicle: string;
+  trafficVehicleCount: number;
+  pedestrianBlueprint: string;
+  obstacleBlueprint: string;
+  executionDurationSeconds: number;
+  speedLimitOffsetPercent: number;
 }
 
 export interface CreateCampaignInput {
@@ -140,6 +252,13 @@ export interface CreateCampaignInput {
   description: string;
   scenarioIds: string[];
   strategy: string;
+  sutName?: string;
+  sutVersion?: string;
+  agent?: "Behavior Agent" | "Autopilot";
+  randomSeed?: number;
+  repetitions?: number;
+  timeoutSeconds?: number;
+  oracleProfile?: string;
 }
 
 export interface ScenarioFilters {
@@ -148,14 +267,41 @@ export interface ScenarioFilters {
 }
 
 export interface AutoScenarioApi {
+  backendRequest<T>(path: string, init?: RequestInit): Promise<T>;
+  backendDownload(path: string, fileName: string): Promise<void>;
+  backendMedia(path: string): Promise<Blob>;
+  backendRefreshSession(): Promise<void>;
   getOverview(): Promise<OverviewData>;
+  getCarlaIntegration(): Promise<CarlaIntegrationConfig>;
+  saveCarlaIntegration(config: CarlaIntegrationConfig): Promise<CarlaIntegrationConfig>;
+  testCarlaIntegration(): Promise<CarlaIntegrationConfig>;
+  getAnalyticsPreferences(): Promise<AnalyticsPreferences>;
+  saveAnalyticsPreferences(preferences: AnalyticsPreferences): Promise<AnalyticsPreferences>;
+  listAuditEvents(): Promise<AuditEvent[]>;
   listScenarios(filters?: ScenarioFilters): Promise<Scenario[]>;
   createScenario(input: CreateScenarioInput): Promise<Scenario>;
+  persistImportedScenario(scenario: Scenario, sourceContent: string): Promise<Scenario>;
+  updateScenario(id: string, changes: Partial<Scenario>): Promise<Scenario>;
+  cloneScenario(id: string): Promise<Scenario>;
+  updateScenarioStatus(id: string, status: ScenarioStatus, note?: string): Promise<Scenario>;
+  listScenarioVersions(id: string): Promise<ScenarioVersionRecord[]>;
   listCampaigns(): Promise<Campaign[]>;
   createCampaign(input: CreateCampaignInput): Promise<Campaign>;
+  updateCampaign(id: string, changes: Partial<Campaign>): Promise<Campaign>;
+  getCampaignRanking(id: string): Promise<Record<string, unknown> | null>;
+  saveCampaignRanking(id: string, ranking: Record<string, unknown>): Promise<void>;
+  updateScenarioMetrics(id: string, changes: Pick<Scenario, "runCount" | "passRate" | "lastRun">): Promise<Scenario>;
+  listRuns(): Promise<ScenarioRun[]>;
+  downloadRunArtifact(runId: string, fileName: string): Promise<void>;
+  queueCampaignRuns(campaignId: string, scenarioIds?: string[], retryOf?: string): Promise<ScenarioRun[]>;
+  cancelCampaignRuns(campaignId: string): Promise<ScenarioRun[]>;
+  addFailureCluster(failure: FailureCluster): Promise<FailureCluster>;
   listFailures(): Promise<FailureCluster[]>;
-  confirmFailureCluster(id: string): Promise<FailureCluster>;
+  confirmFailureCluster(id: string, changes?: Partial<FailureCluster>): Promise<FailureCluster>;
   listWorkers(): Promise<WorkerNode[]>;
+  saveWorkers(workers: WorkerNode[]): Promise<WorkerNode[]>;
   listOracleRules(): Promise<OracleRule[]>;
   saveOracleRules(rules: OracleRule[]): Promise<OracleRule[]>;
+  getOracleProfileState(): Promise<OracleProfileState>;
+  saveOracleProfileState(profile: OracleProfileState): Promise<OracleProfileState>;
 }

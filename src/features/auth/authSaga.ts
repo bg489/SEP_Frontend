@@ -1,10 +1,14 @@
-import { call, put, takeLatest } from "redux-saga/effects";
+import { eventChannel } from "redux-saga";
+import { call, fork, put, take, takeLatest } from "redux-saga/effects";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import type { DemoUser, UserRole } from "../../types";
 import { authApi, type AdminUser, type AuthSession, type LoginInput, type RegisterInput } from "../../services/authApi";
-import { getAccessToken, setAccessToken } from "../../services/authToken";
+import { getAccessToken, sessionExpiredEvent, setAccessToken } from "../../services/authToken";
+import { isTeamDevAuth } from "../../services/authConfig";
+import { setDevRole, type DevRole } from "../../services/devRole";
 import {
   authAnonymous,
+  authDemoCompleted,
   adminRoleChangeRequested,
   adminUserRoleChanged,
   adminUsersFailed,
@@ -19,6 +23,7 @@ import {
   passwordResetSucceeded,
   registerRequested,
   signedOut,
+  switchDevRoleRequested,
 } from "./authSlice";
 
 function* bootstrapAuth() {
@@ -48,14 +53,25 @@ function* signIn(action: PayloadAction<LoginInput>): Generator<unknown, void, Au
   }
 }
 
-function* register(action: PayloadAction<RegisterInput>): Generator<unknown, void, AuthSession> {
+function* register(action: PayloadAction<RegisterInput>) {
   try {
-    const session: AuthSession = yield call(authApi.register, action.payload);
-    setAccessToken(session.accessToken);
+    const notice: string = yield call(authApi.register, action.payload);
+    yield put(authDemoCompleted(notice));
+  } catch (error) {
+    yield put(authFailed(error instanceof Error ? error.message : "Unable to create account."));
+  }
+}
+
+function* switchDevRole(action: PayloadAction<DevRole>): Generator<unknown, void, AuthSession> {
+  if (!isTeamDevAuth) return;
+  try {
+    setDevRole(action.payload);
+    const session: AuthSession = yield call(authApi.login, { email: "", password: "" });
+    setAccessToken(null);
     yield put(authSucceeded(session));
   } catch (error) {
     setAccessToken(null);
-    yield put(authFailed(error instanceof Error ? error.message : "Unable to create account."));
+    yield put(authFailed(error instanceof Error ? error.message : "Unable to switch development role."));
   }
 }
 
@@ -72,6 +88,20 @@ function* signOut() {
   setAccessToken(null);
   localStorage.removeItem("asx-session");
   yield put(signedOut());
+}
+
+function* watchExpiredSessions() {
+  const expired = eventChannel<boolean>((emit) => {
+    const onExpired = () => emit(true);
+    window.addEventListener(sessionExpiredEvent, onExpired);
+    return () => window.removeEventListener(sessionExpiredEvent, onExpired);
+  });
+  try {
+    while (true) {
+      yield take(expired);
+      yield put(authAnonymous());
+    }
+  } finally { expired.close(); }
 }
 
 function* loadAdminUsers(): Generator<unknown, void, AdminUser[]> {
@@ -95,8 +125,10 @@ function* changeAdminUserRole(
 }
 
 export function* authSaga() {
+  yield fork(watchExpiredSessions);
   yield takeLatest(bootstrapAuthRequested.type, bootstrapAuth);
   yield takeLatest(loginRequested.type, signIn);
+  yield takeLatest(switchDevRoleRequested.type, switchDevRole);
   yield takeLatest(registerRequested.type, register);
   yield takeLatest(passwordResetRequested.type, requestPasswordReset);
   yield takeLatest(logoutRequested.type, signOut);

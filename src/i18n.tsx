@@ -1,22 +1,15 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 import { vietnameseTranslations } from "./translations";
-
-export type Locale = "en" | "vi";
+import { LocaleContext, useLocale, type Locale } from "./localeContext";
 
 type TranslationState = { source: string; lastApplied: string };
 type AttributeStates = Map<string, TranslationState>;
 
-const LocaleContext = createContext<{
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-} | null>(null);
 const textStates = new WeakMap<Text, TranslationState>();
 const attributeStates = new WeakMap<Element, AttributeStates>();
 const translatedAttributes = ["placeholder", "title", "aria-label", "alt"] as const;
@@ -26,10 +19,50 @@ function normalize(value: string) {
 }
 
 function translateDynamic(value: string) {
-  let match = value.match(
+  let match = value.match(/^Loading (\d+) requests?…$/);
+  if (match) return `Đang tải ${match[1]} yêu cầu…`;
+  match = value.match(/^(\d+) selected · (\d+) shown$/);
+  if (match) return `${match[1]} đã chọn · ${match[2]} đang hiển thị`;
+  match = value.match(/^(\d+) selected$/);
+  if (match) return `${match[1]} đã chọn`;
+  match = value.match(/^(\d+) vehicle models · (\d+) categories$/);
+  if (match) return `${match[1]} mẫu xe · ${match[2]} nhóm phương tiện`;
+  match = value.match(/^(.+) · (Car|Truck|Van|Bus|Motorcycle|Bicycle|Selected)$/);
+  if (match) return `${match[1]} · ${vietnameseTranslations[match[2]] ?? match[2]}`;
+  match = value.match(/^(.+) · ((?:walker\.pedestrian|static\.prop)\.[\w-]+)$/);
+  if (match && vietnameseTranslations[match[1]]) return `${vietnameseTranslations[match[1]]} · ${match[2]}`;
+  match = value.match(
     /^A password reset link is ready to send to (.+) when authentication is connected\.$/,
   );
   if (match) return "Liên kết đặt lại mật khẩu sẽ được gửi tới " + match[1] + " khi kết nối xác thực được thiết lập.";
+  match = value.match(/^Oracle profile v(\d+) validated and activated\.$/);
+  if (match) return "Hồ sơ oracle v" + match[1] + " đã được kiểm tra và kích hoạt.";
+  match = value.match(/^Mock connection to (.+) succeeded\. No CARLA process was started\.$/);
+  if (match) return "Kết nối giả lập tới " + match[1] + " thành công. CARLA không được khởi động.";
+  match = value.match(/^Mock connection to (.+) failed; the worker is offline\.$/);
+  if (match) return "Kết nối giả lập tới " + match[1] + " thất bại; máy chạy đang ngoại tuyến.";
+  match = value.match(/^Saved (.+) · (Settings validated|Settings need validation)$/);
+  if (match) return "Đã lưu " + match[1] + " · " + (match[2] === "Settings validated" ? "Cấu hình đã được kiểm tra" : "Cấu hình cần được kiểm tra");
+  match = value.match(/^Configuration v(\d+)$/);
+  if (match) return "Cấu hình v" + match[1];
+  match = value.match(/^(.+) is now (online|offline) in the mock cluster\.$/);
+  if (match) return match[1] + (match[2] === "online" ? " hiện trực tuyến trong cụm giả lập." : " hiện ngoại tuyến trong cụm giả lập.");
+  match = value.match(/^(.+) accounts for (\d+)% of affected cluster runs in (.+)\.$/);
+  if (match) return `Kịch bản ${match[1]} chiếm ${match[2]}% lượt chạy thuộc cụm lỗi trong ${vietnameseTranslations[match[3]] ?? match[3]}.`;
+  match = value.match(/^(.+) is the most frequent linked oracle signal \((\d+) affected-run references\)\.$/);
+  if (match) return `${vietnameseTranslations[match[1]] ?? match[1]} là tín hiệu oracle liên kết phổ biến nhất (${match[2]} lượt chạy bị ảnh hưởng).`;
+  match = value.match(/^No failure clusters were recorded in (.+)\.$/);
+  if (match) return `Không ghi nhận cụm lỗi nào trong ${vietnameseTranslations[match[1]] ?? match[1]}.`;
+  match = value.match(/^(\d+) related runs$/);
+  if (match) return match[1] + " lượt chạy liên quan";
+  match = value.match(/^UNSAVED SCENARIO PREVIEW · (.+)$/);
+  if (match) return "XEM TRƯỚC KỊCH BẢN CHƯA LƯU · " + match[1];
+  match = value.match(/^(\d+) linked failure clusters have evidence ready for review$/);
+  if (match) return match[1] + " cụm lỗi được liên kết có bằng chứng sẵn sàng để duyệt";
+  match = value.match(/^(.+) · APFD (.+) vs baseline (.+)$/);
+  if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " · APFD " + match[2] + " so với mốc cơ sở " + match[3];
+  match = value.match(/^(\d+) completed run records$/);
+  if (match) return match[1] + " lượt chạy đã hoàn tất";
   match = value.match(/^(\d+) need review$/);
   if (match) return match[1] + " mục cần duyệt";
   match = value.match(/^(\d+)% complete$/);
@@ -74,8 +107,38 @@ function translateDynamic(value: string) {
   if (match) return "Đã chuyển sang chế độ xem trước không gian làm việc " + (vietnameseTranslations[match[1]] ?? match[1]) + ".";
   match = value.match(/^(.+) updated in the mock workspace\.$/);
   if (match) return match[1] + " đã được cập nhật trong không gian mẫu.";
+  match = value.match(/^(.+) saved as immutable version (.+)\.$/);
+  if (match) return match[1] + " đã lưu thành phiên bản bất biến " + match[2] + ".";
+  match = value.match(/^(.+) submitted for review\. Save edits before submitting\.$/);
+  if (match) return "Đã gửi " + match[1] + " để duyệt. Hãy lưu chỉnh sửa trước khi gửi duyệt.";
+  match = value.match(/^(.+) cloned to (.+)\.$/);
+  if (match) return "Đã nhân bản " + match[1] + " thành " + match[2] + ".";
+  match = value.match(/^Scenario ranking generated for (.+) with (.+)\.$/);
+  if (match) return "Đã tạo thứ tự ưu tiên cho " + match[1] + " bằng chiến lược " + (vietnameseTranslations[match[2]] ?? match[2]) + ".";
+  match = value.match(/^Select a campaign with scenarios before requesting prioritization\.$/);
+  if (match) return "Hãy chọn chiến dịch có kịch bản trước khi yêu cầu xếp ưu tiên.";
+  match = value.match(/^(.+) ranking for (.+); (.+)\.$/);
+  if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " cho " + match[2] + "; " + match[3] + ".";
+  match = value.match(/^APFD (.+); estimated APFDc (.+); (.+) used for (.+)\.$/);
+  if (match) return "APFD " + match[1] + "; APFDc ước tính " + match[2] + "; dùng " + match[3] + " cho " + match[4] + ".";
+  match = value.match(/^Execution blocked: (.+) must be Active first\.$/);
+  if (match) return "Không thể thực thi: " + match[1] + " phải ở trạng thái Active trước.";
+  match = value.match(/^(.+) queued (\d+) scenario runs in the local mock simulator\. No CARLA process was started\.$/);
+  if (match) return "Đã xếp " + match[2] + " lượt chạy kịch bản của " + match[1] + " vào bộ mô phỏng mẫu cục bộ. CARLA không được khởi động.";
+  match = value.match(/^(.+) queued (\d+) run\(s\) in PostgreSQL\. A connected CARLA worker is required to execute them\.$/);
+  if (match) return `Đã xếp ${match[2]} lượt chạy của ${match[1]} vào PostgreSQL. Cần có worker CARLA kết nối để thực thi.`;
+  match = value.match(/^Cancelled (\d+) queued run\(s\)\.$/);
+  if (match) return `Đã hủy ${match[1]} lượt chạy đang chờ.`;
+  match = value.match(/^(.+) registered\.$/);
+  if (match) return `Đã đăng ký ${match[1]}.`;
+  match = value.match(/^(.+) campaign; (.+)\.$/);
+  if (match) return (vietnameseTranslations[match[1]] ?? match[1]) + " chiến dịch; " + match[2] + ".";
   match = value.match(/^Imported from (.+)\. Review the scenario definition before approval\.$/);
   if (match) return "Đã nhập từ " + match[1] + ". Hãy xem lại định nghĩa kịch bản trước khi phê duyệt.";
+  match = value.match(/^Imported from (.+)\. Configure and validate the scenario before testing\.$/);
+  if (match) return "Đã nhập từ " + match[1] + ". Hãy cấu hình và kiểm tra kịch bản trước khi kiểm thử.";
+  match = value.match(/^Scenario (.+) passed system validation and is ready for testing\.$/);
+  if (match) return "Kịch bản " + match[1] + " đã vượt qua bước kiểm tra của hệ thống và sẵn sàng kiểm thử.";
   match = value.match(/^(.+) was imported as a draft\.$/);
   if (match) return match[1] + " đã được nhập dưới dạng bản nháp.";
   match = value.match(/^Invitation prepared for (.+)\.$/);
@@ -226,12 +289,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
-}
-
-export function useLocale() {
-  const context = useContext(LocaleContext);
-  if (!context) throw new Error("useLocale must be used inside LanguageProvider");
-  return context;
 }
 
 export function LanguageSwitcher({ className = "" }: { className?: string }) {

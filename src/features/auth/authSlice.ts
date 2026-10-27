@@ -1,6 +1,8 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { DemoUser, UserRole } from "../../types";
 import type { AdminUser, AuthSession, LoginInput, RegisterInput } from "../../services/authApi";
+import { isTeamDevAuth } from "../../services/authConfig";
+import type { DevRole } from "../../services/devRole";
 
 export type AuthStatus = "checking" | "anonymous" | "authenticated";
 
@@ -43,6 +45,15 @@ const authSlice = createSlice({
       state.error = null;
       state.message = null;
     },
+    switchDevRoleRequested(state, _action: PayloadAction<DevRole>) {
+      if (!isTeamDevAuth) return;
+      state.status = "checking";
+      state.user = null;
+      state.busy = true;
+      state.error = null;
+      state.message = null;
+      state.adminUsers = [];
+    },
     registerRequested(state, _action: PayloadAction<RegisterInput>) {
       state.busy = true;
       state.error = null;
@@ -62,8 +73,16 @@ const authSlice = createSlice({
     },
     authFailed(state, action: PayloadAction<string>) {
       state.status = "anonymous";
+      state.user = null;
       state.busy = false;
       state.error = action.payload;
+    },
+    authDemoCompleted(state, action: PayloadAction<string>) {
+      state.status = "anonymous";
+      state.user = null;
+      state.busy = false;
+      state.error = null;
+      state.message = action.payload;
     },
     passwordResetSucceeded(state, action: PayloadAction<string>) {
       state.busy = false;
@@ -110,6 +129,7 @@ const authSlice = createSlice({
 
 export const {
   authAnonymous,
+  authDemoCompleted,
   authFailed,
   authSucceeded,
   adminRoleChangeRequested,
@@ -124,6 +144,7 @@ export const {
   passwordResetSucceeded,
   registerRequested,
   signedOut,
+  switchDevRoleRequested,
 } = authSlice.actions;
 
 export default authSlice.reducer;

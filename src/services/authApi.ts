@@ -1,146 +1,92 @@
 import type { DemoUser, UserRole } from "../types";
-import { authApiBaseUrl } from "./authConfig";
-import { getAccessToken } from "./authToken";
+import { isTeamDevAuth } from "./authConfig";
+import { storeTokenSession } from "./authToken";
+import { requestTeamApi } from "./teamClient";
+import { devRoleToUserRole, getDevRole } from "./devRole";
 
 export interface AuthSession {
   user: DemoUser;
   accessToken: string | null;
   expiresAt?: string;
 }
-
-export interface LoginInput {
-  email: string;
-  password: string;
-}
-
-export interface RegisterInput {
-  name: string;
-  email: string;
-  password: string;
-  role: RegistrationRole;
-}
-
+export interface LoginInput { email: string; password: string }
+export interface RegisterInput { name: string; email: string; password: string; role: RegistrationRole }
 export type RegistrationRole = Exclude<UserRole, "Administrator">;
+export interface AdminUser extends DemoUser { id: string }
 
-export interface AdminUser extends DemoUser {
-  id: string;
+interface TeamUser { id: string; displayName: string; email: string; role: string; isActive: boolean }
+interface TeamSession { accessToken: string; refreshToken: string; expiresIn: number; user: TeamUser }
+const roleNames: Record<string, UserRole> = {
+  SCENARIO_ENGINEER: "Scenario Engineer", TEST_ENGINEER: "Test Engineer",
+  TEST_REVIEWER: "Test Reviewer", ADMIN: "Administrator",
+};
+
+function userFromApi(user: TeamUser): DemoUser {
+  if (!user.isActive) throw new Error("This account has been disabled.");
+  const role = roleNames[user.role];
+  if (!role) throw new Error(`The backend returned an unsupported role: ${user.role}.`);
+  return { name: user.displayName || user.email, email: user.email, role };
 }
 
-interface ApiUser {
-  id?: string;
-  fullName: string;
-  email: string;
-  role: UserRole;
-}
-
-interface ApiSession {
-  accessToken: string;
-  expiresAt: string;
-  user: ApiUser;
-}
-
-function sessionFromApi(response: ApiSession): AuthSession {
-  return {
-    user: {
-      name: response.user.fullName,
-      email: response.user.email,
-      role: response.user.role,
-    },
-    accessToken: response.accessToken,
-    expiresAt: response.expiresAt,
-  };
-}
-
-async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getAccessToken();
-  let response: Response;
+const mockUsersKey = "autoscenariox.team-api.mock-admin-users";
+const initialMockUsers: AdminUser[] = [
+  { id: "demo-engineer", name: "Demo Scenario Engineer", email: "scenario@example.invalid", role: "Scenario Engineer" },
+  { id: "demo-tester", name: "Demo Test Engineer", email: "tester@example.invalid", role: "Test Engineer" },
+  { id: "demo-reviewer", name: "Demo Test Reviewer", email: "reviewer@example.invalid", role: "Test Reviewer" },
+];
+function mockUsers(): AdminUser[] {
   try {
-    response = await fetch(authApiBaseUrl + path, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init.headers,
-      },
-    });
-  } catch {
-    throw new Error(
-      `Cannot connect to the authentication API at ${authApiBaseUrl}. Start the .NET backend and try again.`,
-    );
-  }
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as
-      | { message?: string; detail?: string; title?: string; errors?: Record<string, string[]> }
-      | null;
-    const validationMessage = body?.errors
-      ? Object.values(body.errors).flat().join(" ")
-      : undefined;
-    throw new Error(
-      body?.message ?? validationMessage ?? body?.detail ?? body?.title ??
-        `Request failed with status ${response.status}`,
-    );
-  }
-
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+    const saved = JSON.parse(localStorage.getItem(mockUsersKey) ?? "null") as AdminUser[] | null;
+    if (Array.isArray(saved)) return saved;
+  } catch { /* Browser-only demo data can fall back to its initial records. */ }
+  return initialMockUsers.map((user) => ({ ...user }));
 }
 
 export const authApi = {
   async login(input: LoginInput): Promise<AuthSession> {
-    const response = await apiRequest<ApiSession>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email: input.email, password: input.password }),
-    });
-    return sessionFromApi(response);
-  },
-
-  async register(input: RegisterInput): Promise<AuthSession> {
-    const response = await apiRequest<ApiSession>("/api/auth/register", {
-      method: "POST",
-      body: JSON.stringify({
-        fullName: input.name.trim(),
-        email: input.email.trim(),
-        password: input.password,
-        role: input.role,
-      }),
-    });
-    return sessionFromApi(response);
+    if (isTeamDevAuth) {
+      const role = getDevRole();
+      const user = await requestTeamApi<TeamUser>("/api/v1/auth/me");
+      // /me returns the persisted DB role. Dev permissions instead use the
+      // existing X-Asx-Dev-Role header, so show that explicitly selected role.
+      return { user: { ...userFromApi(user), role: devRoleToUserRole(role) }, accessToken: null };
+    }
+    const response = await requestTeamApi<TeamSession>("/api/v1/auth/login", {
+      method: "POST", body: JSON.stringify({ email: input.email.trim(), password: input.password }),
+    }, false);
+    const user = userFromApi(response.user);
+    if (!response.accessToken || !response.refreshToken || !Number.isFinite(response.expiresIn)) throw new Error("The backend returned an invalid authentication session.");
+    const expiresAt = Date.now() + response.expiresIn * 1000;
+    storeTokenSession({ accessToken: response.accessToken, refreshToken: response.refreshToken, expiresAt });
+    return { user, accessToken: response.accessToken, expiresAt: new Date(expiresAt).toISOString() };
   },
 
   async currentUser(): Promise<DemoUser> {
-    const response = await apiRequest<ApiUser>("/api/auth/me");
-    return { name: response.fullName, email: response.email, role: response.role };
+    const role = getDevRole();
+    const user = userFromApi(await requestTeamApi<TeamUser>("/api/v1/auth/me"));
+    return isTeamDevAuth ? { ...user, role: devRoleToUserRole(role) } : user;
   },
 
-  async listUsers(): Promise<AdminUser[]> {
-    const users = await apiRequest<ApiUser[]>("/api/admin/users");
-    return users.map((user) => ({
-      id: user.id ?? user.email,
-      name: user.fullName,
-      email: user.email,
-      role: user.role,
-    }));
+  async register(input: RegisterInput): Promise<string> {
+    if (!["Scenario Engineer", "Test Engineer", "Test Reviewer"].includes(input.role)) throw new Error("Administrator cannot be selected during registration.");
+    // No account, password or session is created for an API that does not exist.
+    return "Demo only: the registration form was checked. The team backend does not provide registration yet; no account was created. Ask an administrator to provision a Supabase account.";
   },
+
+  async requestPasswordReset(_email: string): Promise<string> {
+    return "Demo only: the team backend does not provide password recovery yet. No reset email was sent. Contact your administrator.";
+  },
+
+  async listUsers(): Promise<AdminUser[]> { return mockUsers(); },
 
   async setUserRole(id: string, role: UserRole): Promise<AdminUser> {
-    const user = await apiRequest<ApiUser>(`/api/admin/users/${encodeURIComponent(id)}/role`, {
-      method: "PUT",
-      body: JSON.stringify({ role }),
-    });
-    return {
-      id: user.id ?? id,
-      name: user.fullName,
-      email: user.email,
-      role: user.role,
-    };
-  },
-
-  async requestPasswordReset(email: string): Promise<string> {
-    const response = await apiRequest<{ message: string }>("/api/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email: email.trim() }),
-    });
-    return response.message;
+    if (!Object.values(roleNames).includes(role)) throw new Error("Unsupported role.");
+    const users = mockUsers();
+    const user = users.find((item) => item.id === id);
+    if (!user) throw new Error("Demo user was not found.");
+    const updated = { ...user, role };
+    try { localStorage.setItem(mockUsersKey, JSON.stringify(users.map((item) => item.id === id ? updated : item))); }
+    catch { throw new Error("Browser storage is unavailable. The demo role change was not saved."); }
+    return updated;
   },
 };
