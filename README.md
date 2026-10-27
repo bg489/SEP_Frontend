@@ -65,7 +65,17 @@ VITE_API_BASE_URL=
 VITE_AUTH_MODE=Dev
 ```
 
-Chọn **Open development workspace** để dùng danh tính Dev do backend cấu hình. Dev **không kiểm tra email/mật khẩu**; UI hiện cảnh báo rõ. Chuyển cả frontend và backend sang Supabase khi dùng xác thực thật. Frontend không sửa role trong database hoặc dùng role preview để vượt quyền.
+Chọn **Open development workspace** để dùng danh tính Dev do backend cấu hình. Dev **không kiểm tra email/mật khẩu**; UI hiện cảnh báo rõ. Chuyển cả frontend và backend sang Supabase khi dùng xác thực thật. Frontend không sửa role lưu trong database; chế độ Supabase luôn lấy role thật từ backend.
+
+### Đổi role trong Dev
+
+- Trước khi vào workspace: chọn **Dev role / Vai trò Dev** trên màn hình đăng nhập, rồi bấm **Open development workspace**.
+- Sau khi vào workspace: đổi **Dev role / Vai trò Dev** trên thanh trên cùng. Giao diện trở về Tổng quan, tải lại dữ liệu và menu theo role vừa chọn qua Redux Saga.
+- Có đủ `SCENARIO_ENGINEER`, `TEST_ENGINEER`, `TEST_REVIEWER`, `ADMIN`. Lựa chọn được nhớ trong session của tab trình duyệt.
+
+Frontend gửi header `X-Asx-Dev-Role` cho các request Dev, dùng cơ chế đã có của backend. `/auth/me` hiện trả role lưu trong database, nên trong Dev giao diện hiển thị role tạm thời đã chọn để khớp với quyền mà header áp dụng. Việc này không đổi tài khoản hoặc role trong database. Nếu `/me` lỗi, frontend không tạo phiên giả để vào hệ thống.
+
+Bộ chọn và header Dev bị tắt khi `VITE_AUTH_MODE=Supabase`; role trong phiên Supabase không bị ghi đè.
 
 `VITE_DATA_MODE=mock` chỉ xem trước workflow, không bật phiên đăng nhập giả. `.env.local` được Git ignore.
 

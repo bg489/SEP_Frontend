@@ -18,6 +18,8 @@ import { TeamOverview } from "./components/TeamOverview";
 import { TeamScenarioService } from "./services/teamScenarios";
 import { moduleSource, teamOperationPages, teamScenarioPages, usesTeamBackend } from "./services/backendCapabilities";
 import { isTeamDevAuth } from "./services/authConfig";
+import { DevRoleSelect } from "./components/DevRoleSelect";
+import { getDevRole } from "./services/devRole";
 import { api, isMockMode } from "./services/api";
 import {
   appendAuditEvent,
@@ -41,6 +43,7 @@ import {
   logoutRequested,
   passwordResetRequested,
   registerRequested,
+  switchDevRoleRequested,
 } from "./features/auth/authSlice";
 import {
   mockCampaigns,
@@ -1187,7 +1190,7 @@ function AppContent() {
         </div>
       </aside>
       <div className="main-column">
-        <header className="topbar">
+        <header className={`topbar${isTeamDevAuth ? " topbar-dev" : ""}`}>
           <div className="crumb">
             <span>
               {page === "priority" || page === "failures" || page === "report"
@@ -1219,6 +1222,14 @@ function AppContent() {
             </form>
           )}
           <div className="topbar-right">
+            {isTeamDevAuth && <DevRoleSelect compact value={getDevRole()} disabled={auth.busy} onChange={nextRole => {
+              if (nextRole === getDevRole()) return;
+              setPage("overview");
+              setSelectedScenario(null);
+              setDialog(null);
+              setToast("");
+              dispatch(switchDevRoleRequested(nextRole));
+            }} />}
             {apiRequestCount > 0 && !isMockMode && (
               <span className="api-activity" role="status" aria-live="polite" aria-busy="true">
                 <i className="api-spinner" />
@@ -1322,7 +1333,7 @@ function AppContent() {
                   : (vi ? "Scenario, campaign và kết quả chạy lấy từ API. Phân cụm lỗi, báo cáo APFD, quản trị tài khoản và tùy chỉnh hồ sơ dùng dữ liệu mẫu." : "Scenarios, campaigns and run results use the API. Failure clustering, APFD reports, user administration and profile changes use mock data.")
                 : (vi ? "Dữ liệu được đọc và ghi qua Redux Saga tới backend AutoScenarioX mới." : "Data is read and written through Redux Saga to the new AutoScenarioX backend.")}</span>
           </div>
-          {isTeamDevAuth && <div className="capability-banner mock" role="note"><strong>Development authentication</strong><span>{vi ? "Chế độ Dev dùng danh tính cấu hình trong backend; không kiểm tra mật khẩu. Đặt Auth:Mode=Supabase và VITE_AUTH_MODE=Supabase để đăng nhập thật." : "Dev uses the identity configured in the backend without password verification. Set Auth:Mode=Supabase and VITE_AUTH_MODE=Supabase for real sign-in."}</span></div>}
+          {isTeamDevAuth && <div className="capability-banner mock" role="note"><strong>Development authentication</strong><span>{vi ? "Dùng bộ chọn Vai trò Dev trên thanh trên cùng để đổi quyền kiểm thử. Tài khoản Dev không kiểm tra mật khẩu; việc chọn role không thay đổi database. Dùng Supabase khi cần đăng nhập thật." : "Use the Dev role selector in the top bar to switch test permissions. The Dev account does not verify a password, and selecting a role does not change the database. Use Supabase for real sign-in."}</span></div>}
           {usesTeamBackend && ["execution", "run-detail", "nodes"].includes(page) && <div className="capability-banner mock" role="note"><strong>{vi ? "Giới hạn của worker backend hiện tại" : "Current backend worker limitation"}</strong><span>{vi ? "Worker hiện truyền các đối số record_video/lite/max_sim_s mà recorder chưa nhận, nên chạy CARLA thật sẽ gặp lỗi hạ tầng. Frontend vẫn tạo và theo dõi hàng đợi qua API; cần nhóm backend sửa worker để thực thi thành công. Backend được giữ nguyên theo yêu cầu của bạn." : "The existing worker passes record_video/lite/max_sim_s arguments that its recorder does not accept, so real CARLA execution fails as an infrastructure error. The frontend can create and monitor the API queue; the backend team needs to repair the worker for successful execution. Backend code remains unchanged."}</span></div>}
           {usesTeamBackend && teamScenarioPages.includes(page) && <TeamScenarioWorkspace
             service={teamScenarios} page={page} initialScenarioId={editorScenarioId} onChanged={refreshWorkspace} onNotify={notify} />}

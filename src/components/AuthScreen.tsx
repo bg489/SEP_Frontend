@@ -4,6 +4,8 @@ import { LanguageSwitcher } from "../i18n";
 import { useLocale } from "../localeContext";
 import type { LoginInput, RegisterInput, RegistrationRole } from "../services/authApi";
 import { isTeamDevAuth } from "../services/authConfig";
+import { DevRoleSelect } from "./DevRoleSelect";
+import { getDevRole, setDevRole } from "../services/devRole";
 
 type AuthMode = "login" | "register" | "forgot";
 
@@ -31,6 +33,7 @@ export function AuthScreen({
   onRequestPasswordReset,
 }: AuthScreenProps) {
   const [mode, setMode] = useState<AuthMode>("login");
+  const [devRole, setDevRoleValue] = useState(getDevRole);
   const submitted = useRef(false);
   const { locale } = useLocale();
   const text = (en: string, vi: string) => locale === "vi" ? vi : en;
@@ -266,9 +269,10 @@ export function AuthScreen({
               </select>
             </label>
           )}
+          {developmentLogin && <DevRoleSelect value={devRole} disabled={busy} onChange={role => { setDevRole(role); setDevRoleValue(role); }} />}
           {developmentLogin && <div className="auth-role-note" role="status">
             <Icon name="warning" size={15} />
-            {text("Development authentication is enabled explicitly. The backend decides the account and role; use Supabase mode for real sign-in.", "Đang bật xác thực phát triển theo cấu hình. Backend quyết định tài khoản và role; dùng chế độ Supabase khi cần đăng nhập thật.")}
+            {text("Dev mode uses the backend development account with the temporary role selected above. It does not verify a password. Use Supabase mode for real sign-in.", "Chế độ Dev dùng tài khoản phát triển của backend với role tạm thời chọn phía trên. Chế độ này không kiểm tra mật khẩu. Dùng Supabase khi cần đăng nhập thật.")}
           </div>}
           {mode === "register" && (
             <div className="auth-role-note">
