@@ -4,6 +4,8 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import type { DemoUser, UserRole } from "../../types";
 import { authApi, type AdminUser, type AuthSession, type LoginInput, type RegisterInput } from "../../services/authApi";
 import { getAccessToken, sessionExpiredEvent, setAccessToken } from "../../services/authToken";
+import { isTeamDevAuth } from "../../services/authConfig";
+import { setDevRole, type DevRole } from "../../services/devRole";
 import {
   authAnonymous,
   authDemoCompleted,
@@ -21,6 +23,7 @@ import {
   passwordResetSucceeded,
   registerRequested,
   signedOut,
+  switchDevRoleRequested,
 } from "./authSlice";
 
 function* bootstrapAuth() {
@@ -56,6 +59,19 @@ function* register(action: PayloadAction<RegisterInput>) {
     yield put(authDemoCompleted(notice));
   } catch (error) {
     yield put(authFailed(error instanceof Error ? error.message : "Unable to create account."));
+  }
+}
+
+function* switchDevRole(action: PayloadAction<DevRole>): Generator<unknown, void, AuthSession> {
+  if (!isTeamDevAuth) return;
+  try {
+    setDevRole(action.payload);
+    const session: AuthSession = yield call(authApi.login, { email: "", password: "" });
+    setAccessToken(null);
+    yield put(authSucceeded(session));
+  } catch (error) {
+    setAccessToken(null);
+    yield put(authFailed(error instanceof Error ? error.message : "Unable to switch development role."));
   }
 }
 
@@ -112,6 +128,7 @@ export function* authSaga() {
   yield fork(watchExpiredSessions);
   yield takeLatest(bootstrapAuthRequested.type, bootstrapAuth);
   yield takeLatest(loginRequested.type, signIn);
+  yield takeLatest(switchDevRoleRequested.type, switchDevRole);
   yield takeLatest(registerRequested.type, register);
   yield takeLatest(passwordResetRequested.type, requestPasswordReset);
   yield takeLatest(logoutRequested.type, signOut);

@@ -1,6 +1,8 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { DemoUser, UserRole } from "../../types";
 import type { AdminUser, AuthSession, LoginInput, RegisterInput } from "../../services/authApi";
+import { isTeamDevAuth } from "../../services/authConfig";
+import type { DevRole } from "../../services/devRole";
 
 export type AuthStatus = "checking" | "anonymous" | "authenticated";
 
@@ -42,6 +44,15 @@ const authSlice = createSlice({
       state.busy = true;
       state.error = null;
       state.message = null;
+    },
+    switchDevRoleRequested(state, _action: PayloadAction<DevRole>) {
+      if (!isTeamDevAuth) return;
+      state.status = "checking";
+      state.user = null;
+      state.busy = true;
+      state.error = null;
+      state.message = null;
+      state.adminUsers = [];
     },
     registerRequested(state, _action: PayloadAction<RegisterInput>) {
       state.busy = true;
@@ -133,6 +144,7 @@ export const {
   passwordResetSucceeded,
   registerRequested,
   signedOut,
+  switchDevRoleRequested,
 } = authSlice.actions;
 
 export default authSlice.reducer;

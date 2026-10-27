@@ -2,6 +2,7 @@ import type { DemoUser, UserRole } from "../types";
 import { isTeamDevAuth } from "./authConfig";
 import { storeTokenSession } from "./authToken";
 import { requestTeamApi } from "./teamClient";
+import { devRoleToUserRole, getDevRole } from "./devRole";
 
 export interface AuthSession {
   user: DemoUser;
@@ -44,9 +45,11 @@ function mockUsers(): AdminUser[] {
 export const authApi = {
   async login(input: LoginInput): Promise<AuthSession> {
     if (isTeamDevAuth) {
+      const role = getDevRole();
       const user = await requestTeamApi<TeamUser>("/api/v1/auth/me");
-      // Development authentication is explicit and never pretends to validate a password.
-      return { user: userFromApi(user), accessToken: null };
+      // /me returns the persisted DB role. Dev permissions instead use the
+      // existing X-Asx-Dev-Role header, so show that explicitly selected role.
+      return { user: { ...userFromApi(user), role: devRoleToUserRole(role) }, accessToken: null };
     }
     const response = await requestTeamApi<TeamSession>("/api/v1/auth/login", {
       method: "POST", body: JSON.stringify({ email: input.email.trim(), password: input.password }),
@@ -59,7 +62,9 @@ export const authApi = {
   },
 
   async currentUser(): Promise<DemoUser> {
-    return userFromApi(await requestTeamApi<TeamUser>("/api/v1/auth/me"));
+    const role = getDevRole();
+    const user = userFromApi(await requestTeamApi<TeamUser>("/api/v1/auth/me"));
+    return isTeamDevAuth ? { ...user, role: devRoleToUserRole(role) } : user;
   },
 
   async register(input: RegisterInput): Promise<string> {

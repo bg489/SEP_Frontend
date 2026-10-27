@@ -1,6 +1,7 @@
 import { beginApiActivity } from "./apiActivity";
 import { authApiBaseUrl, isTeamDevAuth } from "./authConfig";
 import { expireTokenSession, getSessionGeneration, getTokenSession, storeTokenSession } from "./authToken";
+import { getDevRole } from "./devRole";
 
 export interface TeamValidationIssue { tier?: string; path: string; message: string }
 export interface TeamProblemDetails {
@@ -72,6 +73,8 @@ export async function requestTeamResponse(path: string, init: RequestInit = {}, 
   const finish = beginApiActivity();
   const send = () => {
     const headers = new Headers(init.headers);
+    if (authenticated && isTeamDevAuth) headers.set("X-Asx-Dev-Role", getDevRole());
+    else headers.delete("X-Asx-Dev-Role");
     if (typeof init.body === "string" && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
     const token = getTokenSession()?.accessToken;
     if (authenticated && !isTeamDevAuth && token) headers.set("Authorization", `Bearer ${token}`);
