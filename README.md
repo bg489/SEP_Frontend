@@ -21,12 +21,23 @@ Không chạy backend cũ ở `Project\Backend`. Các thay đổi trong nhánh n
 | Version/diff/import/export/variant | API thật; JSON/YAML; diff giữa các version của cùng scenario |
 | Campaign | API thật; chọn **scenarioVersionId READY** với search/filter; SUT Behavior Agent hoặc Autopilot |
 | Prioritization | API thật; lưu thứ tự vào campaign. APFD/APFDc là **ước lượng từ đặc trưng**, không phải kết quả đo của campaign đã chạy |
-| Execution | API thật: start/rerun, poll runs, xem Oracle evaluation/violation, tải JSON và video nếu worker đã ghi được |
+| Execution | API thật: start/rerun, poll runs, xem đầy đủ Oracle evaluation/violation, tải JSON; phát MP4 có xác thực và tải video nếu worker đã upload |
+| Backend data | API thật: READY mới nhất/lịch sử, đủ bộ lọc/phân trang, execution package, map/catalog/schema, tài khoản hiện tại và database health |
+| Worker API tools | API thật nâng cao: claim/running/requeue-infra, upload NDJSON và MP4 gốc, đọc kết quả/gói thực thi; không khởi động CARLA |
 | Oracle config | Đọc cấu hình thật trong workspace execution; form sửa Oracle cũ là mock |
 | Worker settings/status, user administration, register/reset password, profile editing | **Mock/demo** vì backend chưa có API; không tạo tài khoản Supabase hoặc lưu mật khẩu |
 | Scenario clusters, failure clustering/review, APFD report, analytics settings, audit | **Mock trên trình duyệt**, có nhãn rõ ràng |
 
 Không tự chuyển lỗi HTTP/network của chức năng thật thành mock thành công. Mọi thao tác API từ UI đi qua Redux Saga, gồm download. Loading và khóa thao tác xuất hiện khi request đang chạy.
+
+Đối chiếu hiện tại: **51/51 HTTP method + route** trong Swagger có luồng frontend và kiểm tra contract. Xem [bảng đầy đủ và phạm vi kiểm tra](docs/backend-api-coverage.md). Đây là toàn bộ API backend hiện có, không có nghĩa những chức năng đồ án chưa có endpoint đã trở thành dữ liệu thật.
+
+```powershell
+npm run verify:api
+npm run build
+```
+
+`verify:api` dùng transport/file giả lập trong bộ nhớ; không ghi database, khởi động CARLA hoặc gọi backend thật. Các kiểm tra bao gồm If-Match, multipart import, query, payload, nguyên trạng file PUT, auth refresh/401, Blob video, state/error và đủ 51 route trong snapshot contract.
 
 ## Chạy trên máy
 
@@ -123,6 +134,6 @@ git push -u origin HEAD
 
 ### Giới hạn worker đã đối chiếu trong source backend
 
-Worker hiện gọi recorder với `record_video`, `lite`, `max_sim_s`, nhưng hàm recorder chưa nhận các đối số này; worker cũng mong tuple trong khi recorder hiện trả đường dẫn string. Vì vậy việc start campaign qua API chưa đồng nghĩa có thể chạy CARLA thành công.
+Frontend dùng API có sẵn và giữ nguyên các sửa đổi launcher/worker do bạn thực hiện. Start campaign chỉ tạo hàng đợi; quá trình CARLA phải được worker bên ngoài thực thi và upload telemetry. Nút `Claim` trong công cụ nâng cao dành cho xử lý thủ công: nó lấy tác vụ khỏi hàng đợi, nên worker thông thường sẽ không nhận lại tác vụ đó. Không cần thao tác này khi chạy campaign theo luồng worker bình thường.
 
-Recorder hiện chỉ hỗ trợ `pedestrian_crossing`, `lead_vehicle_brake`; chưa thực thi `vehicle_cut_in`, `traffic_light_override`, SUT Autopilot và kiểm tra red-light. Worker chỉ gửi header Dev, chưa hỗ trợ Bearer Supabase. Các lỗi/giới hạn này thuộc backend hiện có và không được sửa trong công việc frontend này. Không dùng `--simulate` để xác nhận chạy CARLA thật.
+Recorder hiện chỉ hỗ trợ `pedestrian_crossing`, `lead_vehicle_brake`; chưa thực thi `vehicle_cut_in`, `traffic_light_override`, SUT Autopilot và kiểm tra red-light. Worker hiện gửi header Dev, chưa hỗ trợ Bearer Supabase. Các giới hạn runtime này thuộc backend/worker và không được thay đổi trong công việc frontend. Việc API lưu được cấu hình hoặc trả gói runnable chưa chứng minh mô phỏng đã thực thi. Không dùng `--simulate` để xác nhận chạy CARLA thật.

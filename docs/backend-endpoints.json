@@ -1,0 +1,262 @@
+{
+  "auditedDate": "2026-10-27",
+  "source": "AutoScenarioX.Api Swagger and matching controller source",
+  "endpointCount": 51,
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "group": "Auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "group": "Auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "group": "Auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/campaigns",
+      "group": "Campaigns"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns",
+      "group": "Campaigns"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/campaigns/{id}",
+      "group": "Campaigns"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/campaigns/{id}",
+      "group": "Campaigns"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{id}/start",
+      "group": "Campaigns"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{id}/rerun",
+      "group": "Campaigns"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/campaigns/{id}/runs",
+      "group": "Campaigns"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/campaigns/available-scenarios",
+      "group": "Campaigns"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/db",
+      "group": "Health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/oracle-configs",
+      "group": "Oracle"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runs/{id}/result",
+      "group": "Oracle"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/runs/claim",
+      "group": "Oracle"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/runs/{id}/running",
+      "group": "Oracle"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/runs/{id}/requeue-infra",
+      "group": "Oracle"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/runs/{id}/telemetry",
+      "group": "Oracle"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/runs/{id}/video",
+      "group": "Oracle"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runs/{id}/video",
+      "group": "Oracle"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/prioritization/strategies",
+      "group": "Prioritization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/prioritization/rank",
+      "group": "Prioritization"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reference/maps",
+      "group": "Reference"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reference/catalog",
+      "group": "Reference"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reference/scenario-schema",
+      "group": "Reference"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/draft",
+      "group": "ScenarioDrafts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/draft",
+      "group": "ScenarioDrafts"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/scenarios/{scenarioId}/draft",
+      "group": "ScenarioDrafts"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/scenarios/{scenarioId}/draft",
+      "group": "ScenarioDrafts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/draft/export",
+      "group": "ScenarioDrafts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/draft/validate",
+      "group": "ScenarioDrafts"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/import",
+      "group": "ScenarioImport"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/imports",
+      "group": "ScenarioImport"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios",
+      "group": "Scenarios"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios",
+      "group": "Scenarios"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}",
+      "group": "Scenarios"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/scenarios/{scenarioId}",
+      "group": "Scenarios"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/archive",
+      "group": "Scenarios"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/restore",
+      "group": "Scenarios"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/clone",
+      "group": "Scenarios"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}/variant-batches",
+      "group": "ScenarioVariants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}/variant-batches",
+      "group": "ScenarioVariants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}/variant-batches/{batchId}",
+      "group": "ScenarioVariants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenario-versions/ready",
+      "group": "ScenarioVersionHandoff"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenario-versions/{scenarioVersionId}/execution-package",
+      "group": "ScenarioVersionHandoff"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/versions",
+      "group": "ScenarioVersions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/versions",
+      "group": "ScenarioVersions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}/export",
+      "group": "ScenarioVersions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}",
+      "group": "ScenarioVersions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/diff",
+      "group": "ScenarioVersions"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}/deprecate",
+      "group": "ScenarioVersions"
+    }
+  ]
+}
