@@ -25,6 +25,7 @@ export type AppPage =
   | "analytics"
   | "audit"
   | "backend-data"
+  | "coverage"
   | "worker-protocol"
   | "profile";
 

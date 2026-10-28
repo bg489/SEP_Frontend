@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'vite';
+import { readFileSync } from 'node:fs';
 
 const server = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
 const originalFetch = globalThis.fetch;
 let networkCalls = 0;
 globalThis.fetch = () => { networkCalls++; throw new Error('This harness forbids network requests.'); };
 try {
-  const { TeamScenarioService } = await server.ssrLoadModule('/src/services/teamScenarios.ts');
+  const { TeamScenarioService, teamScenarioFromDetail } = await server.ssrLoadModule('/src/services/teamScenarios.ts');
   const calls = [];
   const content = { schema_version: '1.0', extensions: { future: { retained: true } } };
   const draft = { scenarioId: 'scenario-id', rowVersion: 18, content, baseVersionId: null, lastValidationReportId: null };
@@ -23,9 +24,17 @@ try {
   await service.catalog();
   await service.maps();
   await service.schema();
-  await service.search({ q: 'name & code', category: 'cut_in', status: 'ARCHIVED', map: 'Town03', hasDraft: false, page: 3, pageSize: 24 });
+  await service.templates();
+  await service.tags();
+  await service.replaceTags(id, ['rain', 'night']);
+  assert.deepEqual(JSON.parse(calls.at(-1).init.body), { tags: ['rain', 'night'] });
+  await service.history(id, 2, 50);
+  assert.equal(calls.at(-1).path, `/api/v1/scenarios/${id}/history?page=2&pageSize=50`);
+  await service.search({ q: 'name & code', category: 'cut_in', status: 'ARCHIVED', map: 'Town03', weather: 'WetNoon', eventType: 'vehicle_crossing', tag: ['rain', 'night'], hasDraft: false, page: 3, pageSize: 24 });
   const query = new URL(calls.at(-1).path, 'https://fixture.invalid').searchParams;
-  assert.deepEqual(Object.fromEntries(query), { q: 'name & code', category: 'cut_in', status: 'ARCHIVED', map: 'Town03', hasDraft: 'false', page: '3', pageSize: '24' });
+  assert.deepEqual(query.getAll('tag'), ['rain', 'night']);
+  query.delete('tag');
+  assert.deepEqual(Object.fromEntries(query), { q: 'name & code', category: 'cut_in', status: 'ARCHIVED', map: 'Town03', weather: 'WetNoon', eventType: 'vehicle_crossing', hasDraft: 'false', page: '3', pageSize: '24' });
   await service.detail(id);
   await service.createProfile('Scenario', 'Description', 'cut_in');
   assert.deepEqual(JSON.parse(calls.at(-1).init.body), { name: 'Scenario', description: 'Description', category: 'cut_in' });
@@ -65,8 +74,8 @@ try {
   assert.equal(calls.at(-1).fileName, `${id}-v4.json`);
   await service.variants(id, 4);
   await service.variantBatch(id, 4, 'batch-id');
-  await service.generateVariants(id, 4, { npc_count: [5, 10] }, 'Grid prefix', 'Review note');
-  assert.deepEqual(JSON.parse(calls.at(-1).init.body), { parameterGrid: { npc_count: [5, 10] }, namePrefix: 'Grid prefix', note: 'Review note' });
+  await service.generateVariants(id, 4, { npc_count: [5, 10], 'weather.preset': ['ClearNoon', 'ClearNight'] }, 'Grid prefix', 'Review note', 'pairwise');
+  assert.deepEqual(JSON.parse(calls.at(-1).init.body), { parameterGrid: { npc_count: [5, 10], 'weather.preset': ['ClearNoon', 'ClearNight'] }, namePrefix: 'Grid prefix', note: 'Review note', strategy: 'pairwise' });
   await service.ready({ q: 'Ready', category: 'cut_in', map: 'Town03', scenarioId: id, latestOnly: false, page: 2, pageSize: 24 });
   assert.deepEqual(Object.fromEntries(new URL(calls.at(-1).path, 'https://fixture.invalid').searchParams), { pageSize: '24', latestOnly: 'false', q: 'Ready', category: 'cut_in', map: 'Town03', scenarioId: id, page: '2' });
   await service.executionPackage('version-id');
@@ -74,6 +83,7 @@ try {
   const operations = calls.map(call => `${call.method} ${call.path.split('?')[0]}`);
   const expected = [
     'GET /api/v1/reference/catalog', 'GET /api/v1/reference/maps', 'GET /api/v1/reference/scenario-schema',
+    'GET /api/v1/reference/scenario-templates', 'GET /api/v1/tags', `PUT /api/v1/scenarios/${id}/tags`, `GET /api/v1/scenarios/${id}/history`,
     'GET /api/v1/scenarios', `GET /api/v1/scenarios/${id}`, 'POST /api/v1/scenarios', `PATCH /api/v1/scenarios/${id}`,
     `GET /api/v1/scenarios/${id}/draft`, `POST /api/v1/scenarios/${id}/draft`, `PUT /api/v1/scenarios/${id}/draft`, `DELETE /api/v1/scenarios/${id}/draft`,
     `POST /api/v1/scenarios/${id}/draft/validate`, `POST /api/v1/scenarios/${id}/versions`, `GET /api/v1/scenarios/${id}/versions`,
@@ -85,7 +95,48 @@ try {
     'GET /api/v1/scenario-versions/ready', 'GET /api/v1/scenario-versions/version-id/execution-package',
   ];
   assert.deepEqual(operations, expected);
-  assert.equal(new Set(operations).size, 29);
+  assert.equal(new Set(operations).size, 33);
+
+  await service.createProfile('Template scenario', 'Description', 'pedestrian', 'pedestrian_crossing_ahead');
+  assert.deepEqual(JSON.parse(calls.at(-1).init.body), { name: 'Template scenario', description: 'Description', category: 'pedestrian', template: 'pedestrian_crossing_ahead' });
+  await service.replaceTags(id, []);
+  assert.deepEqual(JSON.parse(calls.at(-1).init.body), { tags: [] });
+  const mapped = teamScenarioFromDetail({ id, name: 'Tagged', category: 'pedestrian', status: 'ACTIVE', tags: ['repository-tag'], latestContent: { metadata: { tags: ['old-published-tag'] } } });
+  assert.deepEqual(mapped.tags, ['repository-tag']);
+
+  const helpers = await server.ssrLoadModule('/src/services/teamSchemaEditor.ts');
+  const schema = JSON.parse(readFileSync(new URL('./fixtures/scenario-schema-20261028.json', import.meta.url), 'utf8'));
+  const defs = schema.$defs;
+  const source = { metadata: { name: 'Original' }, actors: [{ id: 'ped_1', type: 'pedestrian', blueprint: 'walker.pedestrian.0001' }, { id: 'car_1', type: 'vehicle', blueprint: 'vehicle.audi.a2' }], events: [{ id: 'cross_1', type: 'pedestrian_crossing', actor_ref: 'ped_1', trigger: { type: 'simulation_time', time_s: 2 }, params: { speed_ms: 1.4, direction: 'left_to_right' } }], parameters: { speed: { type: 'number', value: 20, min: 10, max: 40 } }, extensions: { future: { retained: true } } };
+  const copy = structuredClone(source);
+  const vehicleCrossing = helpers.schemaChangeType(source, ['events', 0, 'type'], 'vehicle_crossing', defs);
+  assert.equal(vehicleCrossing.events[0].actor_ref, 'car_1');
+  assert.deepEqual(vehicleCrossing.events[0].params, { destination: { spawn_point_index: 0 }, speed_kmh: 5 });
+  assert.equal(vehicleCrossing.events[0].params.direction, undefined);
+  const lights = helpers.schemaChangeType(source, ['events', 0, 'type'], 'traffic_light_override', defs);
+  assert.equal(lights.events[0].actor_ref, undefined);
+  assert.deepEqual(lights.events[0].params, { state: 'red', duration_s: 1 });
+  assert.deepEqual(source, copy, 'Action switching must not mutate the original draft');
+  const changed = helpers.schemaUpdate(source, ['ego_vehicle', 'target_speed_kmh'], { $param: 'speed' });
+  assert.deepEqual(changed.ego_vehicle.target_speed_kmh, { $param: 'speed' });
+  assert.deepEqual(changed.extensions, source.extensions);
+  assert.deepEqual(changed.events, source.events);
+  const withoutEvent = helpers.schemaUpdate(source, ['events', 0], undefined);
+  assert.deepEqual(withoutEvent.events, []);
+  assert.equal(source.events.length, 1);
+  const chained = helpers.schemaInitial(defs.trigger.oneOf.find(item => item.properties.type.const === 'after_event'), defs);
+  assert.deepEqual(chained, { type: 'after_event', event_ref: '', delay_s: 0 });
+  assert.equal(helpers.schemaBranch(defs.trigger, { type: 'time_to_collision', actor_ref: 'ped_1', ttc_s: 2 }, defs), 4);
+  const lightSchema = helpers.conditionalSchema(defs.event, { type: 'traffic_light_override' }, defs);
+  assert.equal(lightSchema.properties.actor_ref, undefined);
+  const crossingSchema = helpers.resolveSchema(helpers.conditionalSchema(defs.event, { type: 'vehicle_crossing' }, defs).properties.params, defs);
+  assert.ok(crossingSchema.properties.destination);
+  assert.ok(crossingSchema.properties.sync);
+  assert.ok(defs.paramsPedestrianCrossing.properties.sync.properties.offset_s.oneOf);
+  assert.ok(defs.paramsLeadVehicleBrake.properties.time_gap_s.oneOf);
+  assert.deepEqual(helpers.parameterRangeValues({ type: 'number', min: 0.3, max: 0.5, step: 0.1 }), [0.3, 0.4, 0.5]);
+  assert.deepEqual(helpers.parameterRangeValues({ type: 'integer', min: 1, max: 3 }), [1, 2, 3]);
+  assert.throws(() => helpers.parameterRangeValues({ min: 0, max: 10000, step: 0.01 }), /more than/);
 
   const conflict = new Error('409: CONCURRENCY_CONFLICT');
   const failing = new TeamScenarioService({ ...client, request: async () => { throw conflict; } });
@@ -93,7 +144,7 @@ try {
   assert.deepEqual(content.extensions, { future: { retained: true } });
   assert.equal(networkCalls, 0);
   console.log('ASX_COVERAGE:' + JSON.stringify(calls.map(call => `${call.method} ${call.path}`)));
-  console.log('PASS: 29 Flow1 HTTP operations; full scenario/READY query filters; quoted If-Match; canonical JSON preservation; import Format/Category; clone version/description; variant prefix/note; download paths; concurrency error propagation. Network requests: 0.');
+  console.log('PASS: 33 Flow1 HTTP operations; templates, tags and paged history; all filters with repeated tags; pairwise/weather grids; schema-driven event changes, chain/TTC/sync fields and parameter references; quoted If-Match and JSON preservation. Network requests: 0.');
 } finally {
   globalThis.fetch = originalFetch;
   await server.close();

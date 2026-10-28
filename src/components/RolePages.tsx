@@ -148,19 +148,19 @@ export function RoleWelcome({
     "Test Reviewer": [
       {
         title: "Review queue",
-        detail: "Review failure evidence and root causes",
+        detail: isMockMode ? "Review failure evidence and root causes" : "Read campaign faults and review state from the backend",
         page: "review",
         icon: "failures",
       },
       {
         title: "Failure insights",
-        detail: "Inspect evidence and confidence",
+        detail: isMockMode ? "Inspect evidence and confidence" : "Inspect recorded Oracle evidence and explanations",
         page: "failures",
         icon: "priority",
       },
       {
         title: "Campaign reports",
-        detail: "Check results before sign-off",
+        detail: isMockMode ? "Check results before sign-off" : "Review backend reports and measured effectiveness",
         page: "report",
         icon: "campaigns",
       },

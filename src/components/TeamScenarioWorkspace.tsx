@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocale } from "../localeContext";
-import { carlaVehicles } from "../data/carlaVehicles";
 import { useAsyncAction } from "../hooks/useAsyncAction";
 import type {
   TeamCatalog, TeamDiff, TeamDraft, TeamExecutionPackage, TeamImportRecord, TeamImportResult, TeamMap,
   TeamObject, TeamPage, TeamScenarioDetail, TeamScenarioRow, TeamValidation,
   TeamVariantBatch, TeamVariantResult, TeamVersion, TeamVersionDetail,
+  TeamScenarioTemplate, TeamTag, TeamScenarioHistoryEvent,
 } from "../services/teamContracts";
-import { teamNumber, teamObject, teamString } from "../services/teamContracts";
+import { teamObject } from "../services/teamContracts";
 import { TeamScenarioService } from "../services/teamScenarios";
+import { parameterRangeValues, schemaUpdate } from "../services/teamSchemaEditor";
+import { TeamSchemaEditor } from "./TeamSchemaEditor";
+import { TeamMapView } from "./TeamMapView";
 import type { AppPage } from "../types";
 import "./TeamScenarioWorkspace.css";
 
@@ -25,41 +28,35 @@ const parseObject = (text: string): TeamObject => {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Scenario content must be a JSON object.");
   return value as TeamObject;
 };
-function numericField(data: FormData, name: string): number {
-  const raw = String(data.get(name) ?? "").trim();
-  const value = Number(raw);
-  if (!raw || !Number.isFinite(value)) throw new Error(`Missing or invalid numeric value: ${name}`);
-  return value;
-}
-function explicitLocation(data: FormData, prefix: string): TeamObject {
-  if (data.get(`${prefix}_mode`) === "spawn") {
-    const value = numericField(data, `${prefix}_index`);
-    if (!Number.isInteger(value) || value < 0) throw new Error("Spawn index must be a non-negative integer.");
-    return { spawn_point_index: value };
-  }
-  const value: TeamObject = { x: numericField(data, `${prefix}_x`), y: numericField(data, `${prefix}_y`) };
-  for (const axis of ["z", "yaw"]) if (String(data.get(`${prefix}_${axis}`) ?? "").trim()) value[axis] = numericField(data, `${prefix}_${axis}`);
-  return value;
-}
-function LocationFields({ prefix, t, disabled }: { prefix: string; t: (en: string, vi: string) => string; disabled: boolean }) {
-  const [mode, setMode] = useState("spawn");
-  return <div className="team-form-grid team-location-fields">
-    <label>{t("Position format", "Dạng vị trí")}<select name={`${prefix}_mode`} value={mode} disabled={disabled} onChange={event => setMode(event.target.value)}><option value="spawn">Spawn point index</option><option value="coordinates">CARLA x / y / z / yaw</option></select></label>
-    {mode === "spawn" ? <label>{t("Explicit spawn index", "Spawn index cụ thể")}<input name={`${prefix}_index`} type="number" min={0} step={1} required disabled={disabled} /></label> : <>{["x", "y", "z", "yaw"].map(axis => <label key={axis}>{axis}{axis === "yaw" ? " °" : " m"}<input name={`${prefix}_${axis}`} type="number" step="any" required={axis === "x" || axis === "y"} min={axis === "yaw" ? -180 : undefined} max={axis === "yaw" ? 180 : undefined} disabled={disabled} /></label>)}</>}
-  </div>;
-}
-
 /** Uses the canonical schema rather than flattening away routes, actors or events. */
 export function TeamScenarioWorkspace({ service, page: workspacePage = "scenarios", initialScenarioId, onChanged, onNotify }: Props) {
   const { locale } = useLocale();
   const t = (en: string, vi: string) => locale === "vi" ? vi : en;
   const actions = useAsyncAction();
+  const actionLock = useRef(false);
+  const [schemaFocus, setSchemaFocus] = useState<{path: string; nonce: number} | undefined>();
   const [catalog, setCatalog] = useState<TeamCatalog | null>(null);
   const [maps, setMaps] = useState<TeamMap[]>([]);
   const [repository, setRepository] = useState<TeamPage<TeamScenarioRow> | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [mapFilter, setMapFilter] = useState("");
+  const [weatherFilter, setWeatherFilter] = useState("");
+  const [eventFilter, setEventFilter] = useState("");
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [knownTags, setKnownTags] = useState<TeamTag[]>([]);
+  const [tagText, setTagText] = useState("");
+  const [templates, setTemplates] = useState<TeamScenarioTemplate[]>([]);
+  const [createTemplate, setCreateTemplate] = useState("");
+  const [createName, setCreateName] = useState("");
+  const [createCategory, setCreateCategory] = useState("free_driving");
+  const [fullSchema, setFullSchema] = useState<TeamObject | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(true);
+  const [history, setHistory] = useState<TeamPage<TeamScenarioHistoryEvent> | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(20);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [mapScope, setMapScope] = useState<"route" | "actors" | "events">("route");
   const [status, setStatus] = useState("ACTIVE");
   const [draftFilter, setDraftFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -82,7 +79,7 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
   const [importResult, setImportResult] = useState<TeamImportResult | null>(null);
   const [changeNote, setChangeNote] = useState("");
   const [diff, setDiff] = useState<TeamDiff | null>(null);
-  const [tab, setTab] = useState<"definition" | "versions" | "variants" | "imports">("definition");
+  const [tab, setTab] = useState<"definition" | "versions" | "variants" | "imports" | "history">("definition");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [listLoading, setListLoading] = useState(true);
@@ -94,10 +91,7 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
   const [importFormat, setImportFormat] = useState("");
   const [variantNamePrefix, setVariantNamePrefix] = useState("");
   const [variantNote, setVariantNote] = useState("");
-  const [actorType, setActorType] = useState("vehicle");
-  const [eventType, setEventType] = useState("pedestrian_crossing");
-  const [triggerType, setTriggerType] = useState("simulation_time");
-  const [locationTarget, setLocationTarget] = useState<"start" | "goal">("start");
+  const [variantStrategy, setVariantStrategy] = useState<"cartesian" | "pairwise">("cartesian");
   const [grid, setGrid] = useState("{}");
   const [diffFrom, setDiffFrom] = useState(1);
   const [diffTo, setDiffTo] = useState(2);
@@ -105,9 +99,12 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
   const busy = actions.pending || detailLoading;
 
   async function perform(key: string, task: () => Promise<void>) {
+    if (actionLock.current) return;
+    actionLock.current = true;
     setError(""); setNotice("");
     try { await actions.run(key, task); }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); }
+    finally { actionLock.current = false; }
   }
   function announce(en: string, vi: string) {
     const message = t(en, vi); setNotice(message); onNotify?.(message);
@@ -119,7 +116,7 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
   async function loadSelected(id: string) {
     const [item, history, imported] = await Promise.all([service.detail(id), service.versions(id), service.imports(id)]);
     const current = item.hasDraft ? await service.draft(id) : null;
-    setDetail(item); setDraft(current); setVersions(history); setImports(imported);
+    setDetail(item); setDraft(current); setVersions(history); setImports(imported); setTagText((item.tags ?? []).join(", "));
     setText(pretty(current?.content ?? item.latestContent ?? {})); setDirty(false);
     setReport(null); setAcknowledgeWarnings(false); setPackageResult(null); setVersionResult(null); setDiff(null);
     setVersionNumber(history[0]?.versionNumber ?? 1); setBatches([]); setBatchResult(null);
@@ -128,9 +125,18 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
 
   useEffect(() => {
     let disposed = false;
-    Promise.all([service.catalog(), service.maps()]).then(([nextCatalog, nextMaps]) => {
-      if (!disposed) { setCatalog(nextCatalog); setMaps(nextMaps); }
-    }).catch(caught => { if (!disposed) setError(caught instanceof Error ? caught.message : String(caught)); });
+    setSchemaLoading(true);
+    Promise.allSettled([service.catalog(), service.maps(), service.schema(), service.templates(), service.tags()]).then(results => {
+      if (disposed) return;
+      if (results[0].status === "fulfilled") setCatalog(results[0].value as TeamCatalog);
+      if (results[1].status === "fulfilled") setMaps(results[1].value as TeamMap[]);
+      if (results[2].status === "fulfilled") setFullSchema(results[2].value as TeamObject);
+      if (results[3].status === "fulfilled") setTemplates(results[3].value as TeamScenarioTemplate[]);
+      if (results[4].status === "fulfilled") setKnownTags(results[4].value as TeamTag[]);
+      const failed = results.find(item => item.status === "rejected");
+      if (failed?.status === "rejected") setError(failed.reason instanceof Error ? failed.reason.message : String(failed.reason));
+      setSchemaLoading(false);
+    });
     return () => { disposed = true; };
   }, [service]);
   useEffect(() => {
@@ -143,13 +149,13 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
     let disposed = false;
     const timeout = window.setTimeout(() => {
       setListLoading(true);
-      service.search({ q: query, category, map: mapFilter, status, hasDraft: draftFilter === "" ? undefined : draftFilter === "yes", page, pageSize })
+      service.search({ q: query, category, map: mapFilter, weather: weatherFilter, eventType: eventFilter, tag: tagFilter, status, hasDraft: draftFilter === "" ? undefined : draftFilter === "yes", page, pageSize })
         .then(result => { if (!disposed) setRepository(result); })
         .catch(caught => { if (!disposed) setError(caught instanceof Error ? caught.message : String(caught)); })
         .finally(() => { if (!disposed) setListLoading(false); });
     }, 200);
     return () => { disposed = true; window.clearTimeout(timeout); };
-  }, [service, query, category, mapFilter, status, draftFilter, page, pageSize, revision]);
+  }, [service, query, category, mapFilter, weatherFilter, eventFilter, tagFilter, status, draftFilter, page, pageSize, revision]);
   useEffect(() => {
     if (!selectedId) { setDetail(null); setDraft(null); return; }
     let disposed = false;
@@ -159,15 +165,23 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
       const [item, history, imported] = await Promise.all([service.detail(selectedId), service.versions(selectedId), service.imports(selectedId)]);
       const current = item.hasDraft ? await service.draft(selectedId) : null;
       if (disposed) return;
-      setDetail(item); setDraft(current); setVersions(history); setImports(imported);
+      setDetail(item); setDraft(current); setVersions(history); setImports(imported); setTagText((item.tags ?? []).join(", "));
       setText(pretty(current?.content ?? item.latestContent ?? {})); setDirty(false); setReport(null);
       setAcknowledgeWarnings(false); setPackageResult(null); setVersionResult(null); setDiff(null); setBatchResult(null); setBatches([]);
-      setVersionNumber(history[0]?.versionNumber ?? 1); setGrid("{}"); setVariantNamePrefix(""); setVariantNote("");
+      setVersionNumber(history[0]?.versionNumber ?? 1); setGrid("{}"); setVariantNamePrefix(""); setVariantNote(""); setHistory(null); setHistoryPage(1);
       if (history[0]) { setDiffFrom(history[1]?.versionNumber ?? history[0].versionNumber); setDiffTo(history[0].versionNumber); }
     })().catch(caught => { if (!disposed) setError(caught instanceof Error ? caught.message : String(caught)); })
       .finally(() => { if (!disposed) setDetailLoading(false); });
     return () => { disposed = true; };
   }, [service, selectedId]);
+  useEffect(() => {
+    if (!selectedId || tab !== "history") return;
+    let disposed = false; setHistoryLoading(true);
+    service.history(selectedId, historyPage, historyPageSize).then(next => { if (!disposed) setHistory(next); })
+      .catch(caught => { if (!disposed) setError(caught instanceof Error ? caught.message : String(caught)); })
+      .finally(() => { if (!disposed) setHistoryLoading(false); });
+    return () => { disposed = true; };
+  }, [service, selectedId, tab, historyPage, historyPageSize, revision]);
   function selectVersion(number: number) {
     setVersionNumber(number); setBatches([]); setBatchResult(null); setVersionResult(null);
   }
@@ -175,7 +189,6 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
   const profileEditable = !!detail && detail.status !== "ARCHIVED" && !busy;
   const editable = !!draft && profileEditable;
   function edit(next: TeamObject) { setText(pretty(next)); setDirty(true); setReport(null); setAcknowledgeWarnings(false); }
-  function block(name: string, changes: TeamObject) { if (content) edit({ ...content, [name]: { ...teamObject(content[name]), ...changes } }); }
   async function saveCurrent(): Promise<TeamDraft> {
     if (!detail || !draft) throw new Error(t("Create a draft first.", "Hãy tạo bản nháp trước."));
     const nextContent = parseObject(text);
@@ -188,7 +201,7 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
     event.preventDefault(); const data = new FormData(event.currentTarget);
     if (dirty && !window.confirm(t("Discard unsaved editor changes and open the new scenario?", "Bỏ thay đổi chưa lưu và mở kịch bản mới?"))) return;
     await perform("create", async () => {
-      const item = await service.createProfile(String(data.get("name") ?? "").trim(), String(data.get("description") ?? "").trim(), String(data.get("category") ?? "free_driving"));
+      const item = await service.createProfile(String(data.get("name") ?? "").trim(), String(data.get("description") ?? "").trim(), String(data.get("category") ?? "free_driving"), createTemplate || undefined);
       setSelectedId(item.id); setCreateOpen(false); setTab("definition"); await changed();
       announce("Scenario created with a draft template. Configure the route and actors before publishing.", "Đã tạo kịch bản cùng bản nháp mẫu. Hãy cấu hình tuyến đường và actor trước khi xuất bản.");
     });
@@ -221,65 +234,30 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
     if (dirty && !window.confirm(t("Discard unsaved editor changes?", "Bỏ các thay đổi chưa lưu trong trình soạn thảo?"))) return;
     setSelectedId(id); setTab(workspacePage === "compare" ? "versions" : "definition");
   }
-  const route = teamObject(content?.route);
-  const weather = teamObject(content?.weather);
-  const traffic = teamObject(content?.traffic);
-  const npc = teamObject(traffic.npc_vehicles);
-  const pedestrians = teamObject(traffic.pedestrians);
-  const execution = teamObject(content?.execution);
-  function setRouteIndex(name: "start" | "goal", value: string) {
-    if (value === "") return;
-    block("route", { [name]: { spawn_point_index: Number(value) } });
+  async function loadParameterRanges() {
+    if (!detail) return;
+    const source = await service.version(detail.id, versionNumber);
+    const grid: Record<string, number[]> = {};
+    for (const [name, definition] of Object.entries(teamObject(source.content?.parameters))) grid[name] = parameterRangeValues(teamObject(definition));
+    setGrid(pretty(grid));
+    setVersionResult(source);
   }
-  const actorList = Array.isArray(content?.actors) ? content.actors.map(teamObject) : [];
-  const eventList = Array.isArray(content?.events) ? content.events.map(teamObject) : [];
-  const parameters = teamObject(content?.parameters);
-  function localChange(task: () => void) {
-    setError("");
-    try { task(); } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); }
+  function toggleWeatherAxis(preset: string, checked: boolean) {
+    try {
+      const parsed = parseObject(grid);
+      const values = Array.isArray(parsed["weather.preset"]) ? parsed["weather.preset"].filter((value): value is string => typeof value === "string") : [];
+      const next = checked ? [...new Set([...values, preset])] : values.filter(value => value !== preset);
+      if (next.length) parsed["weather.preset"] = next; else delete parsed["weather.preset"];
+      setGrid(pretty(parsed)); setError("");
+    } catch { setError(t("Fix the parameter grid JSON before choosing weather presets.", "Sửa JSON lưới tham số trước khi chọn thời tiết.")); }
   }
-  function addActor(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
-    localChange(() => {
-      if (!content) return;
-      const id = String(data.get("id") ?? "").trim();
-      if (actorList.some(item => item.id === id)) throw new Error(t("Actor ID must be unique.", "ID actor phải duy nhất."));
-      const actor: TeamObject = { id, type: actorType, blueprint: String(data.get("blueprint") ?? "").trim(), spawn: explicitLocation(data, "actor"), behavior: actorType === "static_obstacle" ? "idle" : String(data.get("behavior") ?? "idle") };
-      if (actorType !== "static_obstacle") actor.initial_speed_kmh = numericField(data, "initial_speed_kmh");
-      edit({ ...content, actors: [...actorList, actor] }); form.reset();
-    });
-  }
-  function addEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
-    localChange(() => {
-      if (!content) return;
-      const id = String(data.get("id") ?? "").trim();
-      if (eventList.some(item => item.id === id)) throw new Error(t("Event ID must be unique.", "ID event phải duy nhất."));
-      const trigger: TeamObject = { type: triggerType };
-      if (triggerType === "simulation_time") trigger.time_s = numericField(data, "time_s");
-      else { trigger.distance_m = numericField(data, "distance_m"); if (triggerType === "ego_distance_to_actor") trigger.actor_ref = String(data.get("trigger_actor_ref")); else trigger.location = explicitLocation(data, "trigger"); }
-      const params: TeamObject = eventType === "pedestrian_crossing" ? { speed_ms: numericField(data, "speed_ms"), direction: String(data.get("direction")) }
-        : eventType === "vehicle_cut_in" ? { side: String(data.get("side")), cut_in_gap_m: numericField(data, "cut_in_gap_m"), lane_change_duration_s: numericField(data, "lane_change_duration_s") }
-        : eventType === "lead_vehicle_brake" ? { deceleration_ms2: numericField(data, "deceleration_ms2"), target_speed_kmh: numericField(data, "target_speed_kmh") }
-        : { target: "next_on_route", state: String(data.get("state")), duration_s: numericField(data, "duration_s") };
-      const item: TeamObject = { id, type: eventType, description: String(data.get("description") ?? ""), trigger, params };
-      if (eventType !== "traffic_light_override") item.actor_ref = String(data.get("actor_ref"));
-      edit({ ...content, events: [...eventList, item] }); form.reset();
-    });
-  }
-  function addParameter(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
-    localChange(() => {
-      if (!content) return;
-      const id = String(data.get("id") ?? "").trim();
-      if (parameters[id] !== undefined) throw new Error(t("Parameter already exists.", "Tham số đã tồn tại."));
-      const type = String(data.get("type")); const value = numericField(data, "value"); const min = numericField(data, "min"); const max = numericField(data, "max");
-      if (min > max || value < min || value > max || type === "integer" && !Number.isInteger(value)) throw new Error(t("Set min ≤ value ≤ max and use an integer for integer parameters.", "Đặt min ≤ value ≤ max và dùng số nguyên cho tham số integer."));
-      const definition: TeamObject = { type, value, min, max, unit: String(data.get("unit") ?? ""), description: String(data.get("description") ?? "") };
-      if (String(data.get("step") ?? "").trim()) definition.step = numericField(data, "step");
-      edit({ ...content, parameters: { ...parameters, [id]: definition } }); form.reset();
-    });
-  }
+  const gridSummary = useMemo(() => {
+    try {
+      const parsed = parseObject(grid);
+      const lengths = Object.values(parsed).map(value => Array.isArray(value) ? value.length : 0);
+      return { cartesian: lengths.length ? lengths.reduce((a, b) => a * b, 1) : 0, weather: Array.isArray(parsed["weather.preset"]) ? parsed["weather.preset"] : [] };
+    } catch { return { cartesian: 0, weather: [] }; }
+  }, [grid]);
   const button = (key: string, en: string, vi: string, task: () => Promise<void>, disabled = false, primary = false) => (
     <button type="button" className={`btn ${primary ? "btn-primary" : "btn-light"}`} disabled={busy || disabled} onClick={() => void perform(key, task)}>
       {actions.isPending(key) && <i className="button-spinner" />}{t(en, vi)}
@@ -301,16 +279,19 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
         <label>{t("Search name or code", "Tìm tên hoặc mã")}<input value={query} maxLength={100} onChange={event => { setQuery(event.target.value); setPage(1); }} placeholder="SCN-00001" /></label>
         <label>{t("Category", "Phân loại")}<select value={category} onChange={event => { setCategory(event.target.value); setPage(1); }}><option value="">{t("All categories", "Tất cả phân loại")}</option>{catalog?.categories.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
         <label>{t("Map", "Bản đồ")}<select value={mapFilter} onChange={event => { setMapFilter(event.target.value); setPage(1); }}><option value="">{t("All maps", "Tất cả bản đồ")}</option>{maps.map(item => <option key={item.mapName}>{item.mapName}</option>)}</select></label>
+        <label>{t("Weather", "Thời tiết")}<select value={weatherFilter} onChange={event => { setWeatherFilter(event.target.value); setPage(1); }}><option value="">{t("All weather", "Tất cả thời tiết")}</option>{catalog?.weatherPresets.map(item => <option key={item}>{item}</option>)}</select></label>
+        <label>{t("Event type", "Loại event")}<select value={eventFilter} onChange={event => { setEventFilter(event.target.value); setPage(1); }}><option value="">{t("All events", "Tất cả event")}</option>{catalog?.eventTypes.map(item => <option key={item}>{item}</option>)}</select></label>
         <label>{t("Lifecycle", "Vòng đời")}<select value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}><option value="ACTIVE">ACTIVE</option><option value="ARCHIVED">ARCHIVED</option></select></label>
         <label>{t("Draft", "Bản nháp")}<select value={draftFilter} onChange={event => { setDraftFilter(event.target.value); setPage(1); }}><option value="">{t("All", "Tất cả")}</option><option value="yes">{t("Has draft", "Có bản nháp")}</option><option value="no">{t("Published only", "Chỉ đã xuất bản")}</option></select></label>
         <label>{t("Items per page", "Số mục mỗi trang")}<select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}>{[12, 24, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}</select></label>
       </div>
+      <div className="team-tag-filter"><b>{t("Tags · must match all selected", "Tag · phải có đủ các tag đã chọn")}</b>{knownTags.map(tag => <label className="team-tag-chip" key={tag.name}><input type="checkbox" checked={tagFilter.includes(tag.name)} onChange={event => { setTagFilter(current => event.target.checked ? [...current, tag.name] : current.filter(item => item !== tag.name)); setPage(1); }} />{tag.name}<small>{tag.activeScenarioCount}</small></label>)}{tagFilter.length > 0 && <button type="button" className="btn btn-light" onClick={() => { setTagFilter([]); setPage(1); }}>{t("Clear tags", "Bỏ lọc tag")}</button>}{!knownTags.length && <span>{t("No repository tags yet.", "Kho chưa có tag.")}</span>}</div>
       <div className="team-scenario-cards" aria-busy={listLoading}>
         {listLoading && <p className="team-loading"><i className="button-spinner" />{t("Loading repository…", "Đang tải kho kịch bản…")}</p>}
         {!listLoading && !repository?.items.length && <p>{t("No scenarios match these filters.", "Không có kịch bản phù hợp bộ lọc.")}</p>}
         {repository?.items.map(item => <button key={item.id} className={`team-scenario-card ${selectedId === item.id ? "selected" : ""}`} disabled={busy} onClick={() => selectScenario(item.id)}>
           <small>{item.code} · {item.category}</small><b>{item.name}</b><span>{item.mapName ?? t("Configure map", "Chưa cấu hình map")} · {item.weatherPreset ?? "—"}</span>
-          <span className="team-card-status">{item.latestVersionNumber ? `${item.latestVersionStatus} v${item.latestVersionNumber}` : t("Not published", "Chưa xuất bản")}{item.hasDraft ? t(" · Draft changes", " · Có bản nháp") : ""}</span>
+          <span className="team-card-status">{item.latestVersionNumber ? `${item.latestVersionStatus} v${item.latestVersionNumber}` : t("Not published", "Chưa xuất bản")}{item.hasDraft ? t(" · Draft changes", " · Có bản nháp") : ""}</span><span>{item.tags?.join(" · ")}</span>
         </button>)}
       </div>
       <div className="team-pagination"><span>{repository?.totalCount ?? 0} {t("scenarios", "kịch bản")}</span><button className="btn btn-light" disabled={listLoading || page <= 1} onClick={() => setPage(value => value - 1)}>{t("Previous", "Trước")}</button><span>{page} / {Math.max(1, repository?.totalPages ?? 1)}</span><button className="btn btn-light" disabled={listLoading || page >= (repository?.totalPages ?? 1)} onClick={() => setPage(value => value + 1)}>{t("Next", "Sau")}</button></div>
@@ -324,7 +305,7 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
         <button type="button" className="btn btn-light" disabled={busy || !detail.latestVersion} onClick={() => setCloneOpen(true)}>{t("Clone published version", "Nhân bản phiên bản")}</button>
         {button("archive", detail.status === "ARCHIVED" ? "Restore scenario" : "Archive scenario", detail.status === "ARCHIVED" ? "Khôi phục kịch bản" : "Lưu trữ kịch bản", async () => { const next = detail.status === "ARCHIVED" ? await service.restore(detail.id) : await service.archive(detail.id); setDetail(next); await changed(); })}
       </div>
-      <nav className="team-tabs">{([ ["definition", "Definition", "Cấu hình"], ["versions", "Versions and handoff", "Phiên bản và bàn giao"], ["variants", "Parameter variants", "Biến thể tham số"], ["imports", "Import history", "Lịch sử nhập"] ] as const).map(([key,en,vi]) => <button key={key} className={tab === key ? "active" : ""} disabled={busy} onClick={() => setTab(key)}>{t(en,vi)}</button>)}</nav>
+      <nav className="team-tabs">{([ ["definition", "Definition", "Cấu hình"], ["versions", "Versions and handoff", "Phiên bản và bàn giao"], ["variants", "Parameter variants", "Biến thể tham số"], ["history", "Activity history", "Lịch sử thao tác"], ["imports", "Import history", "Lịch sử nhập"] ] as const).map(([key,en,vi]) => <button key={key} className={tab === key ? "active" : ""} disabled={busy} onClick={() => setTab(key)}>{t(en,vi)}</button>)}</nav>
       {tab === "definition" && <>
         {!draft && <div className="team-message">{t("This is a published immutable version. Create a draft to edit it.", "Đây là phiên bản đã xuất bản, bất biến. Tạo bản nháp để chỉnh sửa.")}</div>}
         <form className="team-profile-form" onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void perform("profile", async () => { const next = await service.updateProfile(detail.id, { name: String(data.get("name")), description: String(data.get("description")), category: String(data.get("category")) }); setDetail(next); await changed(); announce("Scenario profile saved.", "Đã lưu hồ sơ kịch bản."); }); }}>
@@ -333,74 +314,16 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
           <label>{t("Description", "Mô tả")}<input name="description" key={`${detail.id}:${detail.description}`} defaultValue={detail.description ?? ""} maxLength={2000} disabled={!profileEditable} /></label>
           <button className="btn btn-light" disabled={!profileEditable}>{actions.isPending("profile") && <i className="button-spinner" />}{t("Save profile", "Lưu hồ sơ")}</button>
         </form>
+        <form className="team-tags-editor" onSubmit={event => { event.preventDefault(); void perform("tags", async () => { const values = tagText.split(/[,\n]/).map(value => value.trim()).filter(Boolean); const next = await service.replaceTags(detail.id, values); setDetail(current => current ? { ...current, tags: next.tags } : current); setTagText(next.tags.join(", ")); setKnownTags(await service.tags()); await changed(); announce("Repository tags saved.", "Đã lưu tag của kho kịch bản."); }); }}><label>{t("Repository tags (comma-separated, maximum 20)", "Tag của kho (phân cách dấu phẩy, tối đa 20)")}<input value={tagText} disabled={!profileEditable} onChange={event => setTagText(event.target.value)} placeholder="night, rain, pedestrian" /><small>{t("1–32 lowercase letters, digits, hyphens or underscores. Saving replaces the entire tag set; blank removes all tags. Published JSON metadata stays unchanged.", "1–32 chữ thường, số, dấu gạch ngang hoặc gạch dưới. Lưu thay toàn bộ bộ tag; để trống gỡ hết. Metadata JSON đã xuất bản giữ nguyên.")}</small></label><button className="btn btn-light" disabled={!profileEditable}>{actions.isPending("tags") && <i className="button-spinner" />}{t("Save tags", "Lưu tag")}</button></form>
         <p className="team-help">{t("Profile changes update the repository. Edit metadata in the JSON separately when the next published definition should contain the same changes.", "Thay đổi hồ sơ cập nhật kho kịch bản. Chỉnh metadata trong JSON riêng nếu cấu hình xuất bản tiếp theo cần có cùng thay đổi.")}</p>
-        {content && <fieldset className="team-schema-fields" disabled={!editable}>
-          <legend>{t("Map route weather and actors", "Bản đồ tuyến đường thời tiết và actor")}</legend>
-          <div className="team-form-grid">
-            <label>{t("CARLA map", "Bản đồ CARLA")}<select value={teamString(teamObject(content.map).name)} onChange={event => block("map", { name: event.target.value })}>{!maps.some(item => item.mapName === teamString(teamObject(content.map).name)) && <option>{teamString(teamObject(content.map).name)}</option>}{maps.map(item => <option key={item.mapName} value={item.mapName}>{item.mapName} · {item.spawnPointCount} spawn points</option>)}</select></label>
-            <label>{t("Weather preset", "Thời tiết")}<select value={teamString(weather.preset, "ClearNoon")} onChange={event => block("weather", { preset: event.target.value })}>{catalog?.weatherPresets.map(item => <option key={item}>{item}</option>)}</select></label>
-            <label>{t("Start spawn index", "Vị trí spawn đầu")}<input type="number" min={0} value={typeof teamObject(route.start).spawn_point_index === "number" ? Number(teamObject(route.start).spawn_point_index) : ""} placeholder={t("Coordinates in JSON", "Tọa độ trong JSON")} onChange={event => setRouteIndex("start", event.target.value)} /></label>
-            <label>{t("Goal spawn index", "Vị trí spawn đích")}<input type="number" min={0} value={typeof teamObject(route.goal).spawn_point_index === "number" ? Number(teamObject(route.goal).spawn_point_index) : ""} placeholder={t("Coordinates in JSON", "Tọa độ trong JSON")} onChange={event => setRouteIndex("goal", event.target.value)} /></label>
-            <label>{t("Route speed limit km/h", "Giới hạn tốc độ tuyến km/h")}<input type="number" min={5} max={130} value={typeof route.speed_limit_kmh === "number" ? route.speed_limit_kmh : ""} placeholder={t("Use map signs", "Theo biển báo map")} onChange={event => { const next = { ...route }; if (event.target.value === "") delete next.speed_limit_kmh; else next.speed_limit_kmh = Number(event.target.value); edit({ ...content, route: next }); }} /></label>
-            <label>{t("Goal tolerance m", "Dung sai đích m")}<input type="number" min={1} max={50} value={Number(route.goal_tolerance_m ?? 5)} onChange={event => block("route", { goal_tolerance_m: Number(event.target.value) })} /></label>
-            <label>{t("Ego blueprint", "Mẫu xe chính")}<select value={teamString(teamObject(content.ego_vehicle).blueprint, "vehicle.tesla.model3")} onChange={event => block("ego_vehicle", { blueprint: event.target.value })}>{carlaVehicles.map(item => <option key={item.blueprint} value={item.blueprint}>{item.label} · {item.blueprint}</option>)}</select></label>
-            <label>{t("Ego role name", "Tên vai trò xe chính")}<input value={teamString(teamObject(content.ego_vehicle).role_name, "hero")} onChange={event => block("ego_vehicle", { role_name: event.target.value })} /></label>
-            <label>{t("Ego RGB color (optional)", "Màu RGB xe chính (tùy chọn)")}<input value={teamString(teamObject(content.ego_vehicle).color)} placeholder="255,0,0" pattern="[0-9]{1,3},[0-9]{1,3},[0-9]{1,3}" onChange={event => { const next = { ...teamObject(content.ego_vehicle) }; if (event.target.value) next.color = event.target.value; else delete next.color; edit({ ...content, ego_vehicle: next }); }} /></label>
-            <label>{t("NPC blueprint filter", "Bộ lọc mẫu xe NPC")}<input value={teamString(npc.blueprint_filter, "vehicle.*")} onChange={event => block("traffic", { npc_vehicles: { ...npc, blueprint_filter: event.target.value } })} /></label>
-            <label>{t("NPC vehicle count", "Số xe NPC")}<input type="number" min={0} max={300} value={teamNumber(npc.count, content)} disabled={typeof npc.count === "object"} onChange={event => block("traffic", { npc_vehicles: { ...npc, count: Number(event.target.value) } })} /></label>
-            <label>{t("Background pedestrian count", "Số người đi bộ nền")}<input type="number" min={0} max={300} value={teamNumber(pedestrians.count, content)} disabled={typeof pedestrians.count === "object"} onChange={event => block("traffic", { pedestrians: { ...pedestrians, count: Number(event.target.value) } })} /></label>
-            <label>{t("Random seed", "Seed ngẫu nhiên")}<input type="number" min={0} max={2147483647} value={Number(execution.seed ?? 42)} onChange={event => block("execution", { seed: Number(event.target.value) })} /></label>
-            <label>{t("Simulation timeout seconds", "Thời hạn mô phỏng giây")}<input type="number" min={10} max={3600} value={Number(execution.timeout_s ?? 120)} onChange={event => block("execution", { timeout_s: Number(event.target.value) })} /></label>
-            <label>{t("Fixed time step seconds", "Bước mô phỏng giây")}<input type="number" min={0.01} max={0.1} step={0.01} value={Number(execution.fixed_delta_seconds ?? 0.05)} onChange={event => block("execution", { fixed_delta_seconds: Number(event.target.value), synchronous_mode: true })} /></label>
-            <label>{t("Warm-up seconds", "Thời gian ổn định giây")}<input type="number" min={0} max={30} step={0.1} value={Number(execution.warmup_s ?? 2)} onChange={event => block("execution", { warmup_s: Number(event.target.value) })} /></label>
-            <label>{t("Ego initial speed km/h", "Tốc độ xe chính ban đầu km/h")}<input type="number" min={0} max={130} value={Number(teamObject(content.ego_vehicle).initial_speed_kmh ?? 0)} onChange={event => block("ego_vehicle", { initial_speed_kmh: Number(event.target.value) })} /></label>
-            <label>{t("NPC speed difference % (+ slower)", "Chênh tốc độ NPC % (+ chậm hơn)")}<input type="number" min={-100} max={100} value={Number(npc.speed_difference_percent ?? 0)} onChange={event => block("traffic", { npc_vehicles: { ...npc, speed_difference_percent: Number(event.target.value) } })} /></label>
-            <label>{t("NPC following distance m", "Khoảng cách bám xe NPC m")}<input type="number" min={0} max={20} step={0.1} value={Number(npc.distance_to_leading_m ?? 2.5)} onChange={event => block("traffic", { npc_vehicles: { ...npc, distance_to_leading_m: Number(event.target.value) } })} /></label>
-            <label className="team-checkbox"><input type="checkbox" checked={npc.four_wheels_only !== false} onChange={event => block("traffic", { npc_vehicles: { ...npc, four_wheels_only: event.target.checked } })} />{t("Only four-wheel background vehicles", "Chỉ xe nền bốn bánh")}</label>
-            <label>{t("Pedestrian crossing probability", "Xác suất người nền qua đường")}<input type="number" min={0} max={1} step={0.05} value={Number(pedestrians.crossing_probability ?? 0)} onChange={event => block("traffic", { pedestrians: { ...pedestrians, crossing_probability: Number(event.target.value) } })} /></label>
-            <label>{t("Pedestrian running probability", "Xác suất người nền chạy")}<input type="number" min={0} max={1} step={0.05} value={Number(pedestrians.running_probability ?? 0)} onChange={event => block("traffic", { pedestrians: { ...pedestrians, running_probability: Number(event.target.value) } })} /></label>
-          </div>
-          <details className="team-subpanel"><summary>{t("Detailed weather overrides", "Ghi đè thời tiết chi tiết")}</summary><p className="team-help">{t("Leave a field empty to retain the selected CARLA preset value.", "Để trống để giữ giá trị của preset CARLA đang chọn.")}</p><div className="team-form-grid">{([ ["cloudiness", "Cloudiness", "Độ mây", 0, 100], ["precipitation", "Rain", "Lượng mưa", 0, 100], ["precipitation_deposits", "Puddles", "Nước đọng", 0, 100], ["wind_intensity", "Wind", "Gió", 0, 100], ["sun_azimuth_angle", "Sun azimuth °", "Góc phương vị mặt trời °", 0, 360], ["sun_altitude_angle", "Sun altitude °", "Góc cao mặt trời °", -90, 90], ["fog_density", "Fog density", "Mật độ sương", 0, 100], ["fog_distance", "Fog start distance m", "Khoảng cách sương m", 0, undefined], ["wetness", "Road wetness", "Độ ướt đường", 0, 100] ] as const).map(([key,en,vi,min,max]) => <label key={key}>{t(en,vi)}<input type="number" min={min} max={max} step="any" value={typeof weather[key] === "number" ? Number(weather[key]) : ""} placeholder="Preset" onChange={event => { const next = { ...weather }; if (event.target.value === "") delete next[key]; else next[key] = Number(event.target.value); edit({ ...content, weather: next }); }} /></label>)}</div></details>
-          <p className="team-help">{t("Spawn indices belong to the exact selected map. Set explicit coordinates, waypoints, weather overrides, scripted actors, events and parameter references in the full JSON below. Metadata validation does not guarantee a spawn succeeds in a live world.", "Spawn index thuộc đúng bản đồ đã chọn. Cấu hình tọa độ, waypoint, thời tiết chi tiết, actor kịch bản, event và tham chiếu tham số trong JSON đầy đủ bên dưới. Kiểm tra metadata chưa bảo đảm spawn thành công trong thế giới đang chạy.")}</p>
-          <div className="team-event-guide"><b>{t("Supported event types", "Loại event hỗ trợ")}</b><span>{catalog?.eventTypes.join(" · ")}</span><b>{t("Trigger types", "Loại trigger")}</b><span>{catalog?.triggerTypes.join(" · ")}</span></div>
-        </fieldset>}
-        {content && <div className="team-structured-editor">
-          <details className="team-subpanel"><summary>{t("Route coordinates and waypoints", "Tọa độ tuyến đường và waypoint")}</summary>
-            <pre className="team-mini-json">{pretty(route)}</pre><form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); localChange(() => { const location = explicitLocation(data, "route"); block("route", { [locationTarget]: location }); }); }}><fieldset disabled={!editable}><div className="team-form-grid"><label>{t("Edit route point", "Chỉnh điểm tuyến")}<select value={locationTarget} onChange={event => setLocationTarget(event.target.value as "start" | "goal")}><option value="start">route.start</option><option value="goal">route.goal</option></select></label></div><LocationFields prefix="route" t={t} disabled={!editable} /><button className="btn btn-light">{t("Apply position to draft", "Áp dụng vị trí vào nháp")}</button></fieldset></form>
-            <form onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); localChange(() => { block("route", { waypoints: [...(Array.isArray(route.waypoints) ? route.waypoints : []), explicitLocation(data, "waypoint")] }); }); }}><fieldset disabled={!editable || Array.isArray(route.waypoints) && route.waypoints.length >= 50}><h4>{t("Add intermediate waypoint", "Thêm waypoint trung gian")}</h4><LocationFields prefix="waypoint" t={t} disabled={!editable} /><button className="btn btn-light">{t("Append waypoint", "Thêm waypoint")}</button></fieldset></form>
-            {Array.isArray(route.waypoints) && route.waypoints.map((point,index) => <div className="team-item-row" key={index}><code>{index + 1}. {JSON.stringify(point)}</code><button className="btn btn-light" disabled={!editable} onClick={() => block("route", { waypoints: (route.waypoints as TeamObject[]).filter((_, position) => position !== index) })}>{t("Remove", "Xóa")}</button></div>)}
+        {content && <>
+          {Object.keys(teamObject(content.parameters)).length > 0 && <details className="team-subpanel" open><summary>{t("Quick setup · key test parameters", "Cấu hình nhanh · tham số kiểm thử chính")}</summary><div className="team-form-grid">{Object.entries(teamObject(content.parameters)).map(([name, raw]) => { const definition = teamObject(raw); return <label key={name}>{name} {typeof definition.unit === "string" ? `(${definition.unit})` : ""}<input type="number" min={Number(definition.min)} max={Number(definition.max)} step={definition.type === "integer" ? 1 : typeof definition.step === "number" ? definition.step : "any"} value={typeof definition.value === "number" ? definition.value : ""} disabled={!editable} onChange={event => { if (event.target.value !== "") edit(schemaUpdate(content, ["parameters", name, "value"], Number(event.target.value))); }} /><small>{String(definition.description ?? "")} · {String(definition.min)} → {String(definition.max)}</small></label>; })}</div><p className="team-help">{t("These values resolve the fields linked with $param. Edit ranges and links in Reusable numeric parameters below.", "Các giá trị này áp dụng cho ô liên kết bằng $param. Chỉnh miền giá trị và liên kết ở Tham số số tái sử dụng bên dưới.")}</p></details>}
+          <details className="team-subpanel" open><summary>{t("Interactive map and scenario geometry", "Bản đồ tương tác và hình học kịch bản")}</summary>
+            <label>{t("Position selection scope", "Nhóm vị trí cần chọn")}<select value={mapScope} disabled={!editable} onChange={event => setMapScope(event.target.value as "route" | "actors" | "events")}><option value="route">{t("Route", "Tuyến đường")}</option><option value="actors">{t("Actors", "Actor")}</option><option value="events">{t("Events", "Event")}</option></select></label>
+            <TeamMapView client={service.client} content={content} readOnly={!editable} pick={editable ? { scope: mapScope, onPick: (path, value) => edit(schemaUpdate(content, path, value)) } : undefined} />
           </details>
-          <details className="team-subpanel"><summary>{t("Scripted actors and obstacles", "Actor kịch bản và chướng ngại")} · {actorList.length}/50</summary>
-            <p className="team-help">{t("Choose an explicit location for every actor. Background traffic is configured above; these actors are targets for scripted events. Edit an existing actor in the full JSON.", "Chọn vị trí cụ thể cho từng actor. Giao thông nền cấu hình bên trên; các actor này là mục tiêu của event kịch bản. Chỉnh actor hiện có trong JSON đầy đủ.")}</p>
-            {actorList.map((actor,index) => <div className="team-item-row" key={`${teamString(actor.id)}:${index}`}><div><b>{teamString(actor.id)} · {teamString(actor.type)}</b><code>{teamString(actor.blueprint)} · {JSON.stringify(actor.spawn)}</code></div><button className="btn btn-light" disabled={!editable || eventList.some(item => item.actor_ref === actor.id || teamObject(item.trigger).actor_ref === actor.id)} title={t("Remove referencing events first", "Xóa event tham chiếu trước")} onClick={() => edit({ ...content, actors: actorList.filter((_, position) => position !== index) })}>{t("Remove", "Xóa")}</button></div>)}
-            <form onSubmit={addActor}><fieldset disabled={!editable || actorList.length >= 50}><div className="team-form-grid">
-              <label>ID<input name="id" pattern="[a-z][a-z0-9_]{0,31}" maxLength={32} required placeholder="crossing_actor_1" /></label>
-              <label>{t("Actor type", "Loại actor")}<select value={actorType} onChange={event => setActorType(event.target.value)}>{(catalog?.actorTypes ?? ["vehicle", "pedestrian", "bicycle", "static_obstacle"]).map(item => <option key={item}>{item}</option>)}</select></label>
-              <label>{t("Blueprint", "Mẫu blueprint")}<input name="blueprint" key={actorType} required list="team-actor-blueprints" placeholder={actorType === "pedestrian" ? "walker.pedestrian.0001" : actorType === "static_obstacle" ? "static.prop.trafficcone01" : "vehicle.tesla.model3"} /></label>
-              {actorType !== "static_obstacle" && <><label>{t("Behavior", "Hành vi")}<select name="behavior"><option value="idle">idle</option><option value="scripted">scripted</option><option value="autopilot">autopilot</option></select></label><label>{t("Initial speed km/h", "Tốc độ ban đầu km/h")}<input name="initial_speed_kmh" type="number" min={0} max={130} step="any" defaultValue={0} required /></label></>}
-            </div><datalist id="team-actor-blueprints">{carlaVehicles.map(item => <option key={item.blueprint} value={item.blueprint}>{item.label}</option>)}</datalist><LocationFields prefix="actor" t={t} disabled={!editable} /><button className="btn btn-light">{t("Add actor to draft", "Thêm actor vào nháp")}</button></fieldset></form>
-          </details>
-          <details className="team-subpanel"><summary>{t("Events and triggers", "Event và điều kiện kích hoạt")} · {eventList.length}/20</summary>
-            {eventList.map((item,index) => <div className="team-item-row" key={`${teamString(item.id)}:${index}`}><div><b>{teamString(item.id)} · {teamString(item.type)}</b><code>{JSON.stringify(item.trigger)} · {JSON.stringify(item.params)}</code></div><button className="btn btn-light" disabled={!editable} onClick={() => edit({ ...content, events: eventList.filter((_, position) => position !== index) })}>{t("Remove", "Xóa")}</button></div>)}
-            <form onSubmit={addEvent}><fieldset disabled={!editable || eventList.length >= 20}><div className="team-form-grid">
-              <label>ID<input name="id" pattern="[a-z][a-z0-9_]{0,31}" maxLength={32} required placeholder="crossing_event_1" /></label>
-              <label>{t("Event type", "Loại event")}<select value={eventType} onChange={event => setEventType(event.target.value)}>{(catalog?.eventTypes ?? ["pedestrian_crossing", "vehicle_cut_in", "lead_vehicle_brake", "traffic_light_override"]).map(item => <option key={item}>{item}</option>)}</select></label>
-              <label>{t("Description", "Mô tả")}<input name="description" maxLength={500} /></label>
-              {eventType !== "traffic_light_override" && <label>{t("Target actor", "Actor mục tiêu")}<select name="actor_ref" required><option value="">{t("Choose actor", "Chọn actor")}</option>{actorList.filter(actor => eventType === "pedestrian_crossing" ? actor.type === "pedestrian" : actor.type === "vehicle" || actor.type === "bicycle").map(actor => <option key={teamString(actor.id)} value={teamString(actor.id)}>{teamString(actor.id)}</option>)}</select></label>}
-              <label>{t("Trigger type", "Điều kiện kích hoạt")}<select value={triggerType} onChange={event => setTriggerType(event.target.value)}>{(catalog?.triggerTypes ?? ["simulation_time", "ego_distance_to_actor", "ego_distance_to_location"]).map(item => <option key={item}>{item}</option>)}</select></label>
-              {triggerType === "simulation_time" ? <label>{t("Simulation time seconds", "Thời điểm mô phỏng giây")}<input name="time_s" type="number" min={0} max={3600} step="any" required /></label> : <label>{t("Trigger distance m", "Khoảng cách kích hoạt m")}<input name="distance_m" type="number" min={0.5} max={200} step="any" required /></label>}
-              {triggerType === "ego_distance_to_actor" && <label>{t("Trigger actor", "Actor kích hoạt")}<select name="trigger_actor_ref" required><option value="">{t("Choose actor", "Chọn actor")}</option>{actorList.map(actor => <option key={teamString(actor.id)} value={teamString(actor.id)}>{teamString(actor.id)}</option>)}</select></label>}
-              {eventType === "pedestrian_crossing" && <><label>{t("Walking speed m/s", "Tốc độ đi bộ m/s")}<input name="speed_ms" type="number" min={0.3} max={6} step="any" required /></label><label>{t("Crossing direction", "Hướng qua đường")}<select name="direction"><option value="left_to_right">left_to_right</option><option value="right_to_left">right_to_left</option></select></label></>}
-              {eventType === "vehicle_cut_in" && <><label>{t("Cut-in side", "Hướng chen làn")}<select name="side"><option value="left">left</option><option value="right">right</option></select></label><label>{t("Cut-in gap m", "Khoảng cách chen m")}<input name="cut_in_gap_m" type="number" min={2} max={50} step="any" required /></label><label>{t("Lane change duration seconds", "Thời gian đổi làn giây")}<input name="lane_change_duration_s" type="number" min={0.5} max={10} step="any" defaultValue={2} required /></label></>}
-              {eventType === "lead_vehicle_brake" && <><label>{t("Deceleration m/s²", "Giảm tốc m/s²")}<input name="deceleration_ms2" type="number" min={1} max={10} step="any" required /></label><label>{t("Target speed km/h", "Tốc độ mục tiêu km/h")}<input name="target_speed_kmh" type="number" min={0} max={130} step="any" defaultValue={0} required /></label></>}
-              {eventType === "traffic_light_override" && <><label>{t("Traffic light state", "Trạng thái đèn")}<select name="state"><option value="red">red</option><option value="yellow">yellow</option><option value="green">green</option></select></label><label>{t("Override duration seconds", "Thời gian đổi đèn giây")}<input name="duration_s" type="number" min={1} max={120} step="any" required /></label></>}
-            </div>{triggerType === "ego_distance_to_location" && <LocationFields prefix="trigger" t={t} disabled={!editable} />}<button className="btn btn-light">{t("Add event to draft", "Thêm event vào nháp")}</button></fieldset></form>
-          </details>
-          <details className="team-subpanel"><summary>{t("Parameters for reproducible variants", "Tham số để sinh biến thể")} · {Object.keys(parameters).length}/30</summary><p className="team-help">{t('Use {"$param":"name"} in supported numeric JSON fields to link a parameter. The backend validates references, ranges and generated combinations.', 'Dùng {"$param":"tên"} trong các trường số JSON hỗ trợ để liên kết tham số. Backend kiểm tra tham chiếu, miền giá trị và các tổ hợp sinh ra.')}</p>
-            {Object.entries(parameters).map(([name,definition]) => <div className="team-item-row" key={name}><div><b>{name}</b><code>{JSON.stringify(definition)}</code></div><button className="btn btn-light" disabled={!editable} onClick={() => { const next = { ...parameters }; delete next[name]; edit({ ...content, parameters: next }); }}>{t("Remove", "Xóa")}</button></div>)}
-            <form onSubmit={addParameter}><fieldset disabled={!editable || Object.keys(parameters).length >= 30}><div className="team-form-grid"><label>{t("Parameter name", "Tên tham số")}<input name="id" pattern="[a-z][a-z0-9_]{0,31}" maxLength={32} required /></label><label>{t("Numeric type", "Kiểu số")}<select name="type"><option value="number">number</option><option value="integer">integer</option></select></label>{["value", "min", "max"].map(name => <label key={name}>{name}<input name={name} type="number" step="any" required /></label>)}<label>{t("Step optional", "Bước tùy chọn")}<input name="step" type="number" min={0.000001} step="any" /></label><label>{t("Unit", "Đơn vị")}<input name="unit" maxLength={16} /></label><label>{t("Parameter description", "Mô tả tham số")}<input name="description" maxLength={300} /></label></div><button className="btn btn-light">{t("Add parameter to draft", "Thêm tham số vào nháp")}</button></fieldset></form>
-          </details>
-        </div>}
+          {schemaLoading ? <p className="team-loading"><i className="button-spinner" />{t("Loading backend schema…", "Đang tải schema backend…")}</p> : fullSchema ? <TeamSchemaEditor schema={fullSchema} content={content} maps={maps} disabled={!editable} report={report} onChange={edit} focusTarget={schemaFocus} /> : <div className="team-message team-error"><span>{t("The guided editor requires the backend schema. Your full JSON remains available below.", "Trình cấu hình cần schema backend. JSON đầy đủ vẫn được giữ bên dưới.")}</span>{button("reload-schema", "Retry schema", "Tải lại schema", async () => setFullSchema(await service.schema()))}</div>}
+        </>}
         <label className="team-json-label">{t("Full canonical scenario JSON", "JSON đầy đủ của kịch bản")}<textarea className="team-json-editor" value={text} spellCheck={false} readOnly={!editable} onChange={event => { setText(event.target.value); setDirty(true); setReport(null); setAcknowledgeWarnings(false); }} rows={24} /></label>
         {!content && <p className="team-error-text">{t("JSON is incomplete or invalid. Fix its syntax before saving; your text is preserved.", "JSON chưa hoàn chỉnh hoặc sai cú pháp. Sửa cú pháp trước khi lưu; nội dung vẫn được giữ.")}</p>}
         {draft && <label className="team-publication-note">{t("Publication change note", "Ghi chú phiên bản xuất bản")}<input maxLength={1000} value={changeNote} disabled={busy} onChange={event => setChangeNote(event.target.value)} placeholder={t("Describe what changed in this version", "Mô tả thay đổi trong phiên bản này")} /></label>}
@@ -414,8 +337,8 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
         </div>
         {report && <div className={`team-validation ${report.isValid ? "valid" : "invalid"}`} role="status"><h4>{report.isValid ? t("Validation passed", "Đã qua kiểm tra") : t("Configuration needs changes", "Cấu hình cần sửa")}</h4><p>{t("Stopped at", "Tầng dừng")}: {report.stoppedAt ?? "—"} · {report.validatorVersion} · {report.contentHash}</p>
           {report.duplicateOfVersionNumber != null && <p className="team-error-text">{t("Execution content duplicates version", "Nội dung thực thi trùng phiên bản")} {report.duplicateOfVersionNumber}. {t("Reuse that version or change an execution field.", "Dùng lại phiên bản đó hoặc thay đổi cấu hình thực thi.")}</p>}
-          {report.errors.map((issue,index) => <p className="team-error-text" key={`e${index}`}><code>{issue.path}</code> · {issue.tier} · {issue.message}</p>)}
-          {report.warnings.map((issue,index) => <p className="team-warning-text" key={`w${index}`}><code>{issue.path}</code> · {issue.message}</p>)}
+          {report.errors.map((issue,index) => <p className="team-error-text" key={`e${index}`}><button type="button" className="team-issue-link" onClick={() => setSchemaFocus(current => ({ path: issue.path, nonce: (current?.nonce ?? 0) + 1 }))}><code>{issue.path}</code></button> · {issue.tier} · {issue.message}</p>)}
+          {report.warnings.map((issue,index) => <p className="team-warning-text" key={`w${index}`}><button type="button" className="team-issue-link" onClick={() => setSchemaFocus(current => ({ path: issue.path, nonce: (current?.nonce ?? 0) + 1 }))}><code>{issue.path}</code></button> · {issue.message}</p>)}
           {report.isValid && report.warnings.length > 0 && <label className="team-checkbox"><input type="checkbox" checked={acknowledgeWarnings} disabled={busy} onChange={event => setAcknowledgeWarnings(event.target.checked)} />{t("I reviewed these warnings. A published version may still be non-runnable until metadata and runtime requirements are satisfied.", "Tôi đã xem cảnh báo. Phiên bản xuất bản vẫn có thể chưa chạy được cho đến khi metadata và điều kiện runtime đầy đủ.")}</label>}
         </div>}
       </>}
@@ -429,18 +352,25 @@ export function TeamScenarioWorkspace({ service, page: workspacePage = "scenario
         {packageResult && <div className="team-result"><h4>{t("Execution package", "Gói thực thi")} · {packageResult.runnable ? "RUNNABLE" : "NOT RUNNABLE"}</h4><p>{t("Selectable for new campaigns", "Được chọn cho campaign mới")}: {String(packageResult.selectableForNewCampaign)}</p>{packageResult.issues.map((issue,index) => <p key={index} className="team-error-text">{issue}</p>)}<pre>{pretty(packageResult)}</pre></div>}
       </>}
       {tab === "variants" && <>
-        <p>{t("Generate validated draft scenarios from an explicit parameter grid. Every generated scenario must be reviewed and published separately.", "Sinh kịch bản nháp đã kiểm tra từ lưới giá trị tham số. Mỗi kịch bản sinh ra cần được xem lại và xuất bản riêng.")}</p>
+        <p>{t("Generate validated draft scenarios from parameter values and weather presets. Cartesian uses every combination; pairwise covers each pair with fewer scenarios. Review and publish each generated draft before selecting it in a campaign.", "Sinh kịch bản nháp đã kiểm tra từ giá trị tham số và mẫu thời tiết. Cartesian dùng mọi tổ hợp; pairwise phủ từng cặp với ít kịch bản hơn. Xem lại và xuất bản mỗi bản nháp trước khi đưa vào campaign.")}</p>
         <div className="team-actions"><label>{t("Base version", "Phiên bản gốc")}<select value={versionNumber} onChange={event => selectVersion(Number(event.target.value))}>{versions.map(item => <option key={item.id} value={item.versionNumber}>v{item.versionNumber} · {item.status}</option>)}</select></label>{button("batch-list", "Load batch history", "Tải lịch sử sinh", async () => setBatches(await service.variants(detail.id, versionNumber)), !versions.length)}</div>
-        <label>{t("Parameter grid JSON", "JSON lưới tham số")}<textarea className="team-json-editor" rows={7} value={grid} disabled={busy} onChange={event => setGrid(event.target.value)} placeholder={'{"npc_count": [5, 10], "trigger_distance_m": [8, 12]}'} /></label>
+        <div className="team-actions">{button("range-grid", "Use published parameter ranges", "Dùng miền tham số đã xuất bản", loadParameterRanges, !versions.length)}<label>{t("Generation strategy", "Chiến lược sinh")}<select value={variantStrategy} disabled={busy} onChange={event => setVariantStrategy(event.target.value as "cartesian" | "pairwise")}><option value="cartesian">Cartesian · {t("all combinations", "mọi tổ hợp")}</option><option value="pairwise">Pairwise · {t("pair coverage", "phủ từng cặp")}</option></select></label><span>{t("Full Cartesian grid", "Lưới Cartesian đầy đủ")}: {gridSummary.cartesian.toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}</span></div>
+        <label>{t("Parameter grid JSON", "JSON lưới tham số")}<textarea className="team-json-editor" rows={7} value={grid} disabled={busy} onChange={event => setGrid(event.target.value)} placeholder={'{"npc_count": [5, 10], "weather.preset": ["ClearNoon", "ClearNight"]}'} /></label>
+        <details className="team-subpanel"><summary>{t("Weather axis · optional", "Trục thời tiết · tùy chọn")}</summary><p className="team-help">{t("Select presets to combine with numeric parameters. Leave empty to keep the base version weather. A weather-only grid is supported.", "Chọn thời tiết để kết hợp với tham số số. Để trống giữ thời tiết phiên bản gốc. Có thể sinh chỉ từ trục thời tiết.")}</p><div className="team-weather-axis">{catalog?.weatherPresets.map(preset => <label className="team-tag-chip" key={preset}><input type="checkbox" disabled={busy} checked={gridSummary.weather.includes(preset)} onChange={event => toggleWeatherAxis(preset, event.target.checked)} />{preset}</label>)}</div></details>
         <div className="team-form-grid team-variant-options"><label>{t("Optional name prefix", "Tiền tố tên tùy chọn")}<input value={variantNamePrefix} maxLength={100} disabled={busy} onChange={event => setVariantNamePrefix(event.target.value)} placeholder={detail.name.slice(0,100)} /></label><label>{t("Batch note", "Ghi chú đợt sinh")}<input value={variantNote} maxLength={1000} disabled={busy} onChange={event => setVariantNote(event.target.value)} /></label></div>
         {detail.status === "ARCHIVED" || versions.find(item => item.versionNumber === versionNumber)?.status !== "READY" ? <p className="team-help">{t("Generating variants requires an ACTIVE scenario and a READY base version. Batch history remains available.", "Sinh biến thể cần kịch bản ACTIVE và phiên bản gốc READY. Lịch sử đợt sinh vẫn xem được.")}</p> : null}
-        {button("generate", "Generate variants", "Sinh biến thể", async () => { const parsed: unknown = JSON.parse(grid); if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || !Object.keys(parsed).length || Object.values(parsed).some(value => !Array.isArray(value) || !value.length || value.some(item => typeof item !== "number" || !Number.isFinite(item)))) throw new Error(t("Use an object with non-empty numeric arrays for existing parameters.", "Dùng object gồm các mảng số không rỗng của tham số đang có.")); setBatchResult(await service.generateVariants(detail.id, versionNumber, parsed as Record<string,number[]>, variantNamePrefix.trim() || undefined, variantNote.trim() || undefined)); setBatches(await service.variants(detail.id, versionNumber)); await changed(); }, !versions.length || detail.status === "ARCHIVED" || versions.find(item => item.versionNumber === versionNumber)?.status !== "READY", true)}
-        {batches.map(batch => <div className="team-batch" key={batch.id}><b>{batch.generatedCount}/{batch.requestedCount}</b><span>{batch.createdAt}{batch.note && <> · {batch.note}</>}</span>{button(`batch-${batch.id}`, "View generated scenarios", "Xem kịch bản đã sinh", async () => setBatchResult(await service.variantBatch(detail.id, versionNumber, batch.id)))}</div>)}
+        {button("generate", "Generate variants", "Sinh biến thể", async () => { const parsed = parseObject(grid); if (!Object.keys(parsed).length || Object.entries(parsed).some(([key, value]) => !Array.isArray(value) || !value.length || value.some(item => key === "weather.preset" ? typeof item !== "string" || !catalog?.weatherPresets.includes(item) : typeof item !== "number" || !Number.isFinite(item)))) throw new Error(t("Use non-empty numeric arrays for parameters; weather.preset accepts catalog preset names.", "Dùng mảng số không rỗng cho tham số; weather.preset nhận tên thời tiết trong catalogue.")); setBatchResult(await service.generateVariants(detail.id, versionNumber, parsed as Record<string,(number|string)[]>, variantNamePrefix.trim() || undefined, variantNote.trim() || undefined, variantStrategy)); setBatches(await service.variants(detail.id, versionNumber)); await changed(); }, !versions.length || detail.status === "ARCHIVED" || versions.find(item => item.versionNumber === versionNumber)?.status !== "READY", true)}
+        {batches.map(batch => <div className="team-batch" key={batch.id}><b>{batch.generatedCount}/{batch.requestedCount} · {batch.strategy ?? "cartesian"}</b><span>{t("Full grid", "Lưới đầy đủ")}: {batch.cartesianCount ?? batch.requestedCount} · {new Date(batch.createdAt).toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}{batch.note && <> · {batch.note}</>}</span>{button(`batch-${batch.id}`, "View generated scenarios", "Xem kịch bản đã sinh", async () => setBatchResult(await service.variantBatch(detail.id, versionNumber, batch.id)))}</div>)}
         {batchResult && <div className="team-result"><h4>{t("Generated draft scenarios", "Các kịch bản nháp đã sinh")}</h4>{batchResult.scenarios.map(item => <button className="team-result-link" key={item.id} disabled={busy} onClick={() => selectScenario(item.id)}>{item.code} · {item.name} · {item.hasDraft ? "DRAFT" : item.status}{item.latestVersionNumber ? ` · v${item.latestVersionNumber}` : ""}</button>)}<pre>{pretty(batchResult)}</pre></div>}
       </>}
       {tab === "imports" && <><p>{t("The original import file and its SHA-256 hash are retained by the backend. Supported formats are canonical JSON and YAML.", "Backend giữ tệp nhập gốc và hash SHA-256. Các định dạng hỗ trợ là JSON và YAML theo schema của dự án.")}</p>{imports.length ? <div className="team-table-scroll"><table className="team-table"><thead><tr><th>{t("File", "Tệp")}</th><th>{t("Format", "Định dạng")}</th><th>{t("Status", "Trạng thái")}</th><th>SHA-256</th></tr></thead><tbody>{imports.map(item => <tr key={item.id}><td>{item.originalFileName}</td><td>{item.format}</td><td>{item.status}</td><td><code>{item.originalHash}</code></td></tr>)}</tbody></table></div> : <p>{t("No import records for this scenario.", "Kịch bản này chưa có lịch sử nhập.")}</p>}</>}
+      {tab === "history" && <div aria-busy={historyLoading}><div className="team-actions"><label>{t("History page size", "Số thao tác mỗi trang")}<select value={historyPageSize} disabled={historyLoading} onChange={event => { setHistoryPageSize(Number(event.target.value)); setHistoryPage(1); }}>{[10,20,50,100].map(size => <option key={size}>{size}</option>)}</select></label>{button("history-reload", "Refresh history", "Làm mới lịch sử", async () => setHistory(await service.history(detail.id, historyPage, historyPageSize)))}</div>{historyLoading && <p className="team-loading"><i className="button-spinner" />{t("Loading history…", "Đang tải lịch sử…")}</p>}{history?.items.map(item => <article className="team-history-event" key={item.id}><div><b>{item.action} · {item.entityType}</b><time>{new Date(item.at).toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}</time></div><p>{item.actor.displayName}{item.actor.email ? ` · ${item.actor.email}` : ""}{item.versionNumber !== null ? ` · v${item.versionNumber}` : ""}</p>{item.relatedScenario && <button className="btn btn-light" disabled={busy} onClick={() => selectScenario(item.relatedScenario!.id)}>{item.relatedScenario.code} · {item.relatedScenario.name}</button>}<details><summary>{t("Event details", "Chi tiết thao tác")}</summary><pre className="team-mini-json">{pretty(item.details)}</pre></details></article>)}{!historyLoading && !history?.items.length && <p>{t("No recorded activity.", "Chưa có thao tác được ghi.")}</p>}<div className="team-pagination"><span>{history?.totalCount ?? 0} {t("events", "thao tác")}</span><button className="btn btn-light" disabled={historyLoading || historyPage <= 1} onClick={() => setHistoryPage(value => value - 1)}>{t("Previous", "Trước")}</button><span>{historyPage} / {Math.max(1,history?.totalPages ?? 1)}</span><button className="btn btn-light" disabled={historyLoading || historyPage >= (history?.totalPages ?? 1)} onClick={() => setHistoryPage(value => value + 1)}>{t("Next", "Sau")}</button></div></div>}
     </section>}
-    {createOpen && <div className="modal-backdrop"><form className="modal" onSubmit={event => void create(event)}><div className="modal-head"><div><h2>{t("Create scenario draft", "Tạo bản nháp kịch bản")}</h2><p>{t("The backend provides an editable schema 1.0 template.", "Backend tạo bản mẫu schema 1.0 có thể chỉnh sửa.")}</p></div><button type="button" disabled={busy} onClick={() => setCreateOpen(false)}>×</button></div><label>{t("Name", "Tên")}<input name="name" minLength={3} maxLength={120} required disabled={busy} /></label><label>{t("Description", "Mô tả")}<textarea name="description" maxLength={2000} disabled={busy} /></label><label>{t("Category", "Phân loại")}<select name="category" disabled={busy}>{(catalog?.categories ?? ["free_driving"]).map(item => <option key={item}>{item}</option>)}</select></label><div className="modal-actions"><button type="button" className="btn btn-light" disabled={busy} onClick={() => setCreateOpen(false)}>{t("Cancel", "Hủy")}</button><button className="btn btn-primary" disabled={busy}>{actions.isPending("create") && <i className="button-spinner" />}{t("Create draft", "Tạo bản nháp")}</button></div></form></div>}
+    {createOpen && <div className="modal-backdrop"><form className="modal team-create-modal" onSubmit={event => void create(event)}>
+      <div className="modal-head"><div><h2>{t("Create scenario draft", "Tạo bản nháp kịch bản")}</h2><p>{t("Start from a backend situation template or a blank draft, then configure the map and actors.", "Bắt đầu từ mẫu tình huống backend hoặc bản nháp trống, sau đó cấu hình bản đồ và actor.")}</p></div><button type="button" disabled={busy} onClick={() => setCreateOpen(false)}>×</button></div>
+      <fieldset className="team-template-picker" disabled={busy}><legend>{t("Starting situation", "Tình huống khởi đầu")}</legend><label className="team-template-option"><input type="radio" name="template" value="" checked={!createTemplate} onChange={() => setCreateTemplate("")} /><span><b>{t("Blank draft", "Bản nháp trống")}</b><small>{t("Configure a new scenario from its minimal definition.", "Tự cấu hình kịch bản từ định nghĩa tối thiểu.")}</small></span></label>{templates.map(template => <label className={`team-template-option${createTemplate === template.key ? " selected" : ""}`} key={template.key}><input type="radio" name="template" value={template.key} checked={createTemplate === template.key} onChange={() => { const previous = templates.find(item => item.key === createTemplate); if (!createName.trim() || createName === previous?.title) setCreateName(template.title); setCreateTemplate(template.key); setCreateCategory(template.category); }} /><span><b>{template.title}</b><small>{template.summary}</small><small>{template.mapName} · {template.category} · {template.eventTypes.join(", ") || t("No scripted event", "Không có event kịch bản")}</small>{template.reference && <small>{template.reference}</small>}</span></label>)}</fieldset>
+      <label>{t("Name", "Tên")}<input name="name" value={createName} onChange={event => setCreateName(event.target.value)} minLength={3} maxLength={120} required disabled={busy} /></label><label>{t("Description", "Mô tả")}<textarea name="description" maxLength={2000} disabled={busy} /></label><label>{t("Category", "Phân loại")}<select name="category" value={createCategory} onChange={event => setCreateCategory(event.target.value)} disabled={busy}>{(catalog?.categories ?? ["free_driving"]).map(item => <option key={item}>{item}</option>)}</select></label><div className="modal-actions"><button type="button" className="btn btn-light" disabled={busy} onClick={() => setCreateOpen(false)}>{t("Cancel", "Hủy")}</button><button className="btn btn-primary" disabled={busy}>{actions.isPending("create") && <i className="button-spinner" />}{t("Create draft", "Tạo bản nháp")}</button></div>
+    </form></div>}
     {importOpen && <div className="modal-backdrop"><form className="modal" onSubmit={event => void importScenario(event)}>
       <div className="modal-head"><div><h2>{t("Import scenario", "Nhập kịch bản")}</h2><p>{t("JSON / YAML · imports remain validated drafts. File size follows the backend configuration.", "JSON / YAML · nhập thành bản nháp đã kiểm tra. Kích thước tệp theo cấu hình backend.")}</p></div><button type="button" disabled={busy} onClick={() => setImportOpen(false)}>×</button></div>
       <label>{t("Format", "Định dạng")}<select value={importFormat} disabled={busy} onChange={event => setImportFormat(event.target.value)}><option value="">{t("Detect from file extension", "Nhận diện theo đuôi tệp")}</option><option value="json">JSON</option><option value="yaml">YAML</option></select></label>

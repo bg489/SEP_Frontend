@@ -1,7 +1,7 @@
 {
-  "auditedDate": "2026-10-27",
-  "source": "AutoScenarioX.Api Swagger and matching controller source",
-  "endpointCount": 51,
+  "auditedDate": "2026-10-28",
+  "source": "Running AutoScenarioX.Api Swagger with controller and DTO source cross-check",
+  "endpointCount": 66,
   "endpoints": [
     {
       "method": "POST",
@@ -57,6 +57,56 @@
       "method": "GET",
       "path": "/api/v1/campaigns/available-scenarios",
       "group": "Campaigns"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/coverage",
+      "group": "Coverage"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/verify",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/similar",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/explainability",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/return-to-flow3",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/generate",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/review",
+      "group": "FailureAnalysis"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/campaigns/{campaignId}/failure-analysis/evaluation",
+      "group": "FailureAnalysis"
     },
     {
       "method": "GET",
@@ -120,7 +170,17 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/reference/maps/{mapName}",
+      "group": "Reference"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/reference/catalog",
+      "group": "Reference"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/reference/scenario-templates",
       "group": "Reference"
     },
     {
@@ -157,6 +217,11 @@
       "method": "POST",
       "path": "/api/v1/scenarios/{scenarioId}/draft/validate",
       "group": "ScenarioDrafts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scenarios/{scenarioId}/history",
+      "group": "ScenarioHistory"
     },
     {
       "method": "POST",
@@ -257,6 +322,16 @@
       "method": "POST",
       "path": "/api/v1/scenarios/{scenarioId}/versions/{versionNumber}/deprecate",
       "group": "ScenarioVersions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tags",
+      "group": "Tags"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/scenarios/{scenarioId}/tags",
+      "group": "Tags"
     }
   ]
 }

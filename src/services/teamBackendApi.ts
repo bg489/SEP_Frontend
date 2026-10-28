@@ -65,6 +65,12 @@ export const teamBackendApi: AutoScenarioApi = {
   },
   async getCampaignRanking() { return null; },
   async saveCampaignRanking() { throw new Error("Use the live prioritization workspace to rank and save campaign version order."); },
+  // The former global mock cluster model has confidence/labels that the backend
+  // does not return. Live analysis pages load the actual campaign-scoped DTO
+  // through failureAnalysisApi instead of inventing those legacy fields.
+  async listFailures() { return []; },
+  async addFailureCluster() { throw new Error("Failure groups are produced by the backend. Open Failure insights and group the campaign results."); },
+  async confirmFailureCluster() { throw new Error("Use the backend report review workflow in Review queue to record a review decision."); },
   async listRuns() {
     const all = await campaigns();
     return (await Promise.all(all.filter(item => item.runCount > 0).map(item => runsFor(item.id)))).flat().map(runToUi);
