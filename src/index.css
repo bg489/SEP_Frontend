@@ -24,7 +24,7 @@
 }
 body {
   margin: 0;
-  min-width: 360px;
+  min-width: 320px;
   background: var(--canvas);
   font-size: 13px;
 }
@@ -2784,6 +2784,23 @@ small {
   flex-direction: column;
   gap: 12px;
 }
+dialog.create-dialog-backdrop {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+}
+dialog.create-dialog-backdrop::backdrop {
+  background: transparent;
+}
+.create-dialog-backdrop .modal-head > div {
+  min-width: 0;
+}
+.create-dialog-backdrop .modal-head > button {
+  flex-shrink: 0;
+}
 .modal-wide {
   width: min(780px, 100%);
 }
@@ -3422,7 +3439,7 @@ fieldset.carla-config-grid {
     font-size: 8px;
   }
   body {
-    min-width: 360px;
+    min-width: 320px;
   }
   .sidebar {
     position: sticky;

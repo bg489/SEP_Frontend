@@ -61,7 +61,10 @@ test('FE-UT-052: Start stays pending until the backend creates the queued runs',
   await expect(page.getByRole('heading', { name: 'Scenario runs', exact: true })).toHaveCount(0);
   expect(operations.matching('POST', path)).toHaveLength(1);
 
+  // Keep the background refresh pending while checking the action's own notice.
+  const refresh = operations.holdNext('GET', '/api/v1/scenarios');
   await held.release();
+  await refresh.received;
   await expect(page.getByRole('heading', { name: 'Scenario runs', exact: true })).toBeVisible();
   expect(backend.campaigns.get(ids.campaign)!.runCount).toBe(2);
   await expect(page.locator('.toast')).toContainText(queuedNotice);
@@ -69,6 +72,7 @@ test('FE-UT-052: Start stays pending until the backend creates the queued runs',
   await expect(page.getByRole('row').filter({ hasText: 'Highway braking' }).filter({ hasText: 'Pending' })).toContainText('Queued');
   await expect(resultPanel(page)).toContainText('Awaiting oracle');
   await expect(page.locator('.ops-evaluation')).toHaveCount(0);
+  await refresh.release();
 });
 
 for (const failure of ['API', 'network'] as const) {
