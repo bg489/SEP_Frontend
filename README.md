@@ -41,6 +41,26 @@ npm run build
 
 `verify:api` dùng transport/file giả lập trong bộ nhớ; không ghi database, khởi động CARLA hoặc gọi backend thật. Kiểm tra gồm If-Match, multipart, bộ lọc/tag/history/template/variant, coverage và hình học bản đồ, các bước failure analysis, query/payload, file PUT, auth refresh/401, Blob video và đủ 66 operation trong snapshot.
 
+### Test thao tác trình duyệt cho scenario và campaign
+
+```powershell
+npm ci
+npx playwright install chromium
+npm run test:e2e
+# Xem thao tác trực tiếp hoặc mở báo cáo sau khi chạy:
+npm run test:e2e -- --headed
+npx playwright show-report
+```
+
+Nếu máy đã có Chrome và không tải được Chromium, có thể dùng `$env:PLAYWRIGHT_CHANNEL = 'chrome'` rồi chạy `npm run test:e2e` trong cùng terminal PowerShell.
+
+Test Playwright nằm trong `tests/e2e`, chạy Chromium và tự mở Vite tại `http://127.0.0.1:4173` (cổng này cần trống). Cấu hình test dùng `api` + xác thực `Dev`; mọi request `/api/**` được chặn bằng fixture riêng cho từng test, không cần backend/CARLA và không ghi database. Không thay đổi `.env.local`.
+
+- Scenario: tìm kiếm/lọc/phân trang, tạo từ template, sửa–lưu–validate–publish READY, chặn JSON lỗi, cảnh báo validation, xung đột revision, archive/restore và tải JSON.
+- Campaign: tìm kiếm, chọn phiên bản READY qua nhiều bộ lọc, sắp thứ tự/bỏ chọn, tạo/sửa SUT, lỗi lưu và thử lại, start với run đang chờ, xác nhận/hủy rerun.
+
+Khi test lỗi, `test-results/` giữ screenshot và trace; báo cáo HTML nằm trong `playwright-report/`. Đây là kiểm tra UI với API giả lập; không xác nhận backend hoặc worker chạy mô phỏng thật.
+
 Mọi thao tác ghi dùng cùng transport Redux Saga. Regroup thay phiên phân tích đang có; Return to Flow 3 có thể xóa telemetry/evaluation/video của các run được backend chọn; Rerun có thể thay run cũ. Giao diện giải thích tác động và yêu cầu xác nhận cho các thao tác này. Một kết quả `null` hoặc chưa đủ bước phân tích được hiển thị là chưa có dữ liệu, không thay bằng APFD/APFDc giả.
 
 ## Chạy trên máy

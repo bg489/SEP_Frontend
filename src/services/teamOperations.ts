@@ -92,8 +92,8 @@ export interface WorkerIntegration {
   connectionStatus: string; validated: boolean; active: boolean; message: string; updatedAt: string;
 }
 export const workerDefaults: WorkerIntegration = {
-  carlaRoot: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16",
-  pythonExecutable: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16\\ScenarioRunner\\.venv\\Scripts\\python.exe",
+  carlaRoot: "D:\\Download\\CARLA_0.9.16",
+  pythonExecutable: "D:\\Download\\CARLA_0.9.16\\ScenarioRunner\\.venv\\Scripts\\python.exe",
   host: "127.0.0.1", rpcPort: 2000, trafficManagerPort: 8000, qualityLevel: "Low", recordVideo: true,
   workerRunning: false, workerPid: null, connectionStatus: "Not tested", validated: false,
   active: false, message: "", updatedAt: "",
