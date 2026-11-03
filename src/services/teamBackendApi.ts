@@ -76,7 +76,7 @@ export const teamBackendApi: AutoScenarioApi = {
     return (await Promise.all(all.filter(item => item.runCount > 0).map(item => runsFor(item.id)))).flat().map(runToUi);
   },
   async queueCampaignRuns(id, _scenarioIds, retryOf) {
-    if (retryOf) throw new Error("Open the execution workspace and explicitly rerun the campaign. Rerun replaces previous runs.");
+    if (retryOf) throw new Error("Open the execution workspace and explicitly rerun the campaign. Rerun creates new linked runs and preserves previous evidence.");
     await requestTeamApi(`${endpoint}/${encodeURIComponent(id)}/start`, json("POST"));
     return (await runsFor(id)).map(runToUi);
   },
@@ -95,7 +95,10 @@ export const teamBackendApi: AutoScenarioApi = {
   },
   saveCarlaIntegration: config => mockApi.saveCarlaIntegration({ ...config, active: false, validated: false, connectionStatus: "Not tested" }),
   async testCarlaIntegration() { throw new Error("The team backend does not expose a CARLA connection or worker-management API. Start its existing worker manually and inspect real run results."); },
-  async listWorkers() { return []; },
+  async listWorkers() {
+    const items = await requestTeamApi<import("./teamAdministration").ManagedWorker[]>("/api/v1/workers");
+    return items.map(item => ({ id: item.id, name: item.name, host: item.host, port: item.rpcPort, carlaVersion: item.carlaVersion, scenarioRunnerVersion: "Direct Python API", status: item.health === "Offline" || !item.enabled ? "Offline" as const : item.activeRuns > 0 ? "Busy" as const : "Online" as const, capacity: item.capacity, activeRuns: item.activeRuns, lastHeartbeat: item.lastHeartbeatAt ?? "" }));
+  },
   saveWorkers: workers => mockApi.saveWorkers(workers),
   async getOverview(): Promise<OverviewData> {
     const all = await campaigns();

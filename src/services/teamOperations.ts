@@ -7,7 +7,7 @@ export interface TeamCampaign {
   status: string; progress: number; passRate: number; failedRuns: number; estimatedDuration: string;
   owner: string; createdAt: string; startedAt: string | null; runCount: number;
   sut: { type: string; behavior: string; carlaVersion: string };
-  scenarioVersionIds: string[];
+  scenarioVersionIds: string[]; oracleConfigId?: string | null;
   scenarios: { scenarioVersionId: string; scenarioId: string; scenarioCode: string; scenarioName: string;
     versionNumber: number; mapName: string | null; weatherPreset: string | null; category: string; sortOrder: number }[];
 }
@@ -17,6 +17,11 @@ export interface TeamRun {
   category: string; mapName: string | null; weatherPreset: string | null; sortOrder: number;
   verdict: string | null; contentHash: string | null; seed: number | null;
   startedAt: string | null; finishedAt: string | null; errorMessage: string | null;
+  attempt?: number; previousRunId?: string | null; isCurrent?: boolean; workerId?: string | null;
+}
+export interface RunProgress {
+  runId: string; status: string; updatedAt: string | null;
+  progress: { frame: number; simulationTimeS: number; egoX: number; egoY: number; egoZ: number; speedKmh: number; message: string | null } | null;
 }
 export interface OracleConfig {
   id: string; version: number; name: string; description: string | null;
@@ -45,6 +50,7 @@ export interface RankResult {
 export interface CampaignCreateInput {
   name: string; description?: string | null; strategy?: string; scenarioVersionIds: string[];
   sutType?: string; sutBehavior?: string; sutCarlaVersion?: string;
+  oracleConfigId?: string;
 }
 export type CampaignUpdateInput = Partial<CampaignCreateInput>;
 export interface ReadyVersionQuery {
@@ -80,6 +86,7 @@ export function operationsApi(client: TeamApiClient) {
     rank: (body: PrioritizationInput) => client.request<RankResult>("/api/v1/prioritization/rank", write("POST", body)),
     listOracleConfigs: () => client.request<OracleConfig[]>("/api/v1/oracle-configs"),
     getRunResult: (runId: string) => client.request<RunResult>(`/api/v1/runs/${id(runId)}/result`),
+    getRunProgress: (runId: string) => client.request<RunProgress>(`/api/v1/runs/${id(runId)}/progress`),
     downloadRunResult: (runId: string, fileName = `oracle-${runId}.json`) => client.download(`/api/v1/runs/${id(runId)}/result`, fileName),
     downloadVideo: (runId: string, fileName = `carla-${runId}.mp4`) => client.download(`/api/v1/runs/${id(runId)}/video`, fileName),
     videoMedia: (runId: string) => client.media ? client.media(`/api/v1/runs/${id(runId)}/video`) : Promise.reject(new Error("Authenticated video preview is unavailable.")),
@@ -92,8 +99,8 @@ export interface WorkerIntegration {
   connectionStatus: string; validated: boolean; active: boolean; message: string; updatedAt: string;
 }
 export const workerDefaults: WorkerIntegration = {
-  carlaRoot: "D:\\Download\\CARLA_0.9.16",
-  pythonExecutable: "D:\\Download\\CARLA_0.9.16\\ScenarioRunner\\.venv\\Scripts\\python.exe",
+  carlaRoot: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16",
+  pythonExecutable: "C:\\Users\\admin\\Downloads\\CARLA_0.9.16\\ScenarioRunner\\.venv\\Scripts\\python.exe",
   host: "127.0.0.1", rpcPort: 2000, trafficManagerPort: 8000, qualityLevel: "Low", recordVideo: true,
   workerRunning: false, workerPid: null, connectionStatus: "Not tested", validated: false,
   active: false, message: "", updatedAt: "",
