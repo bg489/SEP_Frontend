@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type MouseEvent } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Icon } from "./Icon";
+import { AccountSettings } from "./AccountSettings";
 import { downloadCsv } from "../utils/download";
 import { downloadTextFile } from "../utils/download";
 import {
@@ -246,7 +247,7 @@ export function RolePages(props: RolePagesProps) {
     case "audit":
       return <AuditLog {...props} />;
     case "profile":
-      return <Profile {...props} />;
+      return isAuthApiEnabled ? <AccountSettings /> : <Profile {...props} />;
     default:
       return null;
   }
