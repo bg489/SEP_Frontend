@@ -29,6 +29,14 @@ describe("FE-UT-050 failure analysis", () => {
     await userEvent.click(verify); expect(await screen.findByRole("alert")).toHaveTextContent("Reviewer access required");
     expect(screen.getByRole("button", { name: "Find similar failures" })).toBeDisabled(); expect(verify).toBeEnabled();
   });
+  it("FE-UT-051 regroup requires acknowledgement and Cancel sends no mutation", async () => {
+    const request = vi.fn(async (path: string) => path === "/api/v1/campaigns" ? campaigns : analysis("campaign-a")); mount(request);
+    const regroup = await screen.findByRole("button", { name: "Regroup faults" }); await waitFor(() => expect(regroup).toBeEnabled());
+    await userEvent.click(regroup); expect(screen.getByRole("dialog")).toHaveTextContent("execution results remain available");
+    expect(screen.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Cancel", exact: true }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); expect(request.mock.calls.every(call => call.length === 1)).toBe(true);
+  });
   it("late analysis for the previous campaign cannot replace the current evidence", async () => {
     let release!: (value: unknown) => void; const old = new Promise(resolve => { release = resolve; });
     const request = vi.fn((path: string) => path === "/api/v1/campaigns" ? Promise.resolve(campaigns) : path.includes("campaign-a/") ? old : Promise.resolve(analysis("campaign-b")));
