@@ -120,7 +120,7 @@ export class TeamScenarioService {
     return this.client.request<TeamScenarioDetail>(`/api/v1/scenarios/${segment(id)}/clone`, { method: "POST", body: body({ name, description, versionNumber }) });
   }
   imports(id: string) { return this.client.request<TeamImportRecord[]>(`/api/v1/scenarios/${segment(id)}/imports`); }
-  importFile(file: File, name?: string, category?: string, format?: "json" | "yaml") {
+  importFile(file: File, name?: string, category?: string, format?: "json" | "yaml" | "openscenario") {
     const data = new FormData(); data.append("File", file);
     if (name) data.append("Name", name); if (category) data.append("Category", category);
     if (format) data.append("Format", format);
