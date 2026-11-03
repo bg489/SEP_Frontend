@@ -11,6 +11,12 @@ function mount(busy = false) {
   return props;
 }
 describe("Account forms", () => {
+  it("FE-UT-055 repeated submits dispatch only one request before loading renders", () => {
+    const props = mount(); const button = screen.getByRole("button", { name: "Sign in", exact: true }); const form = button.closest("form")!;
+    fireEvent.change(screen.getByLabelText("Work email"), { target: { value: "USER@example.invalid" } }); fireEvent.change(screen.getByLabelText("Password", { exact: true }), { target: { value: "fixture-password" } });
+    fireEvent.submit(form); fireEvent.submit(form); expect(props.onLogin).toHaveBeenCalledTimes(1);
+    expect(props.onLogin).toHaveBeenCalledWith({ email: "user@example.invalid", password: "fixture-password" });
+  });
   it("registration offers all three non-Admin roles and sends the chosen role", async () => {
     const props = mount(); const user = userEvent.setup(); await user.click(screen.getByRole("button", { name: "Create account" }));
     const roles = screen.getByRole("combobox", { name: "Role" });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import reducer, {
   accountOperationFailed, accountOperationSucceeded, adminUsersFailed, adminUsersLoaded,
   adminUsersRequested, authDemoCompleted, authFailed, authSucceeded, changePasswordRequested,
-  loginRequested, profileUpdateRequested, registerRequested, signedOut,
+  loginRequested, profileUpdateRequested, registerRequested, signedOut, switchDevRoleRequested,
 } from "../features/auth/authSlice";
 import type { AuthSession } from "../services/authApi";
 
@@ -13,20 +13,24 @@ describe("authentication state", () => {
     expect(reducer(undefined, { type: "init" })).toMatchObject({ status: "checking", user: null, busy: false });
   });
 
-  it("FE-UT-002 login starts loading and clears errors without granting access", () => {
+  it("FE-UT-001 login starts loading and clears errors without granting access", () => {
     const failed = reducer(undefined, authFailed("Wrong password"));
     const state = reducer(failed, loginRequested({ email: "test@example.com", password: "secret" }));
     expect(state).toMatchObject({ status: "anonymous", user: null, busy: true, error: null, message: null });
   });
 
-  it.each(["Scenario Engineer", "Test Engineer", "Test Reviewer", "Administrator"] as const)("FE-UT-003 accepts the backend-returned role %s", role => {
+  it.each(["Scenario Engineer", "Test Engineer", "Test Reviewer", "Administrator"] as const)("FE-UT-002 accepts the backend-returned role %s", role => {
     const state = reducer(undefined, authSucceeded({ ...session, user: { ...session.user, role } }));
     expect(state).toMatchObject({ status: "authenticated", user: { role }, busy: false, error: null });
   });
 
-  it("FE-UT-004 failed credentials remove access and show the actual error", () => {
+  it("FE-UT-003 failed credentials remove access and show the actual error", () => {
     const state = reducer(reducer(undefined, authSucceeded(session)), authFailed("Account disabled"));
     expect(state).toMatchObject({ status: "anonymous", user: null, busy: false, error: "Account disabled" });
+  });
+  it("FE-UT-004 ignores role switching outside explicit Dev authentication", () => {
+    const loggedIn = reducer(undefined, authSucceeded(session));
+    expect(reducer(loggedIn, switchDevRoleRequested("ADMIN"))).toEqual(loggedIn);
   });
 
   it("FE-UT-005 registration awaiting confirmation never creates a fake session", () => {
