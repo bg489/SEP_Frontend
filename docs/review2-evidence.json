@@ -1,0 +1,441 @@
+{
+  "asOf": "2026-11-03T03:03:54.066349+00:00",
+  "environment": "Windows local disposable PostgreSQL 18 on 55433, isolated API 5080, CARLA 0.9.16 Low; not shared staging",
+  "backend": {
+    "commit": "0c257a38a8cc82eb6516d306cee9bc4f784f4316",
+    "dotnetLocal": {
+      "passed": 406,
+      "failed": 0,
+      "skipped": 0
+    },
+    "worker": 27,
+    "runtime": 17,
+    "recorder": 9
+  },
+  "frontend": {
+    "commit": "9d4508be4315a6406ef494c2c78db9a4f7d20dc2",
+    "unitLocal": 95,
+    "browserLocal": 68,
+    "swaggerContracts": 88
+  },
+  "carla": [
+    {
+      "map": "Town02_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "6c3a5a21-2b78-4e55-b23d-739e09b714e7",
+      "versionId": "639da70f-e4ab-453b-ac07-011200d4d4cf",
+      "campaignId": "2ac5e95b-c27d-4a19-ba36-970c5896c9cd",
+      "runId": "cf91727d-5535-4dc2-bcc0-e2be835cc276",
+      "tickCount": 108,
+      "egoDistanceM": 28.074,
+      "actorDistanceM": 4.95,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town03",
+      "sutType": "behavior_agent",
+      "scenarioId": "b80d0b08-1f24-47e7-b3ac-41e20e3560eb",
+      "versionId": "c5ae260e-f44f-4856-a248-3945f73d9bb6",
+      "campaignId": "2fb5cfdc-6462-40a5-aef4-eca4908f9952",
+      "runId": "7ed396d9-855a-426f-ad68-b767a2adc214",
+      "tickCount": 109,
+      "egoDistanceM": 28.224,
+      "actorDistanceM": 5.02,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town03_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "493feabb-e175-4d19-b8fc-bd3c747c4879",
+      "versionId": "d620f30d-23e5-4663-b111-db8a4702b158",
+      "campaignId": "526406f3-87e8-4a3b-8e46-e4cdeeeb91a4",
+      "runId": "5074cf1f-4bec-4a50-95ea-8880456ec054",
+      "tickCount": 108,
+      "egoDistanceM": 28.203,
+      "actorDistanceM": 4.95,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town04",
+      "sutType": "behavior_agent",
+      "scenarioId": "68b99376-b74f-496c-b022-ef1c3eeb9392",
+      "versionId": "745042b2-f35b-4515-abce-226158f8c419",
+      "campaignId": "0ef78edb-bf22-4dfc-bc6a-083298adab90",
+      "runId": "0be4a001-ed97-4aea-96ec-c1eb4d4769ed",
+      "tickCount": 108,
+      "egoDistanceM": 28.048,
+      "actorDistanceM": 4.949,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town04_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "61cadbaa-f07e-45d3-86b8-7b1a54fee848",
+      "versionId": "a8b98931-81a7-4725-8983-c1074494032e",
+      "campaignId": "8131caa9-babf-420d-b04f-6dba3c4419f7",
+      "runId": "c5500eef-e84e-4e8a-b0b7-2f20784967d8",
+      "tickCount": 115,
+      "egoDistanceM": 30.603,
+      "actorDistanceM": 5.439,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town05",
+      "sutType": "behavior_agent",
+      "scenarioId": "41c724ad-491d-401d-9ea4-242f81544912",
+      "versionId": "fc6210a3-1baa-4825-8a61-fb1534a5674b",
+      "campaignId": "1e09fb32-22b8-4bc1-a359-828bbd7a5973",
+      "runId": "94a0af51-a6da-43a3-bb82-33c91f4965d4",
+      "tickCount": 899,
+      "egoDistanceM": 28.036,
+      "actorDistanceM": 6.543,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town05_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "7f2f4516-454a-4b01-8fa1-537ed9af5092",
+      "versionId": "26d72d6b-9bae-44b4-a97f-764afeb98af0",
+      "campaignId": "5fbcaa37-8cc7-46cf-90b2-0a9b94223f96",
+      "runId": "1d1574e2-a6a4-41dd-b143-8a0098d68274",
+      "tickCount": 899,
+      "egoDistanceM": 28.036,
+      "actorDistanceM": 6.543,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town10HD",
+      "sutType": "behavior_agent",
+      "scenarioId": "f3334b70-2fe5-45ca-b0eb-fa2150d9d377",
+      "versionId": "5e878cee-dd7d-4893-a2e7-585cef96ba00",
+      "campaignId": "edb98628-2e7b-4903-a42b-0f0dc568d779",
+      "runId": "fef6bf04-4d79-43fa-a406-3eb5a4235e8f",
+      "tickCount": 101,
+      "egoDistanceM": 25.218,
+      "actorDistanceM": 4.461,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town10HD_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "a3db8785-da10-4a6c-811d-0d1fc0144ca4",
+      "versionId": "87420ba6-0059-4a16-8b73-febdc5174413",
+      "campaignId": "4b37d92b-dfa8-4411-b2df-8ff6e4c601a2",
+      "runId": "ba88a25f-3186-4e96-8c86-1a5969548395",
+      "tickCount": 101,
+      "egoDistanceM": 25.222,
+      "actorDistanceM": 4.461,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town01",
+      "sutType": "behavior_agent",
+      "scenarioId": "a30fa72c-dc9f-497c-a9fb-47854b38d552",
+      "versionId": "cc3512b2-9636-4103-a96a-3bc7c9adf135",
+      "campaignId": "d1006d86-14de-4447-a4d8-8ef23bf6927d",
+      "runId": "8036936e-f074-4a7c-9185-861a0da71e15",
+      "tickCount": 108,
+      "egoDistanceM": 28.032,
+      "actorDistanceM": 4.952,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town01_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "ad285d47-7a4d-4a5f-9741-0609d902de4d",
+      "versionId": "f51153f3-1bb1-4c98-ad19-83b342c3155c",
+      "campaignId": "777ac079-1522-4350-8ca2-f143c18bd250",
+      "runId": "c7455e3b-2871-4601-a4b7-220e577a9f82",
+      "tickCount": 318,
+      "egoDistanceM": 24.139,
+      "actorDistanceM": 9.782,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "PASS",
+      "hasVideo": true
+    },
+    {
+      "map": "Town02",
+      "sutType": "behavior_agent",
+      "scenarioId": "99c50590-9e55-42dc-8e6d-f17e88d54320",
+      "versionId": "feec6436-78b1-4261-9d8c-37e44113b020",
+      "campaignId": "72138581-e275-4955-a210-d0a5116f904c",
+      "runId": "d2cf89f5-3975-4436-852d-b2d963adb155",
+      "tickCount": 108,
+      "egoDistanceM": 28.068,
+      "actorDistanceM": 4.95,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "accepted": true,
+      "oracleVerdict": "FAIL",
+      "hasVideo": true
+    }
+  ],
+  "autopilot": {
+    "map": "Town02",
+    "sutType": "autopilot",
+    "startedAt": "2026-11-03T02:23:41.730571+00:00",
+    "scenarioId": "c5e93c76-b450-4699-bba3-01499c554385",
+    "versionId": "3550a84c-83b4-44a4-aeec-df6feb913f6d",
+    "campaignId": "137913f8-e1fb-47b6-8115-e7e8a876731b",
+    "runId": "e79c1242-5b6c-4d6f-85da-0e7f5cf1e66f",
+    "apiResult": {
+      "runId": "e79c1242-5b6c-4d6f-85da-0e7f5cf1e66f",
+      "campaignId": "137913f8-e1fb-47b6-8115-e7e8a876731b",
+      "campaignCode": "CMP-00058",
+      "campaignName": "Review2 Town02 2630fc",
+      "scenarioId": "c5e93c76-b450-4699-bba3-01499c554385",
+      "scenarioVersionId": "3550a84c-83b4-44a4-aeec-df6feb913f6d",
+      "scenarioCode": "SCN-00055",
+      "scenarioName": "Review2 Town02 2630fc",
+      "versionNumber": 1,
+      "status": "Completed",
+      "seed": null,
+      "startedAt": "2026-11-03T02:23:43.164956+00:00",
+      "finishedAt": "2026-11-03T02:23:56.588424+00:00",
+      "outcome": "COMPLETED",
+      "durationS": 6.65,
+      "telemetryReceivedAt": "2026-11-03T02:23:56.567541+00:00",
+      "verdict": "PASS",
+      "hasVideo": true,
+      "infraRetryCount": 0,
+      "evaluations": [
+        {
+          "id": "59318bcf-8269-4ade-a736-e6befceb04fd",
+          "oracleConfigId": "295e7a4a-a86a-4a2d-9707-92d6dc97f81f",
+          "oracleVersion": 1,
+          "verdict": "PASS",
+          "errorReason": null,
+          "evaluatedAt": "2026-11-03T02:23:56.567541+00:00",
+          "violations": [
+            {
+              "id": "f6cc19b5-5976-4529-9fa9-f158861478ea",
+              "check": "ttc",
+              "severity": "WARNING",
+              "t": 2,
+              "durationS": 1.5,
+              "details": {
+                "actor_id": 117,
+                "min_ttc_s": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "outcome": "COMPLETED",
+    "tickCount": 134,
+    "egoDistanceM": 28.195,
+    "actorDistanceM": 6.77,
+    "executedEventIds": [
+      "crossing_event"
+    ],
+    "sut": {
+      "agent": "autopilot",
+      "profile": "normal"
+    },
+    "fullRoute": true,
+    "telemetry": "C:\\Users\\admin\\AppData\\Local\\Temp\\asx-review2-20261103\\live-autopilot\\SCN-00055_v1_normal_e79c1242.jsonl",
+    "accepted": true,
+    "finishedAt": "2026-11-03T02:23:56.657864+00:00"
+  },
+  "browserToCarla": {
+    "environment": "isolated local API + PostgreSQL 18 (not shared staging)",
+    "startedAt": "2026-11-03T02:29:12.331Z",
+    "campaignId": "bb82d577-702a-46dc-b7c1-40950cbbf0df",
+    "scenarioName": "Review2 Town02 a6c533",
+    "runId": "58d605bc-d890-4d4a-802d-991f13f776b1",
+    "result": {
+      "runId": "58d605bc-d890-4d4a-802d-991f13f776b1",
+      "campaignId": "bb82d577-702a-46dc-b7c1-40950cbbf0df",
+      "campaignCode": "CMP-00060",
+      "campaignName": "Review2 web 2026-11-03T02:29:00.758Z",
+      "scenarioId": "99c50590-9e55-42dc-8e6d-f17e88d54320",
+      "scenarioVersionId": "feec6436-78b1-4261-9d8c-37e44113b020",
+      "scenarioCode": "SCN-00054",
+      "scenarioName": "Review2 Town02 a6c533",
+      "versionNumber": 1,
+      "status": "Completed",
+      "seed": null,
+      "startedAt": "2026-11-03T02:29:19.963605+00:00",
+      "finishedAt": "2026-11-03T02:29:50.984295+00:00",
+      "outcome": "COMPLETED",
+      "durationS": 5.35,
+      "telemetryReceivedAt": "2026-11-03T02:29:50.9548+00:00",
+      "verdict": "FAIL",
+      "hasVideo": true,
+      "infraRetryCount": 0,
+      "evaluations": [
+        {
+          "id": "329921d7-167c-4754-9c5e-447e41fc86ea",
+          "oracleConfigId": "295e7a4a-a86a-4a2d-9707-92d6dc97f81f",
+          "oracleVersion": 1,
+          "verdict": "FAIL",
+          "errorReason": null,
+          "evaluatedAt": "2026-11-03T02:29:50.9548+00:00",
+          "violations": [
+            {
+              "id": "f273d101-6a42-432f-84ae-669e1d6587e2",
+              "check": "ttc",
+              "severity": "WARNING",
+              "t": 2,
+              "durationS": 1.05,
+              "details": {
+                "actor_id": 125,
+                "min_ttc_s": 0
+              }
+            },
+            {
+              "id": "5d73409f-db5d-4d79-b85f-a34a2f0597d6",
+              "check": "speeding",
+              "severity": "FAILING",
+              "t": 2.35,
+              "durationS": 3,
+              "details": {
+                "limit_kmh": 20,
+                "max_speed_kmh": 27.69
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "accepted": true,
+    "finishedAt": "2026-11-03T02:29:55.336Z"
+  },
+  "liveAdministration": {
+    "startedAt": "2026-11-03T02:50:37.247Z",
+    "environment": "Isolated local PostgreSQL/API; no Supabase Auth account created",
+    "accountPersistence": true,
+    "workerName": "Review2 browser 1793674241858",
+    "oracleName": "Review2 browser Oracle 1793674242903",
+    "retentionDays": 45,
+    "accepted": true,
+    "finishedAt": "2026-11-03T02:50:46.246Z"
+  },
+  "metadataDiagnostic": {
+    "environment": "local isolated PostgreSQL/API; small demo corpus; Dev identity",
+    "requests": 200,
+    "concurrentClients": 50,
+    "seconds": 2.024229099999957,
+    "rps": 98.80304556436042,
+    "meanMs": 284.34256000000914,
+    "maxMs": 1721.0448999999244,
+    "p95Ms": 1369.5566000001236,
+    "errors": 0,
+    "scope": "Short metadata read diagnostic. Does not certify sustained 100 RPS, 50 authenticated users, 10k scenarios/100k runs, GPU memory or long-term stability.",
+    "sourceThreshold": "SRS 4.2.3: search/query average <1s, maximum <2s. General throughput >=100 RPS."
+  },
+  "cleanupAfterFinalRun": {
+    "vehicles": 0,
+    "walkers": 0,
+    "sensors": 0,
+    "map": "Town02"
+  },
+  "externalAcceptance": {
+    "supabaseAuth": "Blocked: Auth:AnonKey not configured. DB connection does not provide the Auth key.",
+    "cloudStorage": "Not run against Supabase: private bucket/server storage credentials not configured; HTTP adapter tested with fixtures.",
+    "sharedStaging": "Not provided. Local browser/API/DB/CARLA acceptance completed.",
+    "performance": "Short local metadata sample: 98.8 RPS is below the SRS 4.2.3 target of 100 RPS. Full-volume, sustained load and GPU resource limits remain unverified."
+  },
+  "ci": [
+    {
+      "repository": "bg489/SEP_Frontend",
+      "runs": [
+        {
+          "id": 41568798144,
+          "head_sha": "826307d44041f7840896cd04dbce635394a8a3b1",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/bg489/SEP_Frontend/actions/runs/41568798144"
+        },
+        {
+          "id": 41568793153,
+          "head_sha": "826307d44041f7840896cd04dbce635394a8a3b1",
+          "status": "completed",
+          "conclusion": "failure",
+          "html_url": "https://github.com/bg489/SEP_Frontend/actions/runs/41568793153"
+        },
+        {
+          "id": 41567422224,
+          "head_sha": "29c804ffa0bafc47e60d473f6792ef1f8140ae8b",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/bg489/SEP_Frontend/actions/runs/41567422224"
+        }
+      ]
+    },
+    {
+      "repository": "huylh14/AutoScenarioX",
+      "runs": [
+        {
+          "id": 41567428403,
+          "head_sha": "0c257a38a8cc82eb6516d306cee9bc4f784f4316",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/huylh14/AutoScenarioX/actions/runs/41567428403"
+        },
+        {
+          "id": 41567150685,
+          "head_sha": "0c257a38a8cc82eb6516d306cee9bc4f784f4316",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/huylh14/AutoScenarioX/actions/runs/41567150685"
+        }
+      ]
+    }
+  ]
+}
