@@ -131,6 +131,8 @@ class BrowserApi {
       if (path === '/api/v1/tags') return reply([{ name: 'rain', scenarioCount: 1, activeScenarioCount: 1 }]);
       if (path === '/api/v1/prioritization/strategies') return reply([{ id: 'proposed_failure_history', label: 'Failure history', description: 'Failure history strategy' }, { id: 'random', label: 'Random', description: 'Seeded random order' }]);
       if (path === '/api/v1/oracle-configs') return reply([]);
+    if (path === '/api/v1/workers' && method === 'GET') return reply([]);
+    if (/^\/api\/v1\/runs\/[^/]+\/progress$/.test(path) && method === 'GET') return reply({ runId: path.split('/')[4], status: 'Running', updatedAt: null, progress: null });
       if (path === '/api/v1/scenarios') {
         const items = [...this.scenarios.values()].filter(item =>
           (!params.get('q') || `${item.name} ${item.code}`.toLowerCase().includes(params.get('q')!.toLowerCase())) &&
