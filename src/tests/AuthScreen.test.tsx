@@ -12,7 +12,7 @@ function mount(busy = false) {
 }
 describe("Account forms", () => {
   it("FE-UT-055 repeated submits dispatch only one request before loading renders", () => {
-    const props = mount(); const button = screen.getByRole("button", { name: "Sign in", exact: true }); const form = button.closest("form")!;
+    const props = mount(); const button = screen.getByRole("button", { name: /^Sign in$/ }); const form = button.closest("form")!;
     fireEvent.change(screen.getByLabelText("Work email"), { target: { value: "USER@example.invalid" } }); fireEvent.change(screen.getByLabelText("Password", { exact: true }), { target: { value: "fixture-password" } });
     fireEvent.submit(form); fireEvent.submit(form); expect(props.onLogin).toHaveBeenCalledTimes(1);
     expect(props.onLogin).toHaveBeenCalledWith({ email: "user@example.invalid", password: "fixture-password" });
