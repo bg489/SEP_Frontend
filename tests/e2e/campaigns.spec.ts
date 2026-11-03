@@ -103,7 +103,7 @@ test('rerun requires acknowledgement and cancellation sends no request', async (
   await expect(row.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
   await row.getByRole('button', { name: 'Rerun…', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Rerun campaign?' });
-  const rerun = dialog.getByRole('button', { name: 'Delete old runs & rerun', exact: true });
+  const rerun = dialog.getByRole('button', { name: 'Queue a new attempt', exact: true });
   await expect(rerun).toBeDisabled();
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(dialog).toHaveCount(0);
@@ -111,7 +111,7 @@ test('rerun requires acknowledgement and cancellation sends no request', async (
 
   await row.getByRole('button', { name: 'Rerun…', exact: true }).click();
   await expect(rerun).toBeDisabled();
-  await dialog.getByRole('checkbox', { name: 'I understand that the existing run history will be deleted.' }).check();
+  await dialog.getByRole('checkbox', { name: 'I want to create another attempt and keep the existing evidence.' }).check();
   const request = page.waitForRequest(request => request.method() === 'POST' && request.url().endsWith(`/campaigns/${ids.completed}/rerun`));
   await rerun.click();
   await request;

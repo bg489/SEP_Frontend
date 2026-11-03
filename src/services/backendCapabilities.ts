@@ -5,12 +5,11 @@ export const teamScenarioPages: AppPage[] = ["scenarios", "scenario-editor", "im
 export const teamOperationPages: AppPage[] = ["campaigns", "priority", "execution", "run-detail", "nodes", "oracles"];
 export const teamAnalysisPages: AppPage[] = ["failures", "review", "report"];
 export const teamUtilityPages: AppPage[] = ["backend-data", "worker-protocol", "coverage"];
-export const mockFeaturePages: AppPage[] = ["nodes", "clusters", "users", "analytics", "audit"];
+export const mockFeaturePages: AppPage[] = [];
 
-export function moduleSource(page: AppPage, role?: UserRole): "live" | "mock" | "mixed" {
+export function moduleSource(page: AppPage, _role?: UserRole): "live" | "mock" | "mixed" {
   if (!usesTeamBackend) return "mock";
   if (mockFeaturePages.includes(page)) return "mock";
-  if (page === "oracles") return !role || role === "Administrator" ? "mixed" : "live";
-  if (page === "overview" || page === "profile") return "mixed";
+  if (page === "overview") return "mixed";
   return "live";
 }

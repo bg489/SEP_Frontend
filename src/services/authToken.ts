@@ -11,10 +11,10 @@ export interface TokenSession {
 function restore(): TokenSession | null {
   try {
     const value: unknown = JSON.parse(window.sessionStorage.getItem(sessionKey) ?? "null");
-    if (!value || typeof value !== "object" || !("accessToken" in value) || typeof value.accessToken !== "string") return null;
+    if (!value || typeof value !== "object" || !("accessToken" in value) || typeof value.accessToken !== "string" || !value.accessToken.trim()) return null;
     const stored = value as Partial<TokenSession>;
     return { accessToken: value.accessToken, refreshToken: typeof stored.refreshToken === "string" ? stored.refreshToken : null,
-      expiresAt: typeof stored.expiresAt === "number" ? stored.expiresAt : null };
+      expiresAt: typeof stored.expiresAt === "number" && Number.isFinite(stored.expiresAt) ? stored.expiresAt : null };
   } catch { return null; }
 }
 
@@ -25,7 +25,7 @@ export function getTokenSession(): TokenSession | null { return session ? { ...s
 export function getSessionGeneration(): number { return generation; }
 
 export function storeTokenSession(value: TokenSession | null): void {
-  session = value;
+  session = value ? { ...value } : null;
   generation += 1;
   try {
     if (value) window.sessionStorage.setItem(sessionKey, JSON.stringify(value));
