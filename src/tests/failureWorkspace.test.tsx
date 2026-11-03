@@ -33,8 +33,8 @@ describe("FE-UT-050 failure analysis", () => {
     const request = vi.fn(async (path: string) => path === "/api/v1/campaigns" ? campaigns : analysis("campaign-a")); mount(request);
     const regroup = await screen.findByRole("button", { name: "Regroup faults" }); await waitFor(() => expect(regroup).toBeEnabled());
     await userEvent.click(regroup); expect(screen.getByRole("dialog")).toHaveTextContent("execution results remain available");
-    expect(screen.getByRole("button", { name: "Confirm", exact: true })).toBeDisabled();
-    await userEvent.click(screen.getByRole("button", { name: "Cancel", exact: true }));
+    expect(screen.getByRole("button", { name: /^Confirm$/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /^Cancel$/ }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument(); expect(request.mock.calls.every(call => call.length === 1)).toBe(true);
   });
   it("late analysis for the previous campaign cannot replace the current evidence", async () => {
