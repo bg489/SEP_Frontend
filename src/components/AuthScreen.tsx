@@ -2,12 +2,18 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Icon } from "./Icon";
 import { LanguageSwitcher } from "../i18n";
 import { useLocale } from "../localeContext";
-import type { LoginInput, RegisterInput, RegistrationRole } from "../services/authApi";
+import type { LoginInput, RegisterInput, RegistrationRole, ResetPasswordInput } from "../services/authApi";
 import { isTeamDevAuth } from "../services/authConfig";
 import { DevRoleSelect } from "./DevRoleSelect";
 import { getDevRole, setDevRole } from "../services/devRole";
 
-type AuthMode = "login" | "register" | "forgot";
+type AuthMode = "login" | "register" | "forgot" | "reset";
+
+function readRecoveryToken(): string {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  const token = hash.get("type") === "recovery" ? hash.get("access_token") ?? "" : "";
+  return token;
+}
 
 const registrationRoles: RegistrationRole[] = [
   "Scenario Engineer",
@@ -22,6 +28,7 @@ interface AuthScreenProps {
   onLogin: (input: LoginInput) => void;
   onRegister: (input: RegisterInput) => void;
   onRequestPasswordReset: (email: string) => void;
+  onResetPassword?: (input: ResetPasswordInput) => void;
 }
 
 export function AuthScreen({
@@ -31,8 +38,11 @@ export function AuthScreen({
   onLogin,
   onRegister,
   onRequestPasswordReset,
+  onResetPassword,
 }: AuthScreenProps) {
-  const [mode, setMode] = useState<AuthMode>("login");
+  const [recoveryToken] = useState(readRecoveryToken);
+  const [mode, setMode] = useState<AuthMode>(() => recoveryToken ? "reset" : "login");
+  const [formError, setFormError] = useState("");
   const [devRole, setDevRoleValue] = useState(getDevRole);
   const submitted = useRef(false);
   const { locale } = useLocale();
@@ -43,6 +53,10 @@ export function AuthScreen({
     if (!busy) submitted.current = false;
   }, [busy, error, notice]);
 
+  useEffect(() => {
+    if (recoveryToken) window.history.replaceState(null, "", window.location.pathname + window.location.search);
+  }, [recoveryToken]);
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || submitted.current) return;
@@ -52,6 +66,17 @@ export function AuthScreen({
       return;
     }
     const data = new FormData(event.currentTarget);
+    if (mode === "reset") {
+      const password = String(data.get("password") ?? "");
+      if (password !== String(data.get("passwordConfirm") ?? "")) {
+        setFormError(text("Passwords do not match.", "Hai mật khẩu không khớp."));
+        submitted.current = false;
+        return;
+      }
+      setFormError("");
+      onResetPassword?.({ accessToken: recoveryToken, newPassword: password });
+      return;
+    }
     const email = String(data.get("email") ?? "")
       .trim()
       .toLowerCase();
@@ -183,8 +208,8 @@ export function AuthScreen({
               {mode === "login"
                 ? developmentLogin ? text("Development workspace", "Không gian phát triển") : "Sign in to your workspace"
                 : mode === "register"
-                  ? text("Registration preview", "Xem trước đăng ký")
-                  : text("Password recovery preview", "Xem trước khôi phục mật khẩu")}
+                  ? text("Create your account", "Tạo tài khoản")
+                  : mode === "reset" ? text("Choose a new password", "Đặt mật khẩu mới") : text("Recover your account", "Khôi phục tài khoản")}
             </h2>
             <p>
               {mode === "login"
@@ -192,8 +217,8 @@ export function AuthScreen({
                   ? text("Use the development account configured on the team backend. This mode does not verify a password.", "Sử dụng tài khoản phát triển được cấu hình ở backend nhóm. Chế độ này không kiểm tra mật khẩu.")
                   : text("Sign in with a Supabase account that has access to AutoScenarioX.", "Đăng nhập bằng tài khoản Supabase được cấp quyền vào AutoScenarioX.")
                 : mode === "register"
-                  ? text("Demo only. Registration is not available in the team backend yet. This form creates no account and stores no password.", "Chỉ mô phỏng. Backend nhóm chưa hỗ trợ đăng ký. Biểu mẫu không tạo tài khoản và không lưu mật khẩu.")
-                  : text("Demo only. The team backend has no password recovery endpoint. No reset email will be sent.", "Chỉ mô phỏng. Backend nhóm chưa có API khôi phục mật khẩu. Hệ thống sẽ không gửi email đặt lại.")}
+                  ? text("Choose your workspace role. You may need to confirm your email before signing in.", "Chọn vai trò làm việc. Bạn có thể cần xác nhận email trước khi đăng nhập.")
+                  : mode === "reset" ? text("Use this recovery link to set a new password.", "Sử dụng liên kết khôi phục này để đặt mật khẩu mới.") : text("Enter your email to request a password recovery link.", "Nhập email để nhận liên kết đặt lại mật khẩu.")}
             </p>
           </div>
 
@@ -212,7 +237,7 @@ export function AuthScreen({
               </div>
             </label>
           )}
-          {!developmentLogin && <label className="auth-label">
+          {!developmentLogin && mode !== "reset" && <label className="auth-label">
             Work email
             <div className="auth-input">
               <Icon name="link" size={16} />
@@ -236,8 +261,8 @@ export function AuthScreen({
                   disabled={busy}
                   type="password"
                   required
-                  minLength={mode === "register" ? 8 : 1}
-                  placeholder={mode === "register" ? "8+ characters" : "Your password"}
+                  minLength={mode === "login" ? 1 : 8}
+                  placeholder={mode === "login" ? "Your password" : "8+ characters"}
                   autoComplete={
                     mode === "login" ? "current-password" : "new-password"
                   }
@@ -245,6 +270,10 @@ export function AuthScreen({
               </div>
             </label>
           )}
+          {mode === "reset" && <label className="auth-label">
+            {text("Confirm new password", "Xác nhận mật khẩu mới")}
+            <div className="auth-input"><Icon name="shield" size={16} /><input name="passwordConfirm" type="password" autoComplete="new-password" minLength={8} required disabled={busy} /></div>
+          </label>}
           {mode === "login" && (
             <button
               className="auth-forgot"
@@ -280,10 +309,10 @@ export function AuthScreen({
               Choose Scenario Engineer, Test Engineer, or Test Reviewer. Administrator access must be assigned by an existing administrator.
             </div>
           )}
-          {error && (
+          {(error || formError) && (
             <div className="auth-message auth-error" role="alert">
               <Icon name="warning" size={16} />
-              {error}
+              {formError || error}
             </div>
           )}
           {notice && (
@@ -299,8 +328,8 @@ export function AuthScreen({
               : mode === "login"
                 ? developmentLogin ? text("Open development workspace", "Mở không gian phát triển") : "Sign in"
                 : mode === "register"
-                  ? text("Check demo form", "Kiểm tra biểu mẫu mô phỏng")
-                  : text("Preview recovery request", "Xem trước yêu cầu khôi phục")}
+                  ? text("Create account", "Tạo tài khoản")
+                  : mode === "reset" ? text("Set new password", "Đặt mật khẩu mới") : text("Send recovery link", "Gửi liên kết khôi phục")}
             {!busy && <Icon name="arrow-right" size={16} />}
           </button>
           <div className="auth-switch">
@@ -314,7 +343,7 @@ export function AuthScreen({
                     setMode("register");
                   }}
                 >
-                  {text("Preview registration", "Xem trước đăng ký")}
+                  {text("Create account", "Tạo tài khoản")}
                 </button>
               </>
             ) : (
