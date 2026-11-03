@@ -41,7 +41,8 @@ export interface RunResult {
 export interface RankResult {
   runId: string; strategy: string; createdAt: string;
   metrics: { apfdEstimate: number; apfdcEstimate: number; faultsFoundEarlyEstimate: number;
-    faultsTotalEstimate: number; estimatedSuiteMinutes: number; note: string };
+    faultsTotalEstimate: number; estimatedSuiteMinutes: number; note: string;
+    historyStatus?: string; observedRuns?: number; observedApfd?: number | null; observedApfdc?: number | null };
   ordered: { rank: number; scenarioVersionId: string; scenarioId: string; scenarioCode: string;
     scenarioName: string; category: string; mapName: string | null; weatherPreset: string | null;
     severity: string; failureSignalEstimate: number; score: number; rationale: string; estimatedCostMinutes: number }[];

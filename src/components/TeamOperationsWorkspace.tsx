@@ -8,6 +8,7 @@ import type { OracleConfig, RankResult, ReadyVersion, RunResult, TeamCampaign, T
 import { operationsApi, workerDefaults } from "../services/teamOperations";
 import { Icon } from "./Icon";
 import { RunProgressPanel } from "./RunProgressPanel";
+import { RankingHistory } from "./RankingHistory";
 import "./TeamOperationsWorkspace.css";
 
 type Props = {
@@ -301,6 +302,7 @@ export function TeamOperationsWorkspace({ client, page, role, onNavigate, onChan
   };
 
   return <div className="team-operations">
+    {isPriorityPage && rank && <RankingHistory metrics={rank.metrics} />}
     {isExecutionPage && runs.some(run => run.id === runId && ["Claimed", "Running"].includes(run.status)) && <RunProgressPanel client={client} runId={runId} />}
     <section className="ops-intro card">
       <div><span className="ops-eyebrow">AUTOSCENARIOX · {t("CONNECTED WORKSPACE", "KHÔNG GIAN KẾT NỐI")}</span>
@@ -343,7 +345,7 @@ export function TeamOperationsWorkspace({ client, page, role, onNavigate, onChan
     </> : isOraclePage ? <section className="card ops-panel"><h3>{t("Versioned test oracles", "Test Oracle có phiên bản")}</h3><p className="ops-note">{t("These are the actual backend thresholds. Editing oracle configurations is not exposed by the current backend API.", "Đây là ngưỡng thực tế từ backend. API backend hiện chưa hỗ trợ chỉnh sửa cấu hình Oracle.")}</p><div className="ops-oracle-grid">{oracles.map(config => <article className="ops-oracle" key={config.id}><span className="ops-status">v{config.version}</span><h4>{config.name}</h4><p>{config.description}</p><dl><div><dt>{t("Speed tolerance", "Dung sai tốc độ")}</dt><dd>{config.speedingToleranceKmh} km/h</dd></div><div><dt>{t("Minimum speeding duration", "Thời gian vượt tốc tối thiểu")}</dt><dd>{config.speedingMinDurationS} s</dd></div><div><dt>{t("Maximum standstill", "Dừng xe tối đa")}</dt><dd>{config.freezingMaxStillS} s</dd></div><div><dt>TTC</dt><dd>{config.ttcThresholdS} s</dd></div><div><dt>{t("Goal tolerance", "Dung sai đích đến")}</dt><dd>{config.routeGoalToleranceM} m</dd></div></dl><small>{safeDate(config.createdAt, locale)}<br />{config.id}</small></article>)}</div>{!loading && !oracles.length && <div className="ops-empty">{t("No oracle configuration returned by the backend. Apply the backend database migrations.", "Backend chưa có cấu hình Oracle. Cần áp dụng migration database của backend.")}</div>}</section> : <>
       <section className="ops-stats"><article className="card"><Icon name="campaigns" /><span>{t("Campaigns", "Campaign")}</span><strong>{campaigns.length}</strong></article><article className="card"><Icon name="play" /><span>{t("Running", "Đang chạy")}</span><strong>{campaigns.filter(item => item.status === "Running").length}</strong></article><article className="card"><Icon name="clock" /><span>{t("Queued", "Trong hàng đợi")}</span><strong>{campaigns.filter(item => ["Draft", "Queued"].includes(item.status)).length}</strong></article><article className="card"><Icon name="check" /><span>{t("Completed", "Hoàn tất")}</span><strong>{campaigns.filter(item => ["Completed", "NeedsReview"].includes(item.status)).length}</strong></article></section>
       {isPriorityPage ? <section className="card ops-panel">
-        <div className="ops-panel-heading"><div><h3>{t("Rank the execution suite", "Xếp thứ tự bộ kiểm thử")}</h3><p>{t("The backend ranks scenario content using heuristic features. APFD/APFDc values below are estimates, not measured failure-history results.", "Backend xếp hạng theo đặc trưng nội dung scenario. APFD/APFDc phía dưới là ước lượng, chưa phải kết quả đo từ lịch sử lỗi thực tế.")}</p></div><span className="ops-status estimate">{t("HEURISTIC ESTIMATES", "ƯỚC LƯỢNG HEURISTIC")}</span></div>
+        <div className="ops-panel-heading"><div><h3>{t("Rank the execution suite", "Xếp thứ tự bộ kiểm thử")}</h3><p>{t("Ranking uses scenario features and available Oracle history. Estimated metrics and observed history metrics are shown separately.", "Xếp hạng sử dụng đặc trưng scenario và lịch sử Oracle hiện có. Chỉ số ước lượng và chỉ số từ lịch sử được hiển thị riêng.")}</p></div><span className="ops-status estimate">{t("PRIORITIZATION", "ƯU TIÊN KIỂM THỬ")}</span></div>
         <div className="ops-form-grid">
           <label>{t("Scenario source", "Nguồn scenario")}<select value={rankSource} onChange={event => setRankSource(event.target.value as typeof rankSource)}><option value="campaign">{t("Selected campaign", "Campaign đã chọn")}</option><option value="ready">{t("Latest READY versions in the library", "Phiên bản READY mới nhất trong kho")}</option><option value="versions">{t("Explicit scenario version IDs", "Chỉ định ID phiên bản scenario")}</option></select></label>
           <label>{t("Strategy", "Chiến lược")}<select value={strategy} onChange={event => setStrategy(event.target.value)}>{strategies.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
