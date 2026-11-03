@@ -4,8 +4,8 @@ import { waitFor } from "@testing-library/react";
 import type { UnknownAction } from "redux";
 import { authSaga } from "../features/auth/authSaga";
 import { authApi, type AuthSession } from "../services/authApi";
-import { getAccessToken, setAccessToken } from "../services/authToken";
-import { loginRequested, logoutRequested, registerRequested, profileUpdateRequested } from "../features/auth/authSlice";
+import { expireTokenSession, getAccessToken, setAccessToken } from "../services/authToken";
+import { bootstrapAuthRequested, loginRequested, logoutRequested, registerRequested, profileUpdateRequested, passwordResetRequested } from "../features/auth/authSlice";
 
 const session: AuthSession = { user: { name: "Tester", email: "tester@example.invalid", role: "Test Engineer" }, accessToken: "fixture-token" };
 const deferred = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(yes => { resolve = yes; }); return { promise, resolve }; };
@@ -17,7 +17,14 @@ function harness() {
   return { send: (action: UnknownAction) => channel.put(action), actions };
 }
 describe("Authentication Saga", () => {
-  it("FE-UT-015 leading login ignores a second click until the first request settles", async () => {
+  it("FE-UT-015 bootstrap handles absent and rejected stored identities", async () => {
+    const { send, actions } = harness(); send(bootstrapAuthRequested());
+    await waitFor(() => expect(actions.some(a => a.type === "auth/authAnonymous")).toBe(true));
+    actions.length = 0; setAccessToken("expired-fixture"); vi.spyOn(authApi, "currentUser").mockRejectedValue(new Error("expired"));
+    send(bootstrapAuthRequested()); await waitFor(() => expect(getAccessToken()).toBeNull());
+    expect(actions.some(a => a.type === "auth/authAnonymous")).toBe(true);
+  });
+  it("FE-UT-016 leading login ignores a second click until the first request settles", async () => {
     const pending = deferred<AuthSession>(); const login = vi.spyOn(authApi, "login").mockReturnValue(pending.promise);
     const { send, actions } = harness(); const input = { email: "tester@example.invalid", password: "fixture-password" };
     send(loginRequested(input)); send(loginRequested(input)); expect(login).toHaveBeenCalledTimes(1);
@@ -43,7 +50,14 @@ describe("Authentication Saga", () => {
     await waitFor(() => expect(actions).toContainEqual({ type: "auth/authDemoCompleted", payload: "Confirm your email" }));
     expect(getAccessToken()).toBeNull(); expect(actions.some(a => a.type === "auth/authSucceeded")).toBe(false);
   });
-  it("FE-UT-055 a profile response received after logout cannot restore a user", async () => {
+  it("FE-UT-017 an expired-session event removes the protected identity", async () => {
+    const { actions } = harness(); expireTokenSession(); await waitFor(() => expect(actions.some(a => a.type === "auth/authAnonymous")).toBe(true));
+  });
+  it("FE-UT-018 recovery acknowledgement never authenticates", async () => {
+    vi.spyOn(authApi, "requestPasswordReset").mockResolvedValue("Check your email"); const { send, actions } = harness(); send(passwordResetRequested("user@example.invalid"));
+    await waitFor(() => expect(actions.some(a => a.type === "auth/passwordResetSucceeded")).toBe(true)); expect(actions.some(a => a.type === "auth/authSucceeded")).toBe(false);
+  });
+  it("a profile response received after logout cannot restore a user", async () => {
     const pending = deferred<AuthSession["user"]>(); vi.spyOn(authApi, "updateProfile").mockReturnValue(pending.promise);
     const { send, actions } = harness(); send(profileUpdateRequested("New name")); send(logoutRequested());
     pending.resolve({ ...session.user, name: "New name" }); await new Promise(resolve => setTimeout(resolve, 0));
