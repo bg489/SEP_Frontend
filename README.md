@@ -1,8 +1,9 @@
 # AutoScenarioX Frontend
 
 Current Week 2 branch: `feature/week2-completion-20261119`. The matching backend
-is now in `Project\Backend`, active project `backend/AutoScenarioX.Api` (.NET 8,
-`/api/v1`); its previous Identity host is preserved under `legacy/identity-api`.
+is `huylh14/AutoScenarioX`, local checkout
+`Project\AutoScenarioX\AutoScenarioX`, active project `backend/AutoScenarioX.Api`
+(.NET 8, `/api/v1`).
 The old backend paths and acceptance counts below describe previous revisions.
 Use [docs/week2-verification.md](docs/week2-verification.md) for the current
 configuration, executed tests, task coverage and remaining external acceptance.
@@ -12,10 +13,10 @@ React + TypeScript, Redux Toolkit và Redux Saga; giao diện tiếng Việt/ti�
 Frontend này gọi **backend của nhóm** tại:
 
 ```text
-C:\Users\admin\Desktop\Hoc Bai\SEP\Project\Backend\backend
+C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend
 ```
 
-Chạy project `AutoScenarioX.Api` của repo Backend. Host Identity cũ được giữ trong `legacy/identity-api` và không dùng chung với frontend này.
+Chạy project `AutoScenarioX.Api` trong repo `huylh14/AutoScenarioX` trên nhánh `feature/week2-completion-20261119`.
 
 ## Chức năng và nguồn dữ liệu
 
@@ -77,7 +78,7 @@ Yêu cầu Node.js tương thích Vite, npm; .NET **8 SDK** và cấu hình data
 Terminal backend:
 
 ```powershell
-cd "C:\Users\admin\Desktop\Hoc Bai\SEP\Project\Backend\backend"
+cd "C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend"
 dotnet run --project AutoScenarioX.Api --launch-profile http
 ```
 

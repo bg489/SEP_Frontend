@@ -1,10 +1,11 @@
 # Week 2 frontend verification
 
-Both `bg489/SEP_Frontend` and `bg489/SEP_Backend` use branch
+Both `bg489/SEP_Frontend` and `huylh14/AutoScenarioX` use branch
 `feature/week2-completion-20261119`. The active backend project is
-`Project/Backend/backend/AutoScenarioX.Api`, using the versioned `/api/v1`
-contract. Start it from its project directory; the old Identity API under
-`legacy/identity-api` does not serve this frontend.
+`Project/AutoScenarioX/AutoScenarioX/backend/AutoScenarioX.Api`, using the
+versioned `/api/v1` contract. Start it from its project directory. The previous
+push to `bg489/SEP_Backend` targeted the wrong repository; backend fixes have
+been transferred and tested in the corrected checkout.
 
 The branch restores feature commits from the existing Review 2 history and adds
 current regression coverage. Account registration/recovery/profile/password,

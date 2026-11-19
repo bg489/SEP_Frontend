@@ -3,8 +3,8 @@
   "branch": "feature/week2-completion-20261119",
   "environment": "Local isolated PostgreSQL 18 at 55439/asx_ci_week2; API5087/frontend4175; CARLA0.9.16 Low. Not published shared staging.",
   "backend": {
-    "repository": "bg489/SEP_Backend",
-    "sourceCommit": "8c401622da3ab70825aaa930100884ab9a3f1239",
+    "repository": "huylh14/AutoScenarioX",
+    "sourceCommit": "09ed6e573118c9610eb19d859a50caa166647763",
     "dotnet": {
       "passed": 439,
       "failed": 0,
@@ -16,7 +16,8 @@
       "recorder": 9,
       "probe": 5,
       "totalPassed": 70
-    }
+    },
+    "previousValidationCommit": "8c401622da3ab70825aaa930100884ab9a3f1239"
   },
   "frontend": {
     "repository": "bg489/SEP_Frontend",
@@ -2046,10 +2047,12 @@
     ]
   },
   "ci": {
-    "status": "Blocked before runner startup",
-    "reason": "The job was not started because your account is locked due to a billing issue.",
-    "backend": "https://github.com/bg489/SEP_Backend/actions/runs/44494103117",
-    "frontend": "https://github.com/bg489/SEP_Frontend/actions/runs/44494073597"
+    "status": "Corrected backend CI passed; frontend CI remains separately blocked by bg489 billing.",
+    "reason": "The previous billing conclusion applied to bg489 repositories, not huylh14/AutoScenarioX.",
+    "backend": "https://github.com/huylh14/AutoScenarioX/actions/runs/44499056061",
+    "frontend": "https://github.com/bg489/SEP_Frontend/actions/runs/44494073597",
+    "backendStatus": "success",
+    "frontendStatus": "blocked before startup: bg489 billing issue"
   },
   "performanceSample": {
     "requests": 200,
@@ -2072,11 +2075,18 @@
     "Supabase signup/email recovery with actual Auth key/provider",
     "Private cloud bucket using configured storage credentials",
     "Published shared staging URL and acceptance",
-    "Hosted CI after GitHub account billing unlock",
+    "Frontend hosted CI after bg489 GitHub billing unlock",
     "Reviewed release tag after all required checks pass"
   ],
   "pullRequests": {
-    "backend": "https://github.com/bg489/SEP_Backend/pull/1",
+    "backend": "https://github.com/huylh14/AutoScenarioX/pull/20",
     "frontend": "https://github.com/bg489/SEP_Frontend/pull/6"
+  },
+  "repositoryCorrection": {
+    "checkout": "C:\\Users\\admin\\Desktop\\Hoc Bai\\SEP\\Project\\AutoScenarioX\\AutoScenarioX",
+    "sourceFilesCompared": 358,
+    "differences": [],
+    "verification": "439 .NET and 70 Python checks rerun from the corrected checkout; supplied schema contract matched21tables/199columns.",
+    "runtimeEvidenceProvenance": "CARLA and live browser artifacts were collected before the path correction using identical API/worker/database source after LF/CRLF normalization. Original artifact paths remain valid; no additional simulator run is implied."
   }
 }

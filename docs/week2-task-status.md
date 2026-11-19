@@ -1,8 +1,9 @@
+<!-- Correct backend: huylh14/AutoScenarioX; local Project/AutoScenarioX/AutoScenarioX. Prior SEP_Backend target was incorrect. -->
 # Week 2 task status
 
 Date:19 November2026. Source: `List Phân Việc Week 2.xlsx`, `Trang tính1!A2:F56`.
 
-This is an execution ledger, not a declaration of100% release acceptance. Actual local counts,source revisions,12-map IDs and CI billing failure are in `week2-evidence.json`. Live Supabase/email/bucket, published shared staging, human review and release tagging remain explicit pending items.
+This is an execution ledger, not a declaration of100% release acceptance. Actual local counts,source revisions,12-map IDs and separate CI outcomes are in `week2-evidence.json`. Live Supabase/email/bucket, published shared staging, human review and release tagging remain explicit pending items.
 
 | Excel row | Original task / owner | Current status | Evidence and acceptance limit |
 |---|---|---|---|
@@ -22,8 +23,8 @@ This is an execution ledger, not a declaration of100% release acceptance. Actual
 | 15 | Report 4 làm phần 2: Database Design — Đạt | Document present | Supplied SRS/SDD sections exist; schema-core.dbml/schema-alignment.md bind the database baseline to current code. No claim that diagrams were personally reviewed by every assigned member. |
 | 16 | Report 4 làm phần 3: Class diagram cho từng function — Thuận | Document present | Supplied SRS/SDD sections exist; schema-core.dbml/schema-alignment.md bind the database baseline to current code. No claim that diagrams were personally reviewed by every assigned member. |
 | 17 | Report 4 làm phần 3: Sequence diagram cho từng function — Huy | Document present | Supplied SRS/SDD sections exist; schema-core.dbml/schema-alignment.md bind the database baseline to current code. No claim that diagrams were personally reviewed by every assigned member. |
-| 18 | Tạo CI chạy test backend dotnet, Python và database tạm trong repo — Đạt | Implemented; hosted run blocked | Backend workflow builds/tests .NET/Python and temporary PostgreSQL, fails on errors and uploads evidence. GitHub billing lock prevented runner startup. |
-| 19 | Tạo CI frontend chạy lint, build, test unit, test trình duyệt và lưu báo cáo — Bảo | Implemented; hosted run blocked | Frontend workflow runs lint/build/88 contracts/unit coverage/Playwright and artifacts on push, PR and Review 2 tags. GitHub billing lock blocked startup. |
+| 18 | Tạo CI chạy test backend dotnet, Python và database tạm trong repo — Đạt | Verified locally and in hosted CI | Backend workflow builds/tests .NET/Python and temporary PostgreSQL, fails on errors and uploads evidence. CI passed in huylh14/AutoScenarioX; see workflow URL in week2-evidence.json. |
+| 19 | Tạo CI frontend chạy lint, build, test unit, test trình duyệt và lưu báo cáo — Bảo | Implemented; hosted run blocked | Frontend workflow runs lint/build/88 contracts/unit coverage/Playwright and artifacts on push, PR and Review 2 tags. Frontend CI in bg489/SEP_Frontend was blocked before startup by its reported billing issue. |
 | 20 | Thêm bộ chạy test frontend và viết test đăng nhập, phân quyền, Redux Saga — Bảo | Verified locally | Vitest/RTL/jsdom and auth/role/Saga/error/double-submit cases present; 108 passing invocations include all FE-UT-001–055 IDs. |
 | 21 | Kiểm tra lại database và bàn giao dữ liệu mẫu tài khoản, scenario cho nhóm — Thuận | Verified locally | 21 supplied tables/199 columns match; 3 Week 2 extension tables documented. Fresh PostgreSQL migrations/seed and persistence/concurrency tests passed. |
 | 22 | Làm API đăng ký tài khoản bằng Supabase và cho chọn role, không cho chọn Admin — Thuận | Implemented; live provider pending | Supabase signup permits 3 non-Admin roles, app_users persistence and duplicate protection; mocked provider tests pass. No Auth:AnonKey/email provider configured for live acceptance. |
@@ -60,4 +61,4 @@ This is an execution ledger, not a declaration of100% release acceptance. Actual
 | 53 | Chuẩn bị staging, dữ liệu demo và cập nhật kết quả thật vào 3 file Report 5 — Bảo | Current reports prepared; shared staging pending | Three Report5 copies include dated actual results; original statuses retained as historical. Local API/DB performance and acceptance evidence recorded; no shared staging URL supplied. |
 | 54 | Chạy thử CARLA đủ 12 map và lưu bằng chứng luồng campaign đến kết quả — Huy | Verified with real CARLA | All12 maps full short routes accepted, with version/run IDs, actor/event effect, telemetry, video and measured Oracle; no quick/fixture simulation counted. |
 | 55 | Chạy test frontend trên staging và đối chiếu kết quả CARLA với Huy — Tuấn | Verified locally; published staging pending | Real browser→API→worker→CARLA→video/Oracle→reload accepted; separate public/shared staging acceptance remains pending. |
-| 56 | Chốt bản review-2 cho cả repo frontend và backend sau khi CI đạt — Bảo | Branches pushed and draft PRs opened; release pending | Feature commits/push completed in both repos. Hosted CI blocked by billing and external acceptance remains open; no existing review-2 tag overwritten or false release tag created. |
+| 56 | Chốt bản review-2 cho cả repo frontend và backend sau khi CI đạt — Bảo | Branches pushed and draft PRs opened; release pending | Feature commits/push completed in both repos. Corrected backend CI is tracked separately; frontend CI billing and external acceptance remain open; no existing review-2 tag overwritten or false release tag created. |
