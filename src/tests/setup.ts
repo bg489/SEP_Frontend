@@ -1,6 +1,8 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
+
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom lacks the native dialog top layer. Browser tests exercise real focus
 // containment; component tests need only its open/close state.

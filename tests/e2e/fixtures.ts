@@ -203,8 +203,9 @@ class BrowserApi {
       }
     }
     if (/^\/api\/v1\/runs\/[^/]+\/result$/.test(path) && method === 'GET') {
-      const campaign = [...this.campaigns.values()].find(item => item.runCount > 0)!;
-      const run = this.runs(campaign).find(item => item.id === path.split('/')[4])!;
+      const campaign = [...this.campaigns.values()].find(item => item.runCount > 0 && this.runs(item).some(run => run.id === path.split('/')[4]));
+      const run = campaign && this.runs(campaign).find(item => item.id === path.split('/')[4]);
+      if (!campaign || !run) return reply({ title: 'Run not found in this test backend' }, 404);
       return reply({ ...run, runId: run.id, campaignCode: campaign.code, campaignName: campaign.name, durationS: null, outcome: null, telemetryReceivedAt: null, hasVideo: false, infraRetryCount: 0, evaluations: [] });
     }
     this.unhandled.push(`${method} ${path}`);

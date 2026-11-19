@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: "jsdom",
+    maxWorkers: 3,
+    testTimeout: 15000,
     setupFiles: ["./src/tests/setup.ts"],
     include: ["src/tests/**/*.test.{ts,tsx}"],
     env: { VITE_AUTH_MODE: "Supabase", VITE_DATA_MODE: "api" },
