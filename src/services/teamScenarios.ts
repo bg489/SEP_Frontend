@@ -130,6 +130,9 @@ export class TeamScenarioService {
   exportVersion(id: string, number: number, format: "json" | "yaml") { return this.client.download(`/api/v1/scenarios/${segment(id)}/versions/${number}/export?format=${format}`, `${id}-v${number}.${format}`); }
   variants(id: string, number: number) { return this.client.request<TeamVariantBatch[]>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches`); }
   variantBatch(id: string, number: number, batchId: string) { return this.client.request<TeamVariantResult>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches/${segment(batchId)}`); }
+  downloadVariantBatch(id: string, number: number, batchId: string) {
+    return this.client.download(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches/${segment(batchId)}`, `${id}-variant-batch-${batchId}.json`);
+  }
   generateVariants(id: string, number: number, parameterGrid: Record<string, (number | string)[]>, namePrefix?: string, note?: string, strategy?: "cartesian" | "pairwise") {
     return this.client.request<TeamVariantResult>(`/api/v1/scenarios/${segment(id)}/versions/${number}/variant-batches`, { method: "POST", body: body({ parameterGrid, namePrefix, note, ...(strategy ? { strategy } : {}) }) });
   }
@@ -158,7 +161,7 @@ export class TeamScenarioService {
       ? hydrated.filter(item => item.status === filters.status || filters.status === "Approved" && item.status === "Active") : hydrated;
   }
   async createScenario(input: CreateScenarioInput): Promise<Scenario> {
-    if (input.executionMode === "OpenSCENARIO source") throw new Error("This backend imports canonical JSON/YAML. Use the scenario workspace to import a supported file.");
+    if (input.executionMode === "OpenSCENARIO source") throw new Error("Use the scenario workspace to import JSON, YAML or the supported static OpenSCENARIO subset.");
     if (input.obstacleCount > 0) throw new Error("Each obstacle needs an explicit spawn position. Create the scenario in the schema workspace and configure actors before publishing.");
     const created = await this.createProfile(input.name, input.description, categoryAliases[input.category] ?? input.category);
     const draft = await this.draft(created.id);
@@ -225,7 +228,7 @@ export class TeamScenarioService {
   }
   async persistImportedScenario(scenario: Scenario, sourceContent: string): Promise<Scenario> {
     const fileName = scenario.sourceFileName ?? "scenario.json";
-    if (!/\.(json|ya?ml)$/i.test(fileName)) throw new Error("The team backend accepts JSON/YAML scenario files; OpenSCENARIO import is not implemented.");
+    if (!/\.(json|ya?ml|xosc|osc)$/i.test(fileName)) throw new Error("Choose a JSON, YAML or OpenSCENARIO scenario file.");
     const result = await this.importFile(new File([sourceContent], fileName), scenario.name);
     return teamScenarioFromDetail(result.scenario, await this.draft(result.scenario.id));
   }
