@@ -39,7 +39,8 @@ try {
   evidence = { environment: process.env.ASX_LIVE_ENVIRONMENT ?? "isolated local API/database (not shared staging)", frontend, backend, startedAt: new Date().toISOString(), campaignId: campaign.id, scenarioName };
   await page.screenshot({ path: path.join(output, "queued.png"), fullPage: true });
   let log = "";
-  const child = spawn(python, ["-X", "utf8", "tools/campaign_worker.py", "--api", backend, "--campaign-id", campaign.id, "--once", "--cooldown", "0", "--worker-name", `review2-web-${Date.now()}`, "--out", output],
+  const rpcPort = process.env.ASX_CARLA_PORT ?? "2000";
+  const child = spawn(python, ["-X", "utf8", "tools/campaign_worker.py", "--api", backend, "--campaign-id", campaign.id, "--port", rpcPort, "--tm-port", String(Number(rpcPort) + 6000), "--once", "--cooldown", "0", "--worker-name", `review2-web-${Date.now()}`, "--out", output],
     { cwd: repository, windowsHide: true, env: { ...process.env, ASX_DEV_ROLE: "TEST_ENGINEER", PYTHONIOENCODING: "utf-8" } });
   child.stdout.on("data", data => { log += data; }); child.stderr.on("data", data => { log += data; });
   const exit = new Promise((resolve, reject) => { child.on("error", reject); child.on("exit", code => resolve(code)); });
