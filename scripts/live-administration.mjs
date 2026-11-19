@@ -3,14 +3,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 if (process.env.ASX_LIVE_DATABASE_IS_DISPOSABLE !== "1") throw new Error("Use only the prepared disposable database.");
 const output = path.resolve(process.env.ASX_LIVE_OUTPUT ?? "test-results/live-administration"); await fs.mkdir(output, { recursive: true });
-const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined }); const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const evidence = { startedAt: new Date().toISOString(), environment: "Isolated local PostgreSQL/API; no Supabase Auth account created" };
 const open = name => page.locator("aside").getByRole("button", { name, exact: true }).click();
 try {
   await page.addInitScript(() => localStorage.setItem("asx-locale", "en")); await page.goto(process.env.ASX_LIVE_FRONTEND ?? "http://127.0.0.1:4175");
   await page.getByLabel("Dev role", { exact: true }).selectOption("ADMIN"); await page.getByRole("button", { name: "Open development workspace", exact: true }).click();
-  await open("User management"); await page.getByLabel("Search users").fill("tester@example.invalid");
-  const role = page.getByRole("combobox", { name: "Role for tester@example.invalid" }); await role.selectOption("TEST_REVIEWER");
+  const accountEmail = process.env.ASX_LIVE_ACCOUNT_EMAIL ?? "tester@example.invalid";
+  await open("User management"); await page.getByLabel("Search users").fill(accountEmail);
+  const role = page.getByRole("combobox", { name: `Role for ${accountEmail}` }); await role.selectOption("TEST_REVIEWER");
   await expect(page.getByRole("status").filter({ hasText: "Role saved." })).toBeVisible(); await page.getByRole("button", { name: "Block account", exact: true }).click();
   await expect(page.getByRole("button", { name: "Unblock account", exact: true })).toBeEnabled(); await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(role).toHaveValue("TEST_REVIEWER"); await expect(page.getByText("Blocked", { exact: true })).toBeVisible();

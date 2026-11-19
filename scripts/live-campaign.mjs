@@ -13,7 +13,7 @@ const scenarioName = process.env.ASX_LIVE_SCENARIO;
 const output = path.resolve(process.env.ASX_LIVE_OUTPUT ?? "test-results/live-campaign");
 if (!repository || !python || !scenarioName) throw new Error("Set ASX_BACKEND_REPOSITORY, ASX_PYTHON and ASX_LIVE_SCENARIO to an existing real READY scenario.");
 await fs.mkdir(output, { recursive: true });
-const browser = await chromium.launch(); const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined }); const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
 await context.tracing.start({ screenshots: true, snapshots: true });
 const page = await context.newPage(); const responses = []; const errors = [];
 page.on("pageerror", error => errors.push(error.message));
@@ -36,7 +36,7 @@ try {
   const row = page.getByRole("row").filter({ has: page.getByRole("button", { name, exact: true }) });
   const started = page.waitForResponse(response => response.url().endsWith(`/campaigns/${campaign.id}/start`));
   await row.getByRole("button", { name: "Start", exact: true }).click(); expect((await started).ok()).toBe(true);
-  evidence = { environment: "isolated local API + PostgreSQL 18 (not shared staging)", startedAt: new Date().toISOString(), campaignId: campaign.id, scenarioName };
+  evidence = { environment: process.env.ASX_LIVE_ENVIRONMENT ?? "isolated local API/database (not shared staging)", frontend, backend, startedAt: new Date().toISOString(), campaignId: campaign.id, scenarioName };
   await page.screenshot({ path: path.join(output, "queued.png"), fullPage: true });
   let log = "";
   const child = spawn(python, ["-X", "utf8", "tools/campaign_worker.py", "--api", backend, "--campaign-id", campaign.id, "--once", "--cooldown", "0", "--worker-name", `review2-web-${Date.now()}`, "--out", output],
