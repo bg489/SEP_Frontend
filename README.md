@@ -1,5 +1,12 @@
 # AutoScenarioX Frontend
 
+Current Week 2 branch: `feature/week2-completion-20261119`. The matching backend
+is now in `Project\Backend`, active project `backend/AutoScenarioX.Api` (.NET 8,
+`/api/v1`); its previous Identity host is preserved under `legacy/identity-api`.
+The old backend paths and acceptance counts below describe previous revisions.
+Use [docs/week2-verification.md](docs/week2-verification.md) for the current
+configuration, executed tests, task coverage and remaining external acceptance.
+
 React + TypeScript, Redux Toolkit và Redux Saga; giao diện tiếng Việt/tiếng Anh với màu chủ đạo `#FF6363`, `#FCFFA7`.
 
 Frontend này gọi **backend của nhóm** tại:
