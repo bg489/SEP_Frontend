@@ -1,0 +1,453 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for services/teamBackendApi.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="../theme.js"></script>
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        
+        <label class="theme-select quiet">
+            Theme
+            <select id="themeSelect" autocomplete="off">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="legacy">Legacy</option>
+            </select>
+        </label>
+
+        <h1><a href="../index.html">All files</a> / <a href="index.html">services</a> teamBackendApi.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">5.94% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>6/101</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/47</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">0% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>0/48</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">8.95% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>6/67</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { AutoScenarioApi, CarlaIntegrationConfig, Campaign, OverviewData } from "../types";
+import { mockApi } from "./mockApi";
+import { TeamApiError, downloadTeamArtifact, readTeamMedia, refreshTeamSession, requestTeamApi, teamClient } from "./teamClient";
+import { isTeamDevAuth } from "./authConfig";
+import { TeamScenarioService, teamScenarioFromReady } from "./teamScenarios";
+import { campaignToUi, runToUi, type TeamCampaign, type TeamRun } from "./teamOperations";
+&nbsp;
+const scenarios = new TeamScenarioService(teamClient);
+const endpoint = "/api/v1/campaigns";
+const <span class="fstat-no" title="function not covered" >json = (m</span>ethod: string, value?: unknown): RequestInit =&gt; (<span class="cstat-no" title="statement not covered" >{ method, body: value === undefined ? undefined : JSON.stringify(value) });</span>
+const <span class="fstat-no" title="function not covered" >campaigns = () =&gt; <span class="cstat-no" title="statement not covered" >r</span>equestTeamApi&lt;TeamCampaign[]&gt;(endpoint);</span>
+const <span class="fstat-no" title="function not covered" >runsFor = (i</span>d: string) =&gt; <span class="cstat-no" title="statement not covered" >requestTeamApi&lt;TeamRun[]&gt;(`${endpoint}/${encodeURIComponent(id)}/runs`);</span>
+&nbsp;
+async function <span class="fstat-no" title="function not covered" >allUiScenarios(f</span>ilters: Parameters&lt;AutoScenarioApi["listScenarios"]&gt;[0] = <span class="branch-0 cbranch-no" title="branch not covered" >{}) {</span>
+<span class="cstat-no" title="statement not covered" >  try { <span class="cstat-no" title="statement not covered" >return await scenarios.listScenarios(filters); }</span></span>
+  catch (error) {
+    // Non-authoring roles can consume published READY versions. A permission
+    // response is the only fallback; connection/server errors remain visible.
+<span class="cstat-no" title="statement not covered" >    if (!(error instanceof TeamApiError) || error.status !== 403) <span class="cstat-no" title="statement not covered" >throw error;</span></span>
+    const <span class="cstat-no" title="statement not covered" >items = (await scenarios.allReady()).map(teamScenarioFromReady);</span>
+    const query = <span class="cstat-no" title="statement not covered" >filters.query?.toLowerCase();</span>
+<span class="cstat-no" title="statement not covered" >    return items.<span class="fstat-no" title="function not covered" >filter(<span class="cstat-no" title="statement not covered" >i</span>tem =&gt; (!query || `${item.name} ${item.id} ${item.map}`.toLowerCase().includes(query)) &amp;&amp;</span></span>
+      (!filters.status || filters.status === "All statuses" || filters.status === item.status || filters.status === "Approved"));
+  }
+}
+&nbsp;
+/** Explicit capability split. Unsupported modules use local mocks; live methods
+ * never replace API failures with successful mock responses. */
+export const teamBackendApi: AutoScenarioApi = {
+  ...mockApi,
+  backendRequest: requestTeamApi,
+  backendDownload: downloadTeamArtifact,
+  backendMedia: readTeamMedia,
+  async <span class="fstat-no" title="function not covered" >backendRefreshSession() {</span>
+<span class="cstat-no" title="statement not covered" >    if (isTeamDevAuth) <span class="cstat-no" title="statement not covered" >throw new Error("Dev mode has no Supabase token to refresh.");</span></span>
+<span class="cstat-no" title="statement not covered" >    await refreshTeamSession();</span>
+  },
+  listScenarios: allUiScenarios,
+<span class="fstat-no" title="function not covered" >  createScenario: i</span>nput =&gt; <span class="cstat-no" title="statement not covered" >scenarios.createScenario(input),</span>
+<span class="fstat-no" title="function not covered" >  persistImportedScenario: (s</span>cenario, content) =&gt; <span class="cstat-no" title="statement not covered" >scenarios.persistImportedScenario(scenario, content),</span>
+<span class="fstat-no" title="function not covered" >  updateScenario: (i</span>d, changes) =&gt; <span class="cstat-no" title="statement not covered" >scenarios.updateScenario(id, changes),</span>
+<span class="fstat-no" title="function not covered" >  cloneScenario: i</span>d =&gt; <span class="cstat-no" title="statement not covered" >scenarios.cloneScenario(id),</span>
+<span class="fstat-no" title="function not covered" >  updateScenarioStatus: (i</span>d, status, note) =&gt; <span class="cstat-no" title="statement not covered" >scenarios.updateScenarioStatus(id, status, note),</span>
+<span class="fstat-no" title="function not covered" >  listScenarioVersions: i</span>d =&gt; <span class="cstat-no" title="statement not covered" >scenarios.listScenarioVersions(id),</span>
+  async <span class="fstat-no" title="function not covered" >updateScenarioMetrics() {</span> <span class="cstat-no" title="statement not covered" >throw new Error("Scenario metrics are computed by the team backend from run results."); }</span>,
+  async <span class="fstat-no" title="function not covered" >listCampaigns() {</span> <span class="cstat-no" title="statement not covered" >return (await campaigns()).map(campaignToUi); }</span>,
+  async <span class="fstat-no" title="function not covered" >createCampaign(i</span>nput) {
+    const ready = <span class="cstat-no" title="statement not covered" >await scenarios.allReady();</span>
+    const scenarioVersionIds = <span class="cstat-no" title="statement not covered" >input.scenarioIds.<span class="fstat-no" title="function not covered" >map(i</span>d =&gt; {</span>
+      const version = <span class="cstat-no" title="statement not covered" >ready.<span class="fstat-no" title="function not covered" >find(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.scenarioId === id || item.scenarioVersionId === id)</span>;</span>
+<span class="cstat-no" title="statement not covered" >      if (!version) <span class="cstat-no" title="statement not covered" >throw new Error(`Scenario ${id} has no READY version. Publish a valid version first.`);</span></span>
+<span class="cstat-no" title="statement not covered" >      return version.scenarioVersionId;</span>
+    });
+<span class="cstat-no" title="statement not covered" >    return campaignToUi(await requestTeamApi&lt;TeamCampaign&gt;(endpoint, json("POST", {</span>
+      name: input.name, description: input.description, strategy: input.strategy,
+      scenarioVersionIds, sutType: input.agent === "Autopilot" ? "autopilot" : "behavior_agent",
+      sutBehavior: "normal", sutCarlaVersion: "0.9.16",
+    })));
+  },
+  async <span class="fstat-no" title="function not covered" >updateCampaign(i</span>d, changes) {
+    const allowed: Partial&lt;Campaign&gt; = <span class="cstat-no" title="statement not covered" >{};</span>
+<span class="cstat-no" title="statement not covered" >    for (const key of ["name", "description", "strategy"] as const) <span class="cstat-no" title="statement not covered" >if (changes[key] !== undefined) <span class="cstat-no" title="statement not covered" >allowed[key] = changes[key];</span></span></span>
+<span class="cstat-no" title="statement not covered" >    if (!Object.keys(allowed).length) <span class="cstat-no" title="statement not covered" >throw new Error("Campaign status and metrics are owned by the backend. Use Start run to execute a campaign.");</span></span>
+<span class="cstat-no" title="statement not covered" >    return campaignToUi(await requestTeamApi&lt;TeamCampaign&gt;(`${endpoint}/${encodeURIComponent(id)}`, json("PATCH", allowed)));</span>
+  },
+  async <span class="fstat-no" title="function not covered" >getCampaignRanking() {</span> <span class="cstat-no" title="statement not covered" >return null; }</span>,
+  async <span class="fstat-no" title="function not covered" >saveCampaignRanking() {</span> <span class="cstat-no" title="statement not covered" >throw new Error("Use the live prioritization workspace to rank and save campaign version order."); }</span>,
+  // The former global mock cluster model has confidence/labels that the backend
+  // does not return. Live analysis pages load the actual campaign-scoped DTO
+  // through failureAnalysisApi instead of inventing those legacy fields.
+  async <span class="fstat-no" title="function not covered" >listFailures() {</span> <span class="cstat-no" title="statement not covered" >return []; }</span>,
+  async <span class="fstat-no" title="function not covered" >addFailureCluster() {</span> <span class="cstat-no" title="statement not covered" >throw new Error("Failure groups are produced by the backend. Open Failure insights and group the campaign results."); }</span>,
+  async <span class="fstat-no" title="function not covered" >confirmFailureCluster() {</span> <span class="cstat-no" title="statement not covered" >throw new Error("Use the backend report review workflow in Review queue to record a review decision."); }</span>,
+  async <span class="fstat-no" title="function not covered" >listRuns() {</span>
+    const all = <span class="cstat-no" title="statement not covered" >await campaigns();</span>
+<span class="cstat-no" title="statement not covered" >    return (await Promise.all(all.<span class="fstat-no" title="function not covered" >filter(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.runCount &gt; 0)</span>.<span class="fstat-no" title="function not covered" >map(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >runsFor(item.id))</span>)).flat().map(runToUi);</span>
+  },
+  async <span class="fstat-no" title="function not covered" >queueCampaignRuns(i</span>d, _scenarioIds, retryOf) {
+<span class="cstat-no" title="statement not covered" >    if (retryOf) <span class="cstat-no" title="statement not covered" >throw new Error("Open the execution workspace and explicitly rerun the campaign. Rerun creates new linked runs and preserves previous evidence.");</span></span>
+<span class="cstat-no" title="statement not covered" >    await requestTeamApi(`${endpoint}/${encodeURIComponent(id)}/start`, json("POST"));</span>
+<span class="cstat-no" title="statement not covered" >    return (await runsFor(id)).map(runToUi);</span>
+  },
+  async <span class="fstat-no" title="function not covered" >cancelCampaignRuns() {</span> <span class="cstat-no" title="statement not covered" >throw new Error("The team backend does not expose campaign cancellation. Stop the local worker from its control panel if needed."); }</span>,
+  async <span class="fstat-no" title="function not covered" >downloadRunArtifact(r</span>unId, fileName) {
+    const path = <span class="cstat-no" title="statement not covered" >`/api/v1/runs/${encodeURIComponent(runId)}`;</span>
+<span class="cstat-no" title="statement not covered" >    if (/\.mp4$/i.test(fileName)) <span class="cstat-no" title="statement not covered" >return downloadTeamArtifact(`${path}/video`, fileName);</span></span>
+<span class="cstat-no" title="statement not covered" >    if (fileName !== "oracle-result.json") <span class="cstat-no" title="statement not covered" >throw new Error("This backend provides oracle-result.json and recorded run video.");</span></span>
+    const result = <span class="cstat-no" title="statement not covered" >await requestTeamApi(`${path}/result`);</span>
+    const url = <span class="cstat-no" title="statement not covered" >URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: "application/json" }));</span>
+    const link = <span class="cstat-no" title="statement not covered" >document.createElement("a"); <span class="cstat-no" title="statement not covered" >l</span>ink.href = url; <span class="cstat-no" title="statement not covered" >l</span>ink.download = `${runId}-oracle-result.json`; <span class="cstat-no" title="statement not covered" >l</span>ink.click();</span>
+<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >    setTimeout(() =&gt; <span class="cstat-no" title="statement not covered" >U</span>RL.revokeObjectURL(url), 1</span>000);</span>
+  },
+  async <span class="fstat-no" title="function not covered" >getCarlaIntegration(): Promise&lt;CarlaIntegrationConfig&gt; {</span>
+<span class="cstat-no" title="statement not covered" >    return { ...await mockApi.getCarlaIntegration(), active: false, validated: false, connectionStatus: "Not tested" };</span>
+  },
+<span class="fstat-no" title="function not covered" >  saveCarlaIntegration: c</span>onfig =&gt; <span class="cstat-no" title="statement not covered" >mockApi.saveCarlaIntegration({ ...config, active: false, validated: false, connectionStatus: "Not tested" }),</span>
+  async <span class="fstat-no" title="function not covered" >testCarlaIntegration() {</span> <span class="cstat-no" title="statement not covered" >throw new Error("The team backend does not expose a CARLA connection or worker-management API. Start its existing worker manually and inspect real run results."); }</span>,
+  async <span class="fstat-no" title="function not covered" >listWorkers() {</span>
+    const items = <span class="cstat-no" title="statement not covered" >await requestTeamApi&lt;import("./teamAdministration").ManagedWorker[]&gt;("/api/v1/workers");</span>
+<span class="cstat-no" title="statement not covered" >    return items.<span class="fstat-no" title="function not covered" >map(i</span>tem =&gt; (<span class="cstat-no" title="statement not covered" >{ id: item.id, name: item.name, host: item.host, port: item.rpcPort, carlaVersion: item.carlaVersion, scenarioRunnerVersion: "Direct Python API", status: item.health === "Offline" || !item.enabled ? "Offline" as const : item.activeRuns &gt; 0 ? "Busy" as const : "Online" as const, capacity: item.capacity, activeRuns: item.activeRuns, lastHeartbeat: item.lastHeartbeatAt ?? "" }))</span>;</span>
+  },
+<span class="fstat-no" title="function not covered" >  saveWorkers: w</span>orkers =&gt; <span class="cstat-no" title="statement not covered" >mockApi.saveWorkers(workers),</span>
+  async <span class="fstat-no" title="function not covered" >getOverview(): Promise&lt;OverviewData&gt; {</span>
+    const all = <span class="cstat-no" title="statement not covered" >await campaigns();</span>
+    const <span class="cstat-no" title="statement not covered" >runs = (await Promise.all(all.<span class="fstat-no" title="function not covered" >filter(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.runCount &gt; 0)</span>.<span class="fstat-no" title="function not covered" >map(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >runsFor(item.id))</span>)).flat();</span>
+    let totalScenarios: number;
+<span class="cstat-no" title="statement not covered" >    try { <span class="cstat-no" title="statement not covered" >totalScenarios = (await scenarios.search({ pageSize: 1 })).totalCount; }</span></span>
+    catch (error) { <span class="cstat-no" title="statement not covered" >if (!(error instanceof TeamApiError) || error.status !== 403) <span class="cstat-no" title="statement not covered" >throw error; <span class="cstat-no" title="statement not covered" >t</span></span>otalScenarios = (await scenarios.ready({ pageSize: 1 })).totalCount; }</span>
+    const terminal = <span class="cstat-no" title="statement not covered" >runs.<span class="fstat-no" title="function not covered" >filter(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.verdict)</span>;</span>
+    const days = <span class="cstat-no" title="statement not covered" >Array.from({ length: 7 <span class="fstat-no" title="function not covered" >}, (_</span>, index) =&gt; { const date = <span class="cstat-no" title="statement not covered" >new Date(); <span class="cstat-no" title="statement not covered" >d</span>ate.setDate(date.getDate() - 6 + index); <span class="cstat-no" title="statement not covered" >r</span>eturn date; }</span>);</span>
+    const <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >dayKey = (d</span>ate: Date) =&gt; <span class="cstat-no" title="statement not covered" >`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;</span></span>
+<span class="cstat-no" title="statement not covered" >    return { totalScenarios, activeCampaigns: all.<span class="fstat-no" title="function not covered" >filter(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.status === "Running")</span>.length,</span>
+      passRate: terminal.length ? Math.round(terminal.<span class="fstat-no" title="function not covered" >filter(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.verdict === "PASS")</span>.length / terminal.length * 1000) / 10 : 0,
+      failureClusters: 0, weeklyRuns: days.<span class="fstat-no" title="function not covered" >map(d</span>ate =&gt; <span class="cstat-no" title="statement not covered" >runs.<span class="fstat-no" title="function not covered" >filter(r</span>un =&gt; <span class="cstat-no" title="statement not covered" >run.finishedAt &amp;&amp; dayKey(new Date(run.finishedAt)) === dayKey(date))</span>.length)</span>,
+      weeklyLabels: days.<span class="fstat-no" title="function not covered" >map(d</span>ate =&gt; <span class="cstat-no" title="statement not covered" >date.toLocaleDateString(undefined, { weekday: "short" }))</span>,
+      recentActivity: all.slice(0, 5).<span class="fstat-no" title="function not covered" >map(i</span>tem =&gt; (<span class="cstat-no" title="statement not covered" >{ id: item.id, title: item.name, detail: `${item.code} · ${item.status} · ${item.runCount} runs`, time: item.createdAt, type: "info" }))</span>,
+    };
+  },
+};
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-03T03:08:54.411Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

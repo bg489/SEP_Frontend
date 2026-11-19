@@ -1,0 +1,16 @@
+<testsuites id="" name="" tests="6" failures="0" skipped="0" errors="0" time="20.710088">
+<testsuite name="administration.spec.ts" timestamp="2026-11-03T02:31:11.372Z" hostname="chromium" tests="6" failures="0" skipped="0" time="27.025" errors="0">
+<testcase name="FE-UI-003 SCENARIO_ENGINEER › role navigation exposes administration only to Admin and signs out" classname="administration.spec.ts" time="4.074">
+</testcase>
+<testcase name="FE-UI-003 TEST_ENGINEER › role navigation exposes administration only to Admin and signs out" classname="administration.spec.ts" time="4.21">
+</testcase>
+<testcase name="FE-UI-003 TEST_REVIEWER › role navigation exposes administration only to Admin and signs out" classname="administration.spec.ts" time="3.901">
+</testcase>
+<testcase name="FE-UI-003 ADMIN › role navigation exposes administration only to Admin and signs out" classname="administration.spec.ts" time="5.347">
+</testcase>
+<testcase name="FE-UI-029 persistent account administration › Admin changes a role and blocks an account, then reloads server data" classname="administration.spec.ts" time="5.535">
+</testcase>
+<testcase name="FE-UI-029 persistent account administration › a failed Admin API shows its error without fake accounts" classname="administration.spec.ts" time="3.958">
+</testcase>
+</testsuite>
+</testsuites>

@@ -1,0 +1,414 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for services/teamMapGeometry.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="../theme.js"></script>
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        
+        <label class="theme-select quiet">
+            Theme
+            <select id="themeSelect" autocomplete="off">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="legacy">Legacy</option>
+            </select>
+        </label>
+
+        <h1><a href="../index.html">All files</a> / <a href="index.html">services</a> teamMapGeometry.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">85.15% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>109/128</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">67.85% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>76/112</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">82.85% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>29/35</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">88.57% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>62/70</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">39x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">8x</span>
+<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { TeamJson, TeamObject } from "./teamContracts";
+import type { TeamSpawnPoint } from "./teamReferenceData";
+&nbsp;
+export type MapPoint = { x: number; y: number; z?: number; yaw?: number; index?: number };
+export type MapBox = { x: number; y: number; w: number; h: number };
+export type MapPickScope = "route" | "actors" | "events";
+export type MapPickTarget = { label: string; path: (string | number)[]; free?: boolean };
+export type RelativeLane = "same" | "left" | "right" | "oncoming" | "kerb_right" | "kerb_left";
+const obj = (value: TeamJson | undefined): TeamObject =&gt; value &amp;&amp; typeof value === "object" &amp;&amp; !Array.isArray(value) ? value : {};
+const list = (value: TeamJson | undefined): TeamJson[] =&gt; Array.isArray(value) ? value : [];
+export const mapDistance = (a: MapPoint, b: MapPoint) =&gt; Math.hypot(a.x - b.x, a.y - b.y);
+export const mapRound = (n: number) =&gt; Math.round(n * 10) / 10;
+const rad = (n: number) =&gt; n * Math.PI / 180;
+export function mapNumber(value: TeamJson | undefined, parameters: TeamObject = {}): number | undefined {
+  const name = obj(value).$param;
+  const result = typeof name === "string" ? obj(parameters[name]).value : value;
+  return typeof result === "number" &amp;&amp; Number.isFinite(result) ? result : undefined;
+}
+export function mapLocation(value: TeamJson | undefined, points: TeamSpawnPoint[], parameters: TeamObject = {}): MapPoint | null {
+  const v = obj(value), index = mapNumber(v.spawn_point_index, parameters);
+  if (index !== undefined) return points.find(point =&gt; point.index === index) ?? null;
+  const x = mapNumber(v.x, parameters), y = mapNumber(v.y, parameters);
+  return x === undefined || y === undefined ? <span class="branch-0 cbranch-no" title="branch not covered" >null : {</span> x, y, z: mapNumber(v.z, parameters), yaw: mapNumber(v.yaw, parameters) };
+}
+export function mapTargets(content: TeamObject, scope: MapPickScope): MapPickTarget[] {
+  if (scope === "route") return [{ label: "Start", path: ["route", "start"] },
+    ...list(obj(content.route).waypoints).map((_, i) =&gt; ({ label: `Waypoint ${i + 1}`, path: ["route", "waypoints", i] })),
+    { label: "Goal", path: ["route", "goal"] }];
+  if (scope === "actors") return list(content.actors).map((value, i) =&gt; {
+    const actor = obj(value);
+    return { label: String(actor.id ?? <span class="branch-1 cbranch-no" title="branch not covered" >`Actor ${i + 1}`)</span>, path: ["actors", i, "spawn"], free: actor.type === "pedestrian" || <span class="branch-1 cbranch-no" title="branch not covered" >actor.type === "static_obstacle" }</span>;
+  });
+  return list(content.events).flatMap((value, i) =&gt; {
+    const event = obj(value), name = String(event.id ?? <span class="branch-1 cbranch-no" title="branch not covered" >`Event ${i + 1}`)</span>, params = obj(event.params);
+    return [
+      ...(obj(event.trigger).type === "ego_distance_to_location" ? [{ label: `${name} · trigger`, path: ["events", i, "trigger", "location"], free: true }] : <span class="branch-1 cbranch-no" title="branch not covered" >[]),</span>
+      ...(event.type === "vehicle_crossing" ? [{ label: `${name} · destination`, path: ["events", i, "params", "destination"] }] : <span class="branch-1 cbranch-no" title="branch not covered" >[]),</span>
+      ...(["vehicle_crossing", "pedestrian_crossing"].includes(String(event.type)) &amp;&amp; params.sync ? [{ label: `${name} · conflict`, path: ["events", i, "params", "sync", "point"], free: true }] : <span class="branch-1 cbranch-no" title="branch not covered" >[]),</span>
+    ];
+  });
+}
+export function buildMapScene(content: TeamObject, points: TeamSpawnPoint[]) {
+  const parameters = obj(content.parameters), route = obj(content.route), issues: string[] = [];
+  const locate = (value: TeamJson | undefined, label: string) =&gt; {
+    const result = mapLocation(value, points, parameters);
+    if (!result &amp;&amp; Object.keys(obj(value)).length) issues.push(label);
+    return result;
+  };
+  const routePoints: { kind: "start" | "waypoint" | "goal"; label: string; at: MapPoint }[] = [];
+  const add = (value: TeamJson | undefined, kind: "start" | "waypoint" | "goal", label: string) =&gt; { const at = locate(value, label); if (at) routePoints.push({ kind, label, at }); };
+  add(route.start, "start", "Start"); list(route.waypoints).<span class="fstat-no" title="function not covered" >forEach((v</span>alue, i) =&gt; <span class="cstat-no" title="statement not covered" >add(value, "waypoint", `Waypoint ${i + 1}`))</span>; add(route.goal, "goal", "Goal");
+  const actors = list(content.actors).flatMap((value, i) =&gt; {
+    const actor = obj(value), id = String(actor.id ?? <span class="branch-1 cbranch-no" title="branch not covered" >`Actor ${i + 1}`)</span>, at = locate(actor.spawn, id);
+    return at ? [{ id, type: String(actor.type ?? <span class="branch-1 cbranch-no" title="branch not covered" >"actor")</span>, at, raw: actor }] : [];
+  });
+  const zones: { at: MapPoint; radius: number; label: string }[] = [];
+  const paths: { from: MapPoint; to: MapPoint; sync: MapPoint | null; label: string }[] = [];
+  list(content.events).<span class="fstat-no" title="function not covered" >forEach((v</span>alue, i) =&gt; {
+    const event = <span class="cstat-no" title="statement not covered" >obj(value), t</span>rigger = <span class="cstat-no" title="statement not covered" >obj(event.trigger), p</span>arams = <span class="cstat-no" title="statement not covered" >obj(event.params), l</span>abel = <span class="cstat-no" title="statement not covered" >String(event.id ?? `Event ${i + 1}`);</span>
+    const actor = <span class="cstat-no" title="statement not covered" >actors.<span class="fstat-no" title="function not covered" >find(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.id === event.actor_ref)</span>;</span>
+    const triggerAt = <span class="cstat-no" title="statement not covered" >trigger.type === "ego_distance_to_actor" ? actors.<span class="fstat-no" title="function not covered" >find(i</span>tem =&gt; <span class="cstat-no" title="statement not covered" >item.id === trigger.actor_ref)</span>?.at</span>
+      : trigger.type === "ego_distance_to_location" ? locate(trigger.location, `${label} trigger`) : undefined;
+    const radius = <span class="cstat-no" title="statement not covered" >mapNumber(trigger.distance_m, parameters);</span>
+<span class="cstat-no" title="statement not covered" >    if (triggerAt &amp;&amp; radius !== undefined) <span class="cstat-no" title="statement not covered" >zones.push({ at: triggerAt, radius, label });</span></span>
+    const sync = <span class="cstat-no" title="statement not covered" >params.sync ? locate(obj(params.sync).point, `${label} conflict`) : null;</span>
+    const to = <span class="cstat-no" title="statement not covered" >event.type === "vehicle_crossing" ? locate(params.destination, `${label} destination`) : event.type === "pedestrian_crossing" ? sync : null;</span>
+<span class="cstat-no" title="statement not covered" >    if (actor &amp;&amp; to) <span class="cstat-no" title="statement not covered" >paths.push({ from: actor.at, to, sync, label });</span></span>
+  });
+  return { route: routePoints, actors, zones, paths, issues };
+}
+export function fitMapBox(points: MapPoint[], minimum = 60): MapBox {
+  if (!points.length) return { x: -30, y: -30, w: 60, h: 60 };
+  const xs = points.map(p =&gt; p.x), ys = points.map(p =&gt; p.y);
+  const left = Math.min(...xs), right = Math.max(...xs), top = Math.min(...ys), bottom = Math.max(...ys);
+  const w = Math.max(minimum, right - left), h = Math.max(minimum, bottom - top), pad = Math.max(w, h) * 0.08;
+  return { x: (left + right - w) / 2 - pad, y: (top + bottom - h) / 2 - pad, w: w + pad * 2, h: h + pad * 2 };
+}
+export function zoomMapBox(box: MapBox, factor: number, at: MapPoint): MapBox {
+  const f = Math.min(Math.max(factor, 15 / Math.min(box.w, box.h)), 4000 / Math.max(box.w, box.h));
+  return { x: at.x - (at.x - box.x) * f, y: at.y - (at.y - box.y) * f, w: box.w * f, h: box.h * f };
+}
+/** Lane positions are approximate: metadata contains spawn positions, not road topology. */
+export function relativeMapPosition(points: TeamSpawnPoint[], start: MapPoint &amp; { yaw: number }, ahead: number, lane: RelativeLane): TeamObject | null {
+  if (!points.length) return null;
+  const h = rad(start.yaw), width = 3.5;
+  const candidates = points.filter(p =&gt; p.index !== start.index).map(p =&gt; {
+    const dx = p.x - start.x, dy = p.y - start.y;
+    return { p, ahead: dx * Math.cos(h) + dy * Math.sin(h), right: -dx * Math.sin(h) + dy * Math.cos(h), turn: Math.abs(((p.yaw - start.yaw) % 360 + 540) % 360 - 180) };
+  });
+  if (lane === "kerb_left" || lane === "kerb_right") {
+    const sign = lane === "kerb_right" ? 1 : <span class="branch-1 cbranch-no" title="branch not covered" >-1;</span>
+    const offsets = candidates.filter(c =&gt; Math.abs(c.ahead - ahead) &lt; 20 &amp;&amp; (c.turn &lt; 30 || c.turn &gt; 150) &amp;&amp; c.right * sign &gt; 0).map(c =&gt; c.right * sign).<span class="fstat-no" title="function not covered" >sort((a</span>, b) =&gt; <span class="cstat-no" title="statement not covered" >a - b)</span>;
+    let edge = 0;
+    for (const offset of offsets) <span class="missing-if-branch" title="else path not taken" >E</span>if (offset - edge &lt;= width * 1.5) edge = Math.max(edge, offset);
+    const right = sign * (edge + width / 2 + 1.5);
+    const x = start.x + ahead * Math.cos(h) - right * Math.sin(h), y = start.y + ahead * Math.sin(h) + right * Math.cos(h);
+    const nearest = points.reduce((a, b) =&gt; mapDistance(a, { x, y }) &lt;= mapDistance(b, { x, y }) ? a : b);
+    return { x: mapRound(x), y: mapRound(y), z: mapRound(nearest.z + 0.5), yaw: mapRound(((start.yaw + (right &gt; 0 ? -90 : <span class="branch-1 cbranch-no" title="branch not covered" >90) + 5</span>40) % 360) - 180) };
+  }
+  const offset = lane === "left" ? <span class="branch-0 cbranch-no" title="branch not covered" >-width : l</span>ane === "right" ? width : 0;
+  let pool = candidates.filter(c =&gt; lane === "oncoming" ? c.turn &gt; 150 &amp;&amp; c.right &lt; 0 : c.turn &lt; 30 &amp;&amp; Math.abs(c.right - offset) &lt; width / 2);
+  if (lane === "oncoming" &amp;&amp; pool.length) { const edge = Math.max(...pool.map(c =&gt; c.right)); pool = pool.filter(c =&gt; Math.abs(c.right - edge) &lt; width / 2); }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!pool.length) <span class="cstat-no" title="statement not covered" >return null;</span>
+  const best = pool.<span class="fstat-no" title="function not covered" >reduce((a</span>, b) =&gt; <span class="cstat-no" title="statement not covered" >Math.abs(a.ahead - ahead) &lt;= Math.abs(b.ahead - ahead) ? a : b)</span>;
+  return { spawn_point_index: best.p.index };
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-03T03:08:54.411Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    
