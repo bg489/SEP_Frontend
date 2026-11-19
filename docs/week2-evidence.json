@@ -1,0 +1,2082 @@
+{
+  "asOf": "2026-11-19T09:21:43.358049+00:00",
+  "branch": "feature/week2-completion-20261119",
+  "environment": "Local isolated PostgreSQL 18 at 55439/asx_ci_week2; API5087/frontend4175; CARLA0.9.16 Low. Not published shared staging.",
+  "backend": {
+    "repository": "bg489/SEP_Backend",
+    "sourceCommit": "8c401622da3ab70825aaa930100884ab9a3f1239",
+    "dotnet": {
+      "passed": 439,
+      "failed": 0,
+      "skipped": 0
+    },
+    "python": {
+      "worker": 33,
+      "runtime": 23,
+      "recorder": 9,
+      "probe": 5,
+      "totalPassed": 70
+    }
+  },
+  "frontend": {
+    "repository": "bg489/SEP_Frontend",
+    "sourceCommit": "22b520c96dd8ca34710fead223e3cfc0ddd317db",
+    "unit": {
+      "passed": 108,
+      "failed": 0,
+      "functionalIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55
+      ]
+    },
+    "browser": {
+      "passed": 73,
+      "failed": 0,
+      "transport": "Per-test fixture API"
+    },
+    "contracts": 88,
+    "coverage": {
+      "lines": {
+        "total": 1056,
+        "covered": 649,
+        "skipped": 0,
+        "pct": 61.45
+      },
+      "statements": {
+        "total": 1405,
+        "covered": 817,
+        "skipped": 0,
+        "pct": 58.14
+      },
+      "functions": {
+        "total": 391,
+        "covered": 190,
+        "skipped": 0,
+        "pct": 48.59
+      },
+      "branches": {
+        "total": 1155,
+        "covered": 584,
+        "skipped": 0,
+        "pct": 50.56
+      },
+      "branchesTrue": {
+        "total": 0,
+        "covered": 0,
+        "skipped": 0,
+        "pct": 100
+      }
+    }
+  },
+  "schema": {
+    "coreTables": 21,
+    "coreColumns": 199,
+    "issues": [],
+    "extensions": [
+      "simulation_workers",
+      "system_settings",
+      "similarity_analyses",
+      "linked run attempts/current uniqueness"
+    ],
+    "accepted": true
+  },
+  "carla": [
+    {
+      "map": "Town01",
+      "sutType": "behavior_agent",
+      "scenarioId": "6179f89d-5df0-4ea5-a116-a41d8e4cf6f5",
+      "versionId": "0fb2f33b-b073-4a44-85b9-0d8b383f76f4",
+      "campaignId": "f2700497-4698-4a3a-96f0-97ec97e5c950",
+      "runId": "3544b9dc-be23-4da5-b66a-2c110e994350",
+      "accepted": true,
+      "tickCount": 108,
+      "egoDistanceM": 28.032,
+      "actorDistanceM": 4.952,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town01_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "59f131bc-a601-41b3-870e-30ac4ceb1777",
+      "versionId": "cc795d68-0dbf-4680-87a4-cd5b4177feea",
+      "campaignId": "d82867a7-8b7a-4fd0-b726-1faff73e417a",
+      "runId": "3b751df0-e29e-4408-baa3-651ba164a6fa",
+      "accepted": true,
+      "tickCount": 318,
+      "egoDistanceM": 24.139,
+      "actorDistanceM": 9.782,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "PASS",
+      "hasVideo": true
+    },
+    {
+      "map": "Town02",
+      "sutType": "behavior_agent",
+      "scenarioId": "de3a8d33-1d1f-4fac-8d14-93d389b8c008",
+      "versionId": "1380b7ed-595e-4845-998c-4fc974acd65b",
+      "campaignId": "4fe14128-a983-427f-9b59-7296acb91129",
+      "runId": "8c3ba3f8-c2c9-4eba-89e7-5adc1cfa867d",
+      "accepted": true,
+      "tickCount": 108,
+      "egoDistanceM": 28.068,
+      "actorDistanceM": 4.95,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town02_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "056ecd4a-376f-4af2-9a44-38012bace627",
+      "versionId": "42d20202-9573-4b4e-b565-d7f02171f647",
+      "campaignId": "2a41aaad-6576-4b39-a90c-a440e0409a37",
+      "runId": "0def7a09-ceeb-4be7-9172-4d3777d5e3d6",
+      "accepted": true,
+      "tickCount": 108,
+      "egoDistanceM": 28.071,
+      "actorDistanceM": 4.95,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town03",
+      "sutType": "behavior_agent",
+      "scenarioId": "729363fd-3ee9-43c2-b9d3-7f039130d5f6",
+      "versionId": "c8bfee7f-ee3a-4a26-8951-fbfb0bdd9684",
+      "campaignId": "57142cd3-83ef-4608-9ca6-735bf855a05b",
+      "runId": "89ba857d-c197-4412-bb09-928bf0994e90",
+      "accepted": true,
+      "tickCount": 109,
+      "egoDistanceM": 28.224,
+      "actorDistanceM": 5.02,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town03_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "8a32e932-369b-495a-92f5-f53658332682",
+      "versionId": "34f279d1-8a05-4bc6-a395-099f234d13cb",
+      "campaignId": "96100afa-5e95-4644-baf9-6ea7d614a674",
+      "runId": "5b8452d0-6c0c-4ebb-b6f9-8fb62d4c6103",
+      "accepted": true,
+      "tickCount": 108,
+      "egoDistanceM": 28.206,
+      "actorDistanceM": 4.95,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town04",
+      "sutType": "behavior_agent",
+      "scenarioId": "ca6cbb77-5931-46b1-a6c5-0281ba8abeee",
+      "versionId": "4e5ae001-c71a-4b51-9a49-35962a42e75b",
+      "campaignId": "6d6ef4b8-2361-4637-b554-8c5ec138664d",
+      "runId": "b0d94d98-489a-4d12-b858-d0e2b0698a0b",
+      "accepted": true,
+      "tickCount": 108,
+      "egoDistanceM": 28.048,
+      "actorDistanceM": 4.949,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town04_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "896733bf-8450-4eaa-a22c-abb12f5ebba4",
+      "versionId": "e59fcefa-b8c1-42bc-b765-d5f88790ea2c",
+      "campaignId": "d7d29f8f-60d5-4e24-9fcc-791750adb092",
+      "runId": "370d6945-be28-43b9-871b-5d94fbedc36e",
+      "accepted": true,
+      "tickCount": 115,
+      "egoDistanceM": 30.603,
+      "actorDistanceM": 5.439,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town05",
+      "sutType": "behavior_agent",
+      "scenarioId": "5d97bcb1-1b92-4a1d-a442-8c367a58cff5",
+      "versionId": "4850eb0d-28a8-49f7-9dbc-1fb1126fbf6e",
+      "campaignId": "12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8",
+      "runId": "1eed959f-532e-4243-8bdd-324a0cced555",
+      "accepted": true,
+      "tickCount": 899,
+      "egoDistanceM": 28.036,
+      "actorDistanceM": 6.543,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town05_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "17112287-ce9f-4e85-b2bf-67a9bc9b3578",
+      "versionId": "573e4da5-8fac-47d9-b7cf-84e0ed521b1f",
+      "campaignId": "a70030dd-8476-4b67-940f-149ccc01fb9b",
+      "runId": "c9c21c72-aa74-42ef-835a-5287d87500cb",
+      "accepted": true,
+      "tickCount": 899,
+      "egoDistanceM": 28.036,
+      "actorDistanceM": 6.543,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town10HD",
+      "sutType": "behavior_agent",
+      "scenarioId": "6ee50072-495f-499c-a81c-4dd991615671",
+      "versionId": "3fc938b4-e128-4dc0-82e2-8a49d19a82fa",
+      "campaignId": "5d3ce2b1-10d0-484f-ac00-ec57e660f30f",
+      "runId": "9a4108cf-b3c4-4d62-b0d8-325478d683a0",
+      "accepted": true,
+      "tickCount": 101,
+      "egoDistanceM": 25.218,
+      "actorDistanceM": 4.461,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    },
+    {
+      "map": "Town10HD_Opt",
+      "sutType": "behavior_agent",
+      "scenarioId": "e244eae1-9ba8-49a1-a698-59f274ed25a1",
+      "versionId": "99b5e557-822e-4ddb-b156-c8253850904f",
+      "campaignId": "890263e3-af1d-4a00-bdf8-58224dc2d140",
+      "runId": "a27cf886-9460-4d41-b5de-360bb4929c6e",
+      "accepted": true,
+      "tickCount": 101,
+      "egoDistanceM": 25.222,
+      "actorDistanceM": 4.461,
+      "executedEventIds": [
+        "crossing_event"
+      ],
+      "fullRoute": true,
+      "verdict": "FAIL",
+      "hasVideo": true
+    }
+  ],
+  "autopilot": [
+    {
+      "map": "Town10HD_Opt",
+      "runId": "134965e1-82ee-434e-a0e8-edff09711ebd",
+      "accepted": true,
+      "sut": {
+        "agent": "autopilot",
+        "profile": "normal"
+      },
+      "egoDistanceM": 25.214,
+      "actorDistanceM": 5.861,
+      "executedEventIds": [
+        "crossing_event"
+      ]
+    }
+  ],
+  "liveAdmin": {
+    "startedAt": "2026-11-19T09:19:58.716Z",
+    "environment": "Isolated local PostgreSQL/API; no Supabase Auth account created",
+    "accountPersistence": true,
+    "workerName": "Review2 browser 1795080003034",
+    "oracleName": "Review2 browser Oracle 1795080003546",
+    "retentionDays": 45,
+    "accepted": true,
+    "finishedAt": "2026-11-19T09:20:07.111Z"
+  },
+  "liveCampaign": {
+    "environment": "isolated local API/database (not shared staging)",
+    "frontend": "http://127.0.0.1:4175",
+    "backend": "http://127.0.0.1:5087",
+    "startedAt": "2026-11-19T09:12:30.530Z",
+    "campaignId": "8f796030-e587-4ad0-acc0-9348e17df731",
+    "scenarioName": "Review2 Town10HD_Opt f23944",
+    "runId": "5adb72f7-f999-4b0f-9a2f-b706587efbce",
+    "result": {
+      "runId": "5adb72f7-f999-4b0f-9a2f-b706587efbce",
+      "campaignId": "8f796030-e587-4ad0-acc0-9348e17df731",
+      "campaignCode": "CMP-00028",
+      "campaignName": "Review2 web 2026-11-19T09:12:21.075Z",
+      "scenarioId": "e244eae1-9ba8-49a1-a698-59f274ed25a1",
+      "scenarioVersionId": "99b5e557-822e-4ddb-b156-c8253850904f",
+      "scenarioCode": "SCN-00021",
+      "scenarioName": "Review2 Town10HD_Opt f23944",
+      "versionNumber": 1,
+      "status": "Completed",
+      "seed": null,
+      "startedAt": "2026-11-19T09:12:33.24697+00:00",
+      "finishedAt": "2026-11-19T09:12:53.169864+00:00",
+      "outcome": "COMPLETED",
+      "durationS": 5,
+      "telemetryReceivedAt": "2026-11-19T09:12:53.145528+00:00",
+      "verdict": "FAIL",
+      "hasVideo": true,
+      "infraRetryCount": 0,
+      "evaluations": [
+        {
+          "id": "e41db1a0-5f10-48ff-b32d-16c48d6bb748",
+          "oracleConfigId": "e767d705-1292-48bb-9227-71cb4aea7bf9",
+          "oracleVersion": 2,
+          "verdict": "FAIL",
+          "errorReason": null,
+          "evaluatedAt": "2026-11-19T09:12:53.145528+00:00",
+          "violations": [
+            {
+              "id": "f5dbda98-b3de-4274-88a9-571efb323ccf",
+              "check": "ttc",
+              "severity": "WARNING",
+              "t": 2,
+              "durationS": 0.4,
+              "details": {
+                "actor_id": 29,
+                "min_ttc_s": 0.529
+              }
+            },
+            {
+              "id": "8028d0b6-43ef-45c2-b8e5-8d2693ea75e8",
+              "check": "speeding",
+              "severity": "FAILING",
+              "t": 2.35,
+              "durationS": 2.65,
+              "details": {
+                "limit_kmh": 20,
+                "max_speed_kmh": 27.69
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "accepted": true,
+    "finishedAt": "2026-11-19T09:12:58.612Z",
+    "responses": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/auth/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/workers",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=100&status=ACTIVE",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/17112287-ce9f-4e85-b2bf-67a9bc9b3578",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ca6cbb77-5931-46b1-a6c5-0281ba8abeee",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/8a32e932-369b-495a-92f5-f53658332682",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/729363fd-3ee9-43c2-b9d3-7f039130d5f6",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/de3a8d33-1d1f-4fac-8d14-93d389b8c008",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/056ecd4a-376f-4af2-9a44-38012bace627",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/896733bf-8450-4eaa-a22c-abb12f5ebba4",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6ee50072-495f-499c-a81c-4dd991615671",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/59f131bc-a601-41b3-870e-30ac4ceb1777",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6179f89d-5df0-4ea5-a116-a41d8e4cf6f5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e244eae1-9ba8-49a1-a698-59f274ed25a1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ee4aeb27-1e5f-42cb-a60a-76fa03be8cfd",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/2cd80e21-3e68-4d3d-8593-89638c6b1500",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/a4ec5a1e-f4ff-4b99-a641-a33fcacbe051",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/5d97bcb1-1b92-4a1d-a442-8c367a58cff5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/b8ddf7a0-1cf4-473b-8b5b-6e5a2ccbe4ff",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/911893ad-340f-437a-ad28-311ff3a78d5f",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e31c2f72-ec94-4599-9baa-05e7930e8962",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/61fd6b58-4986-491a-a6f0-208c1cb96b89",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000001",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/prioritization/strategies",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/prioritization/strategies",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002/draft",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenario-versions/ready?pageSize=100&latestOnly=true",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/reference/catalog",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/oracle-configs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/reference/maps",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/available-scenarios?page=1&pageSize=12&latestOnly=true",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/available-scenarios?page=1&pageSize=12&latestOnly=true&q=Review2+Town10HD_Opt+f23944",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 201
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/workers",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=100&status=ACTIVE",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/prioritization/strategies",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e244eae1-9ba8-49a1-a698-59f274ed25a1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6ee50072-495f-499c-a81c-4dd991615671",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/17112287-ce9f-4e85-b2bf-67a9bc9b3578",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/896733bf-8450-4eaa-a22c-abb12f5ebba4",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/5d97bcb1-1b92-4a1d-a442-8c367a58cff5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/8a32e932-369b-495a-92f5-f53658332682",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/729363fd-3ee9-43c2-b9d3-7f039130d5f6",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ca6cbb77-5931-46b1-a6c5-0281ba8abeee",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/056ecd4a-376f-4af2-9a44-38012bace627",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/de3a8d33-1d1f-4fac-8d14-93d389b8c008",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/59f131bc-a601-41b3-870e-30ac4ceb1777",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ee4aeb27-1e5f-42cb-a60a-76fa03be8cfd",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/2cd80e21-3e68-4d3d-8593-89638c6b1500",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6179f89d-5df0-4ea5-a116-a41d8e4cf6f5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000001",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/b8ddf7a0-1cf4-473b-8b5b-6e5a2ccbe4ff",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/61fd6b58-4986-491a-a6f0-208c1cb96b89",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e31c2f72-ec94-4599-9baa-05e7930e8962",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/911893ad-340f-437a-ad28-311ff3a78d5f",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/a4ec5a1e-f4ff-4b99-a641-a33fcacbe051",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002/draft",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenario-versions/ready?pageSize=100&latestOnly=true",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/start",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=100&status=ACTIVE",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/workers",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/prioritization/strategies",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e244eae1-9ba8-49a1-a698-59f274ed25a1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6ee50072-495f-499c-a81c-4dd991615671",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/17112287-ce9f-4e85-b2bf-67a9bc9b3578",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/5d97bcb1-1b92-4a1d-a442-8c367a58cff5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/896733bf-8450-4eaa-a22c-abb12f5ebba4",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/8a32e932-369b-495a-92f5-f53658332682",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/729363fd-3ee9-43c2-b9d3-7f039130d5f6",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ca6cbb77-5931-46b1-a6c5-0281ba8abeee",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/056ecd4a-376f-4af2-9a44-38012bace627",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/de3a8d33-1d1f-4fac-8d14-93d389b8c008",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/59f131bc-a601-41b3-870e-30ac4ceb1777",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6179f89d-5df0-4ea5-a116-a41d8e4cf6f5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/a4ec5a1e-f4ff-4b99-a641-a33fcacbe051",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/2cd80e21-3e68-4d3d-8593-89638c6b1500",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/911893ad-340f-437a-ad28-311ff3a78d5f",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ee4aeb27-1e5f-42cb-a60a-76fa03be8cfd",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/b8ddf7a0-1cf4-473b-8b5b-6e5a2ccbe4ff",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e31c2f72-ec94-4599-9baa-05e7930e8962",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/61fd6b58-4986-491a-a6f0-208c1cb96b89",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000001",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/result",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002/draft",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenario-versions/ready?pageSize=100&latestOnly=true",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/result",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/result",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/result",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/progress",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/result",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/auth/me",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=100&status=ACTIVE",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/workers",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e244eae1-9ba8-49a1-a698-59f274ed25a1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6ee50072-495f-499c-a81c-4dd991615671",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/17112287-ce9f-4e85-b2bf-67a9bc9b3578",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/5d97bcb1-1b92-4a1d-a442-8c367a58cff5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ca6cbb77-5931-46b1-a6c5-0281ba8abeee",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/896733bf-8450-4eaa-a22c-abb12f5ebba4",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/8a32e932-369b-495a-92f5-f53658332682",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/056ecd4a-376f-4af2-9a44-38012bace627",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/729363fd-3ee9-43c2-b9d3-7f039130d5f6",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/de3a8d33-1d1f-4fac-8d14-93d389b8c008",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/59f131bc-a601-41b3-870e-30ac4ceb1777",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/2cd80e21-3e68-4d3d-8593-89638c6b1500",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/6179f89d-5df0-4ea5-a116-a41d8e4cf6f5",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/ee4aeb27-1e5f-42cb-a60a-76fa03be8cfd",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/a4ec5a1e-f4ff-4b99-a641-a33fcacbe051",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/b8ddf7a0-1cf4-473b-8b5b-6e5a2ccbe4ff",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/911893ad-340f-437a-ad28-311ff3a78d5f",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/e31c2f72-ec94-4599-9baa-05e7930e8962",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/61fd6b58-4986-491a-a6f0-208c1cb96b89",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000001",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/890263e3-af1d-4a00-bdf8-58224dc2d140/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/5d3ce2b1-10d0-484f-ac00-ec57e660f30f/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/a70030dd-8476-4b67-940f-149ccc01fb9b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/12cfc0c4-cfc8-4551-a7c0-1b0e95c73fe8/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d7d29f8f-60d5-4e24-9fcc-791750adb092/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/96100afa-5e95-4644-baf9-6ea7d614a674/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/57142cd3-83ef-4608-9ca6-735bf855a05b/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/2a41aaad-6576-4b39-a90c-a440e0409a37/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/6d6ef4b8-2361-4637-b554-8c5ec138664d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/4fe14128-a983-427f-9b59-7296acb91129/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/d82867a7-8b7a-4fd0-b726-1faff73e417a/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/c5b553e2-a300-45b6-88a6-0d9e96f6ce23/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/f2700497-4698-4a3a-96f0-97ec97e5c950/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/edde71a6-e8d4-4fbd-beef-72d624a6e09d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/e61d5157-9b0d-42d3-be36-56b1b3c812ca/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios/d1000000-0000-0000-0000-000000000002/draft",
+        "status": 403
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/75d94cbd-6679-4b1d-8706-130a2d2be403/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/7e44075d-e750-4094-b857-b03e087a3048/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/889958a2-6722-4461-8c8c-eccaae583038/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenarios?pageSize=1",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/94b7485e-a3b3-45f8-aa19-4a45449f7f5d/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/prioritization/strategies",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/prioritization/strategies",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/scenario-versions/ready?pageSize=100&latestOnly=true",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/campaigns/8f796030-e587-4ad0-acc0-9348e17df731/runs",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:4175/api/v1/runs/5adb72f7-f999-4b0f-9a2f-b706587efbce/result",
+        "status": 200
+      }
+    ]
+  },
+  "ci": {
+    "status": "Blocked before runner startup",
+    "reason": "The job was not started because your account is locked due to a billing issue.",
+    "backend": "https://github.com/bg489/SEP_Backend/actions/runs/44494103117",
+    "frontend": "https://github.com/bg489/SEP_Frontend/actions/runs/44494073597"
+  },
+  "performanceSample": {
+    "requests": 200,
+    "concurrency": 20,
+    "elapsedSeconds": 6.152,
+    "requestsPerSecond": 32.51,
+    "meanMs": 154.36,
+    "p95Ms": 1276.09,
+    "maxMs": 5422.46,
+    "errors": 0,
+    "errorSamples": [],
+    "paths": [
+      "/api/v1/scenarios?page=1&pageSize=12",
+      "/api/v1/campaigns",
+      "/api/v1/reference/maps"
+    ],
+    "scope": "Local read-only sample; no claim of shared staging or long-term availability"
+  },
+  "externalAcceptancePending": [
+    "Supabase signup/email recovery with actual Auth key/provider",
+    "Private cloud bucket using configured storage credentials",
+    "Published shared staging URL and acceptance",
+    "Hosted CI after GitHub account billing unlock",
+    "Reviewed release tag after all required checks pass"
+  ],
+  "pullRequests": {
+    "backend": "https://github.com/bg489/SEP_Backend/pull/1",
+    "frontend": "https://github.com/bg489/SEP_Frontend/pull/6"
+  }
+}
