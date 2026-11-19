@@ -9,6 +9,8 @@ import {
 import { useDispatch, useSelector } from "react-redux";
 import { Icon, type IconName } from "./components/Icon";
 import { AuthScreen } from "./components/AuthScreen";
+import { TeamAdministrationWorkspace } from "./components/TeamAdministrationWorkspace";
+import { TeamSimilarityWorkspace } from "./components/TeamSimilarityWorkspace";
 import { RolePages, RoleWelcome } from "./components/RolePages";
 import { LanguageProvider, LanguageSwitcher } from "./i18n";
 import { useLocale } from "./localeContext";
@@ -46,6 +48,7 @@ import {
   loginRequested,
   logoutRequested,
   passwordResetRequested,
+  resetPasswordRequested,
   registerRequested,
   switchDevRoleRequested,
 } from "./features/auth/authSlice";
@@ -1131,6 +1134,7 @@ function AppContent() {
         onLogin={(input) => dispatch(loginRequested(input))}
         onRegister={(input) => dispatch(registerRequested(input))}
         onRequestPasswordReset={(email) => dispatch(passwordResetRequested(email))}
+        onResetPassword={(input) => dispatch(resetPasswordRequested(input))}
       />
     );
   }
@@ -1368,21 +1372,22 @@ function AppContent() {
               : moduleSource(page, role) === "mixed"
                 ? page === "oracles"
                   ? (vi ? "Cấu hình Oracle phía trên lấy từ backend. Form chỉnh sửa mẫu phía dưới chỉ lưu trong trình duyệt, không thay đổi ngưỡng đánh giá thật." : "The Oracle configurations above come from the backend. The demo editor below saves only in this browser and does not change actual evaluation thresholds.")
-                   : (vi ? "Kịch bản, coverage, chiến dịch, kết quả chạy và phân tích lỗi lấy từ API. Quản trị tài khoản, phân cụm kịch bản và tùy chỉnh hồ sơ vẫn dùng dữ liệu mẫu ở các màn hình có nhãn Mock." : "Scenarios, coverage, campaigns, run results and failure analysis use the API. User administration, scenario clustering and profile changes remain local demos on screens labeled Mock.")
+                   : (vi ? "Kịch bản, coverage, chiến dịch, kết quả chạy, phân tích lỗi và quản trị lấy từ API. Tổng quan được tổng hợp từ các dữ liệu backend." : "Scenarios, coverage, campaigns, run results, failure analysis and administration use the API. Overview summaries are derived from backend records.")
                 : (vi ? "Dữ liệu được đọc và ghi qua Redux Saga tới backend AutoScenarioX mới." : "Data is read and written through Redux Saga to the new AutoScenarioX backend.")}</span>
           </div>
           {isTeamDevAuth && <div className="capability-banner mock" role="note"><strong>Development authentication</strong><span>{vi ? "Dùng bộ chọn Vai trò Dev trên thanh trên cùng để đổi quyền kiểm thử. Tài khoản Dev không kiểm tra mật khẩu; việc chọn role không thay đổi database. Dùng Supabase khi cần đăng nhập thật." : "Use the Dev role selector in the top bar to switch test permissions. The Dev account does not verify a password, and selecting a role does not change the database. Use Supabase for real sign-in."}</span></div>}
           {usesTeamBackend && ["execution", "run-detail", "nodes"].includes(page) && <div className="capability-banner mixed" role="note"><strong>{vi ? "Thực thi qua worker bên ngoài" : "Execution uses an external worker"}</strong><span>{vi ? "Start campaign tạo hàng đợi qua API. Worker Python phải nhận run, thực thi CARLA Low và gửi telemetry; frontend hiển thị kết luận backend trả về. Công cụ Worker API cho phép kiểm tra callback thủ công, không khởi động mô phỏng." : "Start campaign creates the API queue. The Python worker must claim runs, execute CARLA at Low quality and submit telemetry; the frontend displays the verdict returned by the backend. Worker API tools inspect manual callbacks and do not launch a simulation."}</span></div>}
           {usesTeamBackend && teamScenarioPages.includes(page) && <TeamScenarioWorkspace
             service={teamScenarios} page={page} initialScenarioId={editorScenarioId} onChanged={refreshWorkspace} onNotify={notify} />}
-          {usesTeamBackend && teamOperationPages.includes(page) && <TeamOperationsWorkspace
+          {usesTeamBackend && teamOperationPages.includes(page) && page !== "nodes" && !(page === "oracles" && role === "Administrator") && <TeamOperationsWorkspace
             client={sagaTeamClient} page={page} role={role} onNavigate={navigate} onChanged={refreshWorkspace} onNotify={notify} />}
           {usesTeamBackend && page === "backend-data" && <BackendDataWorkspace client={sagaTeamClient} role={role} onRefreshSession={async () => { await api.backendRefreshSession(); dispatch(bootstrapAuthRequested()); }} />}
           {usesTeamBackend && page === "worker-protocol" && <WorkerProtocolPanel client={sagaTeamClient} role={role} onNotify={notify} />}
           {usesTeamBackend && page === "coverage" && <TeamCoveragePanel client={sagaTeamClient} />}
           {usesTeamBackend && teamAnalysisPages.includes(page) && <TeamFailureAnalysisWorkspace key={`${role}:${page}`} client={sagaTeamClient} role={role} initialView={page === "report" ? "effectiveness" : page === "review" ? "review" : "analysis"} onChanged={refreshWorkspace} onNotify={notify} />}
-          {usesTeamBackend && page === "oracles" && role === "Administrator" && <section><div className="capability-banner mock"><strong>{vi ? "Form chỉnh sửa Oracle · Mock" : "Oracle editor · Mock"}</strong><span>{vi ? "Backend hiện chưa có API chỉnh sửa Oracle. Form này không thay đổi cấu hình thật phía trên." : "The backend has no Oracle editing API. This form does not change the actual configurations above."}</span></div><Oracles rules={rules} profile={oracleProfile} onSave={saveRules} /></section>}
-          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamAnalysisPages, ...teamUtilityPages].includes(page)) && <>
+          {usesTeamBackend && (["users", "nodes", "analytics", "audit"].includes(page) || page === "oracles" && role === "Administrator") && <TeamAdministrationWorkspace key={`${role}:${page}`} client={sagaTeamClient} page={page} role={role} />}
+          {usesTeamBackend && page === "clusters" && <TeamSimilarityWorkspace client={sagaTeamClient} />}
+          {!(usesTeamBackend && [...teamScenarioPages, ...teamOperationPages, ...teamAnalysisPages, ...teamUtilityPages, "users", "analytics", "audit", "clusters"].includes(page)) && <>
           {page === "overview" && (
             <RoleWelcome role={role} onNavigate={navigate} />
           )}

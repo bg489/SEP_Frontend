@@ -37,14 +37,14 @@ test('FE-UT-052: failed rerun keeps its confirmation open and reports no queued-
   await openSection(page, 'Campaigns');
   await campaignRow(page, 'Completed campaign').getByRole('button', { name: 'Rerun…', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Rerun campaign?' });
-  await dialog.getByRole('checkbox', { name: 'I understand that the existing run history will be deleted.', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'I want to create another attempt and keep the existing evidence.', exact: true }).check();
   operations.failNext('POST', `/api/v1/campaigns/${ids.completed}/rerun`, 503, 'Rerun service is unavailable.');
-  await dialog.getByRole('button', { name: 'Delete old runs & rerun', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Queue a new attempt', exact: true }).click();
   await expect(dialog).toContainText('Rerun service is unavailable.');
   await expect(page.getByRole('status').filter({ hasText: queuedNotice })).toHaveCount(0);
   await expect(page.locator('.toast').filter({ hasText: queuedNotice })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Scenario runs', exact: true })).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Delete old runs & rerun', exact: true })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Queue a new attempt', exact: true })).toBeEnabled();
 });
 
 test('FE-UT-052: Start stays pending until the backend creates the queued runs', async ({ workspace: page, backend, operations }) => {

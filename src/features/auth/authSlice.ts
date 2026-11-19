@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { DemoUser, UserRole } from "../../types";
-import type { AdminUser, AuthSession, LoginInput, RegisterInput } from "../../services/authApi";
+import type { AdminUser, AuthSession, LoginInput, RegisterInput, ResetPasswordInput, ChangePasswordInput } from "../../services/authApi";
 import { isTeamDevAuth } from "../../services/authConfig";
 import type { DevRole } from "../../services/devRole";
 
@@ -64,6 +64,22 @@ const authSlice = createSlice({
       state.error = null;
       state.message = null;
     },
+    resetPasswordRequested(state, _action: PayloadAction<ResetPasswordInput>) {
+      state.busy = true; state.error = null; state.message = null;
+    },
+    profileUpdateRequested(state, _action: PayloadAction<string>) {
+      state.busy = true; state.error = null; state.message = null;
+    },
+    changePasswordRequested(state, _action: PayloadAction<ChangePasswordInput>) {
+      state.busy = true; state.error = null; state.message = null;
+    },
+    accountOperationSucceeded(state, action: PayloadAction<{ message: string; user?: DemoUser }>) {
+      if (action.payload.user) state.user = action.payload.user;
+      state.busy = false; state.error = null; state.message = action.payload.message;
+    },
+    accountOperationFailed(state, action: PayloadAction<string>) {
+      state.busy = false; state.error = action.payload;
+    },
     authSucceeded(state, action: PayloadAction<AuthSession>) {
       state.status = "authenticated";
       state.user = action.payload.user;
@@ -113,6 +129,10 @@ const authSlice = createSlice({
       state.adminUsersBusy = true;
       state.adminUsersError = null;
     },
+    adminStatusChangeRequested(state, _action: PayloadAction<{ id: string; isActive: boolean }>) {
+      state.adminUsersBusy = true;
+      state.adminUsersError = null;
+    },
     adminUserRoleChanged(state, action: PayloadAction<AdminUser>) {
       state.adminUsers = state.adminUsers.map((user) =>
         user.id === action.payload.id ? action.payload : user,
@@ -132,6 +152,12 @@ export const {
   authDemoCompleted,
   authFailed,
   authSucceeded,
+  resetPasswordRequested,
+  profileUpdateRequested,
+  changePasswordRequested,
+  accountOperationSucceeded,
+  accountOperationFailed,
+  adminStatusChangeRequested,
   adminRoleChangeRequested,
   adminUserRoleChanged,
   adminUsersFailed,

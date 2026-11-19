@@ -1,5 +1,13 @@
 # AutoScenarioX Frontend
 
+Current Week 2 branch: `feature/week2-completion-20261119`. The matching backend
+is `huylh14/AutoScenarioX`, local checkout
+`Project\AutoScenarioX\AutoScenarioX`, active project `backend/AutoScenarioX.Api`
+(.NET 8, `/api/v1`).
+The old backend paths and acceptance counts below describe previous revisions.
+Use [docs/week2-verification.md](docs/week2-verification.md) for the current
+configuration, executed tests, task coverage and remaining external acceptance.
+
 React + TypeScript, Redux Toolkit và Redux Saga; giao diện tiếng Việt/tiếng Anh với màu chủ đạo `#FF6363`, `#FCFFA7`.
 
 Frontend này gọi **backend của nhóm** tại:
@@ -8,7 +16,7 @@ Frontend này gọi **backend của nhóm** tại:
 C:\Users\admin\Desktop\Hoc Bai\SEP\Project\AutoScenarioX\AutoScenarioX\backend
 ```
 
-Không chạy backend cũ ở `Project\Backend`. Các thay đổi trong nhánh này chỉ thuộc repository Frontend; backend của nhóm giữ nguyên.
+Chạy project `AutoScenarioX.Api` trong repo `huylh14/AutoScenarioX` trên nhánh `feature/week2-completion-20261119`.
 
 ## Chức năng và nguồn dữ liệu
 
@@ -26,13 +34,13 @@ Không chạy backend cũ ở `Project\Backend`. Các thay đổi trong nhánh n
 | Backend data | API thật: READY mới nhất/lịch sử, execution package, map chi tiết/spawn, template/catalog/schema, coverage, tài khoản và danh sách bảng database còn thiếu |
 | Failure insights / Review queue / Campaign reports | API thật theo campaign: group → verify → similar → explainability → generate → review; trả các run chưa giải thích được về Flow 3; đọc APFD/APFDc và các đường cong từ kết quả backend |
 | Worker API tools | API thật nâng cao: claim/running/requeue-infra, upload NDJSON và MP4 gốc, đọc kết quả/gói thực thi; không khởi động CARLA |
-| Oracle config | Đọc cấu hình thật trong workspace execution; form sửa Oracle cũ là mock |
-| Worker settings/status, user administration, register/reset password, profile editing | **Mock/demo** vì backend chưa có API; không tạo tài khoản Supabase hoặc lưu mật khẩu |
-| Scenario clusters, analytics settings, audit toàn hệ thống | **Mock trên trình duyệt**, có nhãn rõ ràng; lịch sử của từng scenario có API thật riêng |
+| Oracle config | API thật: tạo phiên bản bất biến, kích hoạt mặc định và giữ cấu hình campaign cũ |
+| Worker, user administration, register/reset password, profile editing | API thật qua Saga; Supabase account/email cần cấu hình provider phía backend |
+| Scenario similarity, analytics settings, audit | API thật: Gower/DTW v1 và kết quả so sánh lưu database; cài đặt/audit tải lại từ backend |
 
 Không tự chuyển lỗi HTTP/network của chức năng thật thành mock thành công. Mọi thao tác API từ UI đi qua Redux Saga, gồm download. Loading và khóa thao tác xuất hiện khi request đang chạy.
 
-Đối chiếu ngày 28/10/2026: **66/66 HTTP method + route** trong Swagger có luồng frontend và kiểm tra contract. Xem [bảng đầy đủ và phạm vi kiểm tra](docs/backend-api-coverage.md). Đây là phạm vi API backend đang công bố, không đồng nghĩa worker đã hoàn thành mọi yêu cầu của đồ án.
+Kiểm tra contract hiện tại: **88/88 HTTP method + route** trong snapshot. Kết quả live và phạm vi nghiệm thu được ghi riêng tại `docs/week2-evidence.json`.
 
 ```powershell
 npm run verify:api
@@ -90,7 +98,7 @@ Mở URL Vite in trong terminal, thường `http://localhost:5173`. Vite proxy `
 
 ### Xác thực
 
-`.env.example` mặc định `VITE_AUTH_MODE=Supabase`. Backend phải có `Auth:Mode=Supabase`, `Auth:ProjectUrl`, `Auth:AnonKey` theo hướng dẫn của nhóm. Tài khoản thật đăng nhập qua API; role lấy từ backend. Register và forgot-password trong UI hiện chỉ là demo có nhãn, không tạo session/tài khoản thật.
+`.env.example` mặc định `VITE_AUTH_MODE=Supabase`. Backend phải có `Auth:Mode=Supabase`, `Auth:ProjectUrl`, `Auth:AnonKey`. Login/register/recovery gọi API thật; role lấy từ backend. Thiếu provider trả lỗi cấu hình rõ ràng, không tạo tài khoản hoặc thông báo thành công giả.
 
 Backend trên máy hiện cấu hình Dev; `.env.local` hiện ghép tương ứng:
 
@@ -128,7 +136,7 @@ UI → Redux Saga → teamClient → .NET API → Supabase PostgreSQL
                     Python worker ↔ CARLA 0.9.16
 ```
 
-Scenario phải được save/validate/publish READY trước khi chọn vào campaign. Start campaign chỉ tạo hàng đợi; cần worker thực sự claim/chạy/upload telemetry để có kết quả. Rerun hiện **xóa run cũ của campaign** và UI yêu cầu xác nhận. Backend chưa có cancel campaign.
+Scenario phải được save/validate/publish READY trước khi chọn vào campaign. Start campaign tạo hàng đợi; worker claim/chạy/upload telemetry để có kết quả. Rerun tạo attempt mới có liên kết, giữ kết quả và bằng chứng cũ. Backend chưa có cancel campaign.
 
 Backend nhóm dùng canonical JSON/YAML và Python API worker. Nó không dùng endpoint OpenSCENARIO/ScenarioRunner của backend cũ. Không diễn giải các ghi chú tự do thành route/event có thể thực thi.
 
@@ -160,4 +168,4 @@ git push -u origin HEAD
 
 Frontend dùng API có sẵn và giữ nguyên các sửa đổi launcher/worker do bạn thực hiện. Start campaign chỉ tạo hàng đợi; quá trình CARLA phải được worker bên ngoài thực thi và upload telemetry. Nút `Claim` trong công cụ nâng cao dành cho xử lý thủ công: nó lấy tác vụ khỏi hàng đợi, nên worker thông thường sẽ không nhận lại tác vụ đó. Không cần thao tác này khi chạy campaign theo luồng worker bình thường.
 
-Recorder hiện chỉ hỗ trợ `pedestrian_crossing`, `lead_vehicle_brake`; chưa thực thi `vehicle_cut_in`, `traffic_light_override`, SUT Autopilot và kiểm tra red-light. Worker hiện gửi header Dev, chưa hỗ trợ Bearer Supabase. Các giới hạn runtime này thuộc backend/worker và không được thay đổi trong công việc frontend. Việc API lưu được cấu hình hoặc trả gói runnable chưa chứng minh mô phỏng đã thực thi. Không dùng `--simulate` để xác nhận chạy CARLA thật.
+Recorder hiện thực năm event/trigger theo schema, BehaviorAgent/Autopilot và kiểm tra red-light. Worker dùng Bearer khi có `ASX_ACCESS_TOKEN`, hoặc header Dev khi backend bật Development. Unsupported sync/time_gap_s bị từ chối rõ ràng. Việc API lưu cấu hình chưa chứng minh mô phỏng đã thực thi; bằng chứng thật của nhánh hiện tại được ghi tại `docs/week2-evidence.json`. Không dùng `--simulate` để xác nhận CARLA thật.
